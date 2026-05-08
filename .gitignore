@@ -1,0 +1,5 @@
+# Bootstrap. Real .gitignore lives on the work branch.
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+build/

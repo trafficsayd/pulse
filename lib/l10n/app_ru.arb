@@ -137,6 +137,17 @@
 
   "tapTapHint": "Коснитесь, чтобы постучать",
   "halfHeartHint": "Удерживай свою половину",
+  "sketchHint": "Рисуй вживую или отправь готовую открытку",
+  "sketchLive": "LIVE",
+  "sketchCard": "Открытка",
+  "sketchClear": "Очистить",
+  "sketchSend": "Отправить",
+  "sketchSendReady": "Рисунок готов к отправке",
+  "sketchEffectClean": "Обычная кисть",
+  "sketchEffectNeon": "Неон",
+  "sketchEffectGlow": "Свечение",
+  "sketchEffectWatercolor": "Акварель",
+  "sketchEffectSparkles": "Блёстки",
 
   "settingsTitle": "Настройки",
   "settingsLanguage": "Язык",

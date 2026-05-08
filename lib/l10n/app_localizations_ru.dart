@@ -366,6 +366,39 @@ class AppLocalizationsRu extends AppLocalizations {
   String get halfHeartHint => 'Удерживай свою половину';
 
   @override
+  String get sketchHint => 'Рисуй вживую или отправь готовую открытку';
+
+  @override
+  String get sketchLive => 'LIVE';
+
+  @override
+  String get sketchCard => 'Открытка';
+
+  @override
+  String get sketchClear => 'Очистить';
+
+  @override
+  String get sketchSend => 'Отправить';
+
+  @override
+  String get sketchSendReady => 'Рисунок готов к отправке';
+
+  @override
+  String get sketchEffectClean => 'Обычная кисть';
+
+  @override
+  String get sketchEffectNeon => 'Неон';
+
+  @override
+  String get sketchEffectGlow => 'Свечение';
+
+  @override
+  String get sketchEffectWatercolor => 'Акварель';
+
+  @override
+  String get sketchEffectSparkles => 'Блёстки';
+
+  @override
   String get settingsTitle => 'Настройки';
 
   @override

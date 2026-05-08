@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import 'mode_close_button.dart';
 
 /// "Half-Heart" — each side touches their half. While both halves are held,
 /// they pulse together as one heart. The remote partner state is simulated
@@ -96,15 +97,10 @@ class _HalfHeartModeScreenState extends State<HalfHeartModeScreen>
                 ),
               ),
             ),
-            Positioned(
+            const Positioned(
               top: 8,
               right: 8,
-              child: IconButton(
-                onPressed: () => Navigator.of(context).maybePop(),
-                icon: const Icon(Icons.close_rounded),
-                color: AppColors.textSecondary,
-                tooltip: t.hubExit,
-              ),
+              child: ModeCloseButton(),
             ),
           ],
         ),

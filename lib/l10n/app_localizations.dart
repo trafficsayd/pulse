@@ -823,6 +823,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Something went wrong'**
   String get errorGeneric;
+
+  /// No description provided for @routeNotFoundTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Page not found'**
+  String get routeNotFoundTitle;
+
+  /// No description provided for @routeNotFoundBackToHub.
+  ///
+  /// In en, this message translates to:
+  /// **'Back to hub'**
+  String get routeNotFoundBackToHub;
 }
 
 class _AppLocalizationsDelegate

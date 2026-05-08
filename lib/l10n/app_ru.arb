@@ -158,5 +158,8 @@
   "connectionStatusTitle": "Подключение",
   "connectionStatusOfflineNotice": "Приложение работает без интернета и не собирает данные",
 
-  "errorGeneric": "Что-то пошло не так"
+  "errorGeneric": "Что-то пошло не так",
+
+  "routeNotFoundTitle": "Страница не найдена",
+  "routeNotFoundBackToHub": "На главную"
 }

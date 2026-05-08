@@ -409,4 +409,10 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get errorGeneric => 'Что-то пошло не так';
+
+  @override
+  String get routeNotFoundTitle => 'Страница не найдена';
+
+  @override
+  String get routeNotFoundBackToHub => 'На главную';
 }

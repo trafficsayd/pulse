@@ -277,5 +277,10 @@
   "@connectionStatusOfflineNotice": {},
 
   "errorGeneric": "Something went wrong",
-  "@errorGeneric": {}
+  "@errorGeneric": {},
+
+  "routeNotFoundTitle": "Page not found",
+  "@routeNotFoundTitle": {},
+  "routeNotFoundBackToHub": "Back to hub",
+  "@routeNotFoundBackToHub": {}
 }

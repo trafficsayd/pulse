@@ -18,6 +18,10 @@ import '../../modes/domain/pulse_mode.dart';
 import '../../subscription/application/subscription_controller.dart';
 import '../../transport/transport.dart';
 
+const double _modeTileWidth = 84;
+const double _modeTileHeight = 104;
+const double _modeDiscSize = 64;
+
 /// Main canvas after pairing.
 ///
 /// Layout matches the design: a transport pill in the top-left, the active
@@ -53,6 +57,18 @@ class HubScreen extends ConsumerWidget {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
+                  IconButton(
+                    onPressed: () => context.go(Routes.settings),
+                    icon: const Icon(
+                      Icons.menu_rounded,
+                      color: AppColors.textSecondary,
+                    ),
+                    tooltip: t.settingsTitle,
+                  ),
+                  const Spacer(),
+                  if (activeConnection != null)
+                    _ActiveAvatar(connection: activeConnection),
+                  if (activeConnection != null) const SizedBox(width: 8),
                   GestureDetector(
                     onTap: () => context.go(Routes.connectionStatus),
                     child: TransportPill(
@@ -60,17 +76,6 @@ class HubScreen extends ConsumerWidget {
                       label: transportLabel,
                     ),
                   ),
-                  const Spacer(),
-                  if (activeConnection != null)
-                    _ActiveAvatar(connection: activeConnection)
-                  else
-                    IconButton(
-                      onPressed: () => context.go(Routes.settings),
-                      icon: const Icon(
-                        Icons.tune_rounded,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
                 ],
               ),
             ),
@@ -242,28 +247,33 @@ class _PositionedExtra extends StatelessWidget {
       offset: Offset(dx, dy),
       child: GestureDetector(
         onTap: onTap,
-        child: Container(
-          width: 64,
-          height: 64,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: AppColors.surface,
-            border: Border.all(color: AppColors.outline),
-          ),
+        child: SizedBox(
+          width: _modeTileWidth,
+          height: _modeTileHeight,
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisAlignment: MainAxisAlignment.start,
             children: [
-              const Icon(
-                Icons.more_horiz_rounded,
-                color: AppColors.textSecondary,
-                size: 22,
+              Container(
+                width: _modeDiscSize,
+                height: _modeDiscSize,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: AppColors.surface,
+                  border: Border.all(color: AppColors.outline),
+                ),
+                alignment: Alignment.center,
+                child: const Icon(
+                  Icons.more_horiz_rounded,
+                  color: AppColors.textSecondary,
+                  size: 22,
+                ),
               ),
-              const SizedBox(height: 2),
+              const SizedBox(height: 6),
               Text(
                 t.hubMore,
                 style: const TextStyle(
                   color: AppColors.textMuted,
-                  fontSize: 9,
+                  fontSize: 11,
                 ),
               ),
             ],
@@ -289,60 +299,78 @@ class _ModeDisc extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context)!;
     final color = locked ? AppColors.textMuted : descriptor.tint;
     return GestureDetector(
       onTap: onTap,
       onLongPress: onLongPress,
       child: SizedBox(
-        width: 78,
-        height: 78,
-        child: Stack(
-          alignment: Alignment.center,
+        width: _modeTileWidth,
+        height: _modeTileHeight,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.start,
           children: [
-            Container(
-              width: 64,
-              height: 64,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: color.withValues(alpha: 0.16),
-                border: Border.all(color: color, width: 1.4),
-                boxShadow: locked
-                    ? null
-                    : [
-                        BoxShadow(
-                          color: color.withValues(alpha: 0.35),
-                          blurRadius: 18,
-                        ),
-                      ],
-              ),
+            Stack(
               alignment: Alignment.center,
-              child: Text(
-                descriptor.glyph,
-                style: TextStyle(
-                  fontSize: 28,
-                  color: locked ? AppColors.textMuted : null,
-                ),
-              ),
-            ),
-            if (locked)
-              Positioned(
-                bottom: 0,
-                right: 6,
-                child: Container(
-                  width: 18,
-                  height: 18,
+              children: [
+                Container(
+                  width: _modeDiscSize,
+                  height: _modeDiscSize,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: AppColors.background,
-                    border: Border.all(color: AppColors.outline),
+                    color: color.withValues(alpha: 0.16),
+                    border: Border.all(color: color, width: 1.4),
+                    boxShadow: locked
+                        ? null
+                        : [
+                            BoxShadow(
+                              color: color.withValues(alpha: 0.35),
+                              blurRadius: 18,
+                            ),
+                          ],
                   ),
-                  child: const Icon(
-                    Icons.lock_rounded,
-                    size: 10,
-                    color: AppColors.textMuted,
+                  alignment: Alignment.center,
+                  child: Text(
+                    descriptor.glyph,
+                    style: TextStyle(
+                      fontSize: 28,
+                      color: locked ? AppColors.textMuted : null,
+                    ),
                   ),
                 ),
+                if (locked)
+                  Positioned(
+                    bottom: 0,
+                    right: 6,
+                    child: Container(
+                      width: 18,
+                      height: 18,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: AppColors.background,
+                        border: Border.all(color: AppColors.outline),
+                      ),
+                      child: const Icon(
+                        Icons.lock_rounded,
+                        size: 10,
+                        color: AppColors.textMuted,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text(
+              localizedModeTitle(descriptor, t),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: locked ? AppColors.textMuted : AppColors.textPrimary,
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
               ),
+            ),
           ],
         ),
       ),

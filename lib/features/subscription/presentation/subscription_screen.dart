@@ -38,9 +38,9 @@ class SubscriptionScreen extends ConsumerWidget {
                 fill: AppColors.surface,
                 strokeWidth: 1.5,
                 child: const Icon(
-                  Icons.lock_open_rounded,
-                  size: 56,
-                  color: AppColors.pulse,
+                  Icons.workspace_premium_rounded,
+                  size: 64,
+                  color: Color(0xFFFFD86A),
                 ),
               ),
             ),

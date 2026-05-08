@@ -9,13 +9,13 @@ ThemeData buildPulseTheme() {
   const colorScheme = ColorScheme.dark(
     brightness: Brightness.dark,
     primary: AppColors.pulse,
-    onPrimary: AppColors.textPrimary,
-    secondary: AppColors.pulse,
-    onSecondary: AppColors.textPrimary,
+    onPrimary: Colors.white,
+    secondary: AppColors.heart,
+    onSecondary: Colors.white,
     surface: AppColors.surface,
     onSurface: AppColors.textPrimary,
-    error: Color(0xFFFF6B6B),
-    onError: AppColors.textPrimary,
+    error: AppColors.danger,
+    onError: Colors.white,
   );
 
   final base = ThemeData(
@@ -38,6 +38,12 @@ ThemeData buildPulseTheme() {
       elevation: 0,
       centerTitle: true,
       foregroundColor: AppColors.textPrimary,
+      titleTextStyle: TextStyle(
+        color: AppColors.textPrimary,
+        fontSize: 17,
+        fontWeight: FontWeight.w500,
+        letterSpacing: 0.2,
+      ),
     ),
     bottomSheetTheme: const BottomSheetThemeData(
       backgroundColor: AppColors.surfaceElevated,
@@ -45,7 +51,7 @@ ThemeData buildPulseTheme() {
       modalBackgroundColor: AppColors.surfaceElevated,
       modalBarrierColor: Color(0xCC000000),
     ),
-    dividerColor: AppColors.outline,
+    dividerColor: AppColors.outlineSoft,
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
         backgroundColor: AppColors.pulse,
@@ -84,6 +90,16 @@ ThemeData buildPulseTheme() {
       backgroundColor: AppColors.surfaceElevated,
       contentTextStyle: TextStyle(color: AppColors.textPrimary),
       behavior: SnackBarBehavior.floating,
+    ),
+    switchTheme: SwitchThemeData(
+      trackColor: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.selected)) {
+          return AppColors.transportDirect;
+        }
+        return AppColors.outline;
+      }),
+      thumbColor: WidgetStateProperty.all(Colors.white),
+      trackOutlineColor: WidgetStateProperty.all(Colors.transparent),
     ),
   );
 }

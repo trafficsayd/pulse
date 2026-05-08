@@ -1,6 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../connections/application/connections_controller.dart';
+import '../../../core/storage/secure_key_store.dart';
 import '../../subscription/application/subscription_controller.dart';
 
 /// Tracks how many Sneak In signals were sent to each contact today, so the

@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 /// Thin wrapper over [FlutterSecureStorage] that pins the platform-specific
@@ -44,3 +45,13 @@ class SecureKeyStore {
 
   Future<void> deleteAll() => _storage.deleteAll();
 }
+
+/// Singleton [SecureKeyStore] consumed by every controller that needs to
+/// read or write at-rest data (connections, subscription tier, sneak-in
+/// quota counters, etc).
+///
+/// Tests can override this with `ProviderScope(overrides: [...])` to swap
+/// in an in-memory store without touching the controllers themselves.
+final secureKeyStoreProvider = Provider<SecureKeyStore>(
+  (ref) => SecureKeyStore(),
+);

@@ -1,0 +1,87 @@
+{
+  "@@locale": "ru",
+  "appTitle": "Pulse",
+
+  "pairingCreate": "Создать пару",
+  "pairingJoin": "Присоединиться",
+  "pairingShareCode": "Покажи этот шестизначный код другому устройству",
+  "pairingEnterCode": "Введи шестизначный код",
+  "pairingCancel": "Отмена",
+  "pairingNicknameHint": "Псевдоним (видно только тебе)",
+
+  "hubModesTitle": "Режимы",
+  "hubLongPressToStart": "Долгое нажатие — запустить",
+  "hubNoActiveConnection": "Нет активной связи",
+  "hubChooseSomeone": "Выбери человека в «Моих людях», чтобы начать сессию.",
+  "hubExit": "Выйти",
+
+  "transportDirect": "Прямое",
+  "transportLocal": "Локальная сеть",
+  "transportRelay": "Реле",
+  "transportSearching": "Поиск",
+
+  "peopleTitle": "Мои люди",
+  "peopleEmpty": "Пока нет сохранённых связей.",
+  "peopleAdd": "Добавить",
+  "peopleMakeActive": "Сделать активной",
+  "peopleSneakIn": "Подкрасться",
+  "peoplePermissions": "Разрешения",
+  "peopleArchive": "Архивировать",
+  "peopleDelete": "Удалить связь",
+  "peopleStatusActive": "Активна",
+  "peopleStatusPaused": "На паузе",
+  "peopleStatusArchived": "В архиве",
+
+  "permissionsTitle": "Разрешения для {nickname}",
+  "@permissionsTitle": {
+    "placeholders": {
+      "nickname": {"type": "String"}
+    }
+  },
+  "permissionsAllowSessions": "Разрешить полные сессии",
+  "permissionsAllowSneakIn": "Разрешить Sneak In",
+  "permissionsConfirmFirst": "Подтверждать первое вмешательство",
+  "permissionsBlocked": "Заблокировано",
+
+  "sneakInTitle": "Подкрасться",
+  "sneakInSwipeUp": "Свайп вверх — отправить",
+  "sneakInLimitReached": "Дневной лимит на этого человека исчерпан.",
+  "sneakInRemaining": "{count, plural, =0{Сегодня больше нельзя} =1{Осталось 1 на сегодня} few{Осталось {count} на сегодня} many{Осталось {count} на сегодня} other{Осталось {count} на сегодня}}",
+  "@sneakInRemaining": {
+    "placeholders": {
+      "count": {"type": "int", "format": "decimalPattern"}
+    }
+  },
+
+  "subscriptionTitle": "Подписка Pulse",
+  "subscriptionDescription": "Открывает все текущие и будущие режимы, безлимитный Sneak In и до 10 сохранённых связей.",
+  "subscriptionPrice": "150 ₽ / месяц",
+  "subscriptionContinueTrial": "Продолжить триал",
+  "subscriptionSubscribe": "Оформить подписку",
+  "subscriptionRestore": "Восстановить покупки",
+  "subscriptionLockedMode": "Этот режим недоступен.",
+  "subscriptionTrialDaysLeft": "{days, plural, =0{Триал заканчивается сегодня} =1{Остался 1 день триала} few{Осталось {days} дня триала} many{Осталось {days} дней триала} other{Осталось {days} дней триала}}",
+  "@subscriptionTrialDaysLeft": {
+    "placeholders": {
+      "days": {"type": "int", "format": "decimalPattern"}
+    }
+  },
+  "subscriptionTrialExpired": "Триал закончился",
+  "subscriptionConnectionLimitReached": "Достигнут лимит связей для текущего тарифа.",
+
+  "modeTapTap": "Тук-Тук",
+  "modeHalfHeart": "Половина сердца",
+  "modeCandle": "Свечка",
+  "modeWhisper": "Шёпот",
+  "modeBell": "Колокольчик",
+  "modeRay": "Лучик",
+  "modeConstellation": "Созвездие",
+
+  "tapTapHint": "Стучи в любом месте",
+  "halfHeartHint": "Удерживай свою половину",
+
+  "settingsLanguage": "Язык",
+  "settingsLanguageSystem": "Системный",
+
+  "errorGeneric": "Что-то пошло не так"
+}

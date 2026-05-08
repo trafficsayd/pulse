@@ -1,0 +1,148 @@
+{
+  "@@locale": "en",
+  "appTitle": "Pulse",
+  "@appTitle": {
+    "description": "App display name."
+  },
+
+  "pairingCreate": "Create pair",
+  "@pairingCreate": {
+    "description": "Button on pairing screen to start a new pair."
+  },
+  "pairingJoin": "Join pair",
+  "@pairingJoin": {
+    "description": "Button on pairing screen to join an existing pair via code."
+  },
+  "pairingShareCode": "Share this 6-digit code with the other device",
+  "@pairingShareCode": {},
+  "pairingEnterCode": "Enter the 6-digit code",
+  "@pairingEnterCode": {},
+  "pairingCancel": "Cancel",
+  "@pairingCancel": {},
+  "pairingNicknameHint": "Local nickname (only visible to you)",
+  "@pairingNicknameHint": {},
+
+  "hubModesTitle": "Modes",
+  "@hubModesTitle": {},
+  "hubLongPressToStart": "Long-press a mode to start",
+  "@hubLongPressToStart": {},
+  "hubNoActiveConnection": "No active connection",
+  "@hubNoActiveConnection": {},
+  "hubChooseSomeone": "Pick someone in My People to start a session.",
+  "@hubChooseSomeone": {},
+  "hubExit": "Exit",
+  "@hubExit": {},
+
+  "transportDirect": "Direct",
+  "@transportDirect": {},
+  "transportLocal": "Local network",
+  "@transportLocal": {},
+  "transportRelay": "Relay",
+  "@transportRelay": {},
+  "transportSearching": "Searching",
+  "@transportSearching": {},
+
+  "peopleTitle": "My People",
+  "@peopleTitle": {},
+  "peopleEmpty": "No saved connections yet.",
+  "@peopleEmpty": {},
+  "peopleAdd": "Add person",
+  "@peopleAdd": {},
+  "peopleMakeActive": "Make active",
+  "@peopleMakeActive": {},
+  "peopleSneakIn": "Sneak in",
+  "@peopleSneakIn": {},
+  "peoplePermissions": "Permissions",
+  "@peoplePermissions": {},
+  "peopleArchive": "Archive",
+  "@peopleArchive": {},
+  "peopleDelete": "Delete connection",
+  "@peopleDelete": {},
+  "peopleStatusActive": "Active",
+  "@peopleStatusActive": {},
+  "peopleStatusPaused": "Paused",
+  "@peopleStatusPaused": {},
+  "peopleStatusArchived": "Archived",
+  "@peopleStatusArchived": {},
+
+  "permissionsTitle": "Permissions for {nickname}",
+  "@permissionsTitle": {
+    "placeholders": {
+      "nickname": {"type": "String"}
+    }
+  },
+  "permissionsAllowSessions": "Allow full sessions",
+  "@permissionsAllowSessions": {},
+  "permissionsAllowSneakIn": "Allow Sneak In",
+  "@permissionsAllowSneakIn": {},
+  "permissionsConfirmFirst": "Confirm first sneak in",
+  "@permissionsConfirmFirst": {},
+  "permissionsBlocked": "Blocked",
+  "@permissionsBlocked": {},
+
+  "sneakInTitle": "Sneak in",
+  "@sneakInTitle": {},
+  "sneakInSwipeUp": "Swipe up to send",
+  "@sneakInSwipeUp": {},
+  "sneakInLimitReached": "You've reached today's limit for this person.",
+  "@sneakInLimitReached": {},
+  "sneakInRemaining": "{count, plural, =0{No sneak ins left today} =1{1 sneak in left today} other{{count} sneak ins left today}}",
+  "@sneakInRemaining": {
+    "placeholders": {
+      "count": {"type": "int", "format": "decimalPattern"}
+    }
+  },
+
+  "subscriptionTitle": "Pulse Subscription",
+  "@subscriptionTitle": {},
+  "subscriptionDescription": "Unlock all current and future modes, unlimited Sneak In, up to 10 saved connections.",
+  "@subscriptionDescription": {},
+  "subscriptionPrice": "150 ₽ / month",
+  "@subscriptionPrice": {},
+  "subscriptionContinueTrial": "Continue trial",
+  "@subscriptionContinueTrial": {},
+  "subscriptionSubscribe": "Subscribe",
+  "@subscriptionSubscribe": {},
+  "subscriptionRestore": "Restore purchases",
+  "@subscriptionRestore": {},
+  "subscriptionLockedMode": "This mode is locked.",
+  "@subscriptionLockedMode": {},
+  "subscriptionTrialDaysLeft": "{days, plural, =0{Trial ends today} =1{1 day of trial left} other{{days} days of trial left}}",
+  "@subscriptionTrialDaysLeft": {
+    "placeholders": {
+      "days": {"type": "int", "format": "decimalPattern"}
+    }
+  },
+  "subscriptionTrialExpired": "Trial expired",
+  "@subscriptionTrialExpired": {},
+  "subscriptionConnectionLimitReached": "You've reached the connection limit for your tier.",
+  "@subscriptionConnectionLimitReached": {},
+
+  "modeTapTap": "Knock-Knock",
+  "@modeTapTap": {},
+  "modeHalfHeart": "Half-Heart",
+  "@modeHalfHeart": {},
+  "modeCandle": "Candle",
+  "@modeCandle": {},
+  "modeWhisper": "Whisper",
+  "@modeWhisper": {},
+  "modeBell": "Bell",
+  "@modeBell": {},
+  "modeRay": "Ray",
+  "@modeRay": {},
+  "modeConstellation": "Constellation",
+  "@modeConstellation": {},
+
+  "tapTapHint": "Tap anywhere",
+  "@tapTapHint": {},
+  "halfHeartHint": "Hold the half on your side",
+  "@halfHeartHint": {},
+
+  "settingsLanguage": "Language",
+  "@settingsLanguage": {},
+  "settingsLanguageSystem": "System default",
+  "@settingsLanguageSystem": {},
+
+  "errorGeneric": "Something went wrong",
+  "@errorGeneric": {}
+}

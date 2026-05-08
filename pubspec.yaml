@@ -28,6 +28,9 @@ dependencies:
   # Secure storage abstraction (iOS Keychain / Android EncryptedSharedPreferences)
   flutter_secure_storage: ^9.2.2
 
+  # QR rendering for the pairing screen
+  qr_flutter: ^4.1.0
+
   # Utilities
   collection: ^1.18.0
   uuid: ^4.5.1

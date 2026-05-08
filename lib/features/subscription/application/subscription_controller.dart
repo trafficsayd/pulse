@@ -1,6 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../connections/application/connections_controller.dart';
+import '../../../core/storage/secure_key_store.dart';
 import '../../modes/domain/pulse_mode.dart';
 import '../domain/entitlements.dart';
 

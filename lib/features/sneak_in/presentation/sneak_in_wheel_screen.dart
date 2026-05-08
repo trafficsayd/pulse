@@ -2,123 +2,237 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:pulse/l10n/app_localizations.dart';
 
+import '../../../core/routing/routes.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/bottom_nav_shell.dart';
+import '../../../core/widgets/connection_avatar.dart';
 import '../../connections/application/connections_controller.dart';
 import '../../connections/domain/connection.dart';
+import '../../connections/domain/connection_status.dart';
 import '../application/sneak_in_controller.dart';
-import 'sneak_signal_catalogue.dart';
 
-/// Sneak In wheel — pick one of N short sounds, swipe up to send to a paused
-/// partner.
-///
-/// The actual transmission lives in the transport layer; this screen is
-/// only responsible for picking a signal and respecting the per-day quota
-/// enforced by [SneakInController].
+/// 8-emoji selector wheel. Tap to highlight a sound, swipe up (or tap the
+/// glowing center disc) to send it to the active partner.
 class SneakInWheelScreen extends ConsumerStatefulWidget {
   const SneakInWheelScreen({super.key});
 
   @override
-  ConsumerState<SneakInWheelScreen> createState() => _SneakInWheelScreenState();
+  ConsumerState<SneakInWheelScreen> createState() =>
+      _SneakInWheelScreenState();
 }
 
 class _SneakInWheelScreenState extends ConsumerState<SneakInWheelScreen> {
   int _selected = 0;
+
+  static const List<_SneakEmoji> _emojis = [
+    _SneakEmoji('🤭', 'sneakSignalHiccup'),
+    _SneakEmoji('💨', 'sneakSignalToot'),
+    _SneakEmoji('🔔', 'sneakSignalBell'),
+    _SneakEmoji('👻', 'sneakSignalKnock'),
+    _SneakEmoji('🤫', 'sneakSignalWhisper'),
+    _SneakEmoji('👏', 'sneakSignalClap'),
+    _SneakEmoji('💥', 'sneakSignalBoom'),
+    _SneakEmoji('🐭', 'sneakSignalSqueak'),
+  ];
 
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context)!;
     final state = ref.watch(connectionsControllerProvider);
     final pausedTargets = state.connections
-        .where((c) => c.permissions.allowSneakIn)
+        .where((c) =>
+            c.permissions.allowSneakIn &&
+            c.status != ConnectionStatus.archived)
         .toList(growable: false);
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(title: Text(t.sneakInTitle)),
+    return BottomNavShell(
+      current: BottomNavTab.sneakIn,
       body: SafeArea(
+        bottom: false,
         child: Column(
           children: [
-            Expanded(
-              child: Center(
-                child: _SignalWheel(
-                  selectedIndex: _selected,
-                  onSelect: (i) => setState(() => _selected = i),
+            const SizedBox(height: 8),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Text(
+                t.sneakInTitle,
+                style: const TextStyle(
+                  color: AppColors.textPrimary,
+                  fontSize: 26,
+                  fontWeight: FontWeight.w400,
                 ),
               ),
             ),
-            const _SwipeUpAffordance(),
-            const SizedBox(height: 8),
+            const SizedBox(height: 4),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: _Targets(
-                targets: pausedTargets,
-                selectedSignalIndex: _selected,
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Text(
+                t.sneakInChooseSound,
+                style: const TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 13,
+                ),
               ),
             ),
-            const SizedBox(height: 16),
+            Expanded(
+              child: Center(
+                child: _Wheel(
+                  emojis: _emojis,
+                  selectedIndex: _selected,
+                  onSelect: (i) {
+                    setState(() => _selected = i);
+                    HapticFeedback.selectionClick();
+                  },
+                  onCenterTap: () => _send(pausedTargets),
+                ),
+              ),
+            ),
+            Text(
+              t.sneakInSwipeUp,
+              style: const TextStyle(
+                color: AppColors.textMuted,
+                fontSize: 12,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: _Targets(targets: pausedTargets),
+            ),
+            const SizedBox(height: 20),
           ],
         ),
       ),
     );
   }
+
+  Future<void> _send(List<Connection> targets) async {
+    if (targets.isEmpty) return;
+    final t = AppLocalizations.of(context)!;
+    final target = targets.first;
+    final ok = await ref
+        .read(sneakInControllerProvider.notifier)
+        .tryRecordSneakIn(target.id);
+    if (!ok) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(t.sneakInLimitReached)),
+      );
+      return;
+    }
+    HapticFeedback.mediumImpact();
+    if (!mounted) return;
+    context.go(
+      '${Routes.sneakInIncoming}?connectionId=${target.id}',
+    );
+  }
 }
 
-class _SignalWheel extends StatelessWidget {
-  const _SignalWheel({required this.selectedIndex, required this.onSelect});
+class _SneakEmoji {
+  const _SneakEmoji(this.emoji, this.titleKey);
+  final String emoji;
+  final String titleKey;
+}
 
+class _Wheel extends StatelessWidget {
+  const _Wheel({
+    required this.emojis,
+    required this.selectedIndex,
+    required this.onSelect,
+    required this.onCenterTap,
+  });
+
+  final List<_SneakEmoji> emojis;
   final int selectedIndex;
-  final void Function(int) onSelect;
+  final ValueChanged<int> onSelect;
+  final VoidCallback onCenterTap;
 
   @override
   Widget build(BuildContext context) {
-    const radius = 120.0;
-    const signals = kSneakSignals;
-    return SizedBox(
-      width: radius * 2 + 80,
-      height: radius * 2 + 80,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          Container(
-            width: radius * 2,
-            height: radius * 2,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(color: AppColors.outline),
+    return GestureDetector(
+      onVerticalDragEnd: (d) {
+        if ((d.primaryVelocity ?? 0) < -200) onCenterTap();
+      },
+      child: SizedBox(
+        width: 320,
+        height: 320,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Container(
+              width: 280,
+              height: 280,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: AppColors.outline),
+              ),
             ),
-          ),
-          for (var i = 0; i < signals.length; i++)
-            _wheelTile(
-              index: i,
-              total: signals.length,
-              radius: radius,
-              selected: i == selectedIndex,
-              icon: signals[i].icon,
-              onTap: () => onSelect(i),
+            Container(
+              width: 200,
+              height: 200,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: AppColors.outlineSoft),
+              ),
             ),
-        ],
+            for (var i = 0; i < emojis.length; i++)
+              _emojiTile(
+                context,
+                index: i,
+                total: emojis.length,
+                radius: 120,
+              ),
+            GestureDetector(
+              onTap: onCenterTap,
+              child: Container(
+                width: 84,
+                height: 84,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: const LinearGradient(
+                    colors: [AppColors.pulse, AppColors.heart],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.pulse.withValues(alpha: 0.5),
+                      blurRadius: 32,
+                      spreadRadius: 4,
+                    ),
+                  ],
+                ),
+                child: const Icon(
+                  Icons.send_rounded,
+                  color: Colors.white,
+                  size: 28,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _wheelTile({
+  Widget _emojiTile(
+    BuildContext context, {
     required int index,
     required int total,
     required double radius,
-    required bool selected,
-    required IconData icon,
-    required VoidCallback onTap,
   }) {
     final angle = (index / total) * 2 * math.pi - math.pi / 2;
-    final x = math.cos(angle) * radius;
-    final y = math.sin(angle) * radius;
+    final dx = math.cos(angle) * radius;
+    final dy = math.sin(angle) * radius;
+    final selected = index == selectedIndex;
     return Transform.translate(
-      offset: Offset(x, y),
+      offset: Offset(dx, dy),
       child: GestureDetector(
-        onTap: onTap,
+        onTap: () => onSelect(index),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 180),
           width: 56,
@@ -133,9 +247,10 @@ class _SignalWheel extends StatelessWidget {
               width: selected ? 2 : 1,
             ),
           ),
-          child: Icon(
-            icon,
-            color: selected ? AppColors.pulse : AppColors.textSecondary,
+          alignment: Alignment.center,
+          child: Text(
+            emojis[index].emoji,
+            style: const TextStyle(fontSize: 26),
           ),
         ),
       ),
@@ -143,30 +258,10 @@ class _SignalWheel extends StatelessWidget {
   }
 }
 
-class _SwipeUpAffordance extends StatelessWidget {
-  const _SwipeUpAffordance();
-
-  @override
-  Widget build(BuildContext context) {
-    final t = AppLocalizations.of(context)!;
-    return Column(
-      children: [
-        const Icon(Icons.keyboard_arrow_up_rounded, color: AppColors.textMuted),
-        const SizedBox(height: 4),
-        Text(
-          t.sneakInSwipeUp,
-          style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
-        ),
-      ],
-    );
-  }
-}
-
 class _Targets extends ConsumerWidget {
-  const _Targets({required this.targets, required this.selectedSignalIndex});
+  const _Targets({required this.targets});
 
   final List<Connection> targets;
-  final int selectedSignalIndex;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -176,38 +271,9 @@ class _Targets extends ConsumerWidget {
       runSpacing: 8,
       alignment: WrapAlignment.center,
       children: [
-        for (final c in targets)
-          GestureDetector(
-            onVerticalDragEnd: (details) {
-              if ((details.primaryVelocity ?? 0) < -200) {
-                _send(context, ref, c);
-              }
-            },
-            onTap: () => _send(context, ref, c),
-            child: _TargetChip(connection: c),
-          ),
+        for (final c in targets) _TargetChip(connection: c),
       ],
     );
-  }
-
-  Future<void> _send(
-    BuildContext context,
-    WidgetRef ref,
-    Connection target,
-  ) async {
-    final ok = await ref
-        .read(sneakInControllerProvider.notifier)
-        .tryRecordSneakIn(target.id);
-    if (!ok) {
-      if (!context.mounted) return;
-      final t = AppLocalizations.of(context)!;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(t.sneakInLimitReached)),
-      );
-      return;
-    }
-    HapticFeedback.mediumImpact();
-    // TODO(transport): publish a sneak_signal packet via TransportManager.
   }
 }
 
@@ -219,30 +285,40 @@ class _TargetChip extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = AppLocalizations.of(context)!;
-    final remaining =
-        ref.watch(sneakInControllerProvider.notifier).remaining(connection.id);
-    final color = AppColors.avatarPalette[
-        connection.colorIndex % AppColors.avatarPalette.length];
+    final remaining = ref
+        .watch(sneakInControllerProvider.notifier)
+        .remaining(connection.id);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color),
+        border: Border.all(color: AppColors.outline),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(connection.emoji),
-          const SizedBox(width: 6),
+          ConnectionAvatar(
+            emoji: connection.emoji,
+            colorIndex: connection.colorIndex,
+            size: 22,
+            showRing: false,
+          ),
+          const SizedBox(width: 8),
           Text(
             connection.nickname,
-            style: const TextStyle(color: AppColors.textPrimary),
+            style: const TextStyle(
+              color: AppColors.textPrimary,
+              fontSize: 13,
+            ),
           ),
           const SizedBox(width: 6),
           Text(
             t.sneakInRemaining(remaining),
-            style: const TextStyle(color: AppColors.textMuted, fontSize: 11),
+            style: const TextStyle(
+              color: AppColors.textMuted,
+              fontSize: 11,
+            ),
           ),
         ],
       ),

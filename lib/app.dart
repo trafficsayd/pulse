@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_gen/gen_l10n/app_localizations.dart';
+import 'package:pulse/l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'core/locale/locale_controller.dart';
 import 'core/routing/app_router.dart';
 import 'core/theme/app_theme.dart';
 
@@ -23,12 +24,15 @@ class _PulseAppState extends ConsumerState<PulseApp> {
 
   @override
   Widget build(BuildContext context) {
+    final locale = ref.watch(localeControllerProvider);
     return MaterialApp.router(
-      onGenerateTitle: (context) => AppLocalizations.of(context)?.appTitle ?? 'Pulse',
+      onGenerateTitle: (context) =>
+          AppLocalizations.of(context)?.appTitle ?? 'Pulse',
       theme: buildPulseTheme(),
       darkTheme: buildPulseTheme(),
       themeMode: ThemeMode.dark,
       debugShowCheckedModeBanner: false,
+      locale: locale,
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       routerConfig: _router,

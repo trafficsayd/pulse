@@ -1,60 +1,148 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
-import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:pulse/l10n/app_localizations.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 
+import '../../../core/locale/locale_controller.dart';
 import '../../../core/routing/routes.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../connections/application/connections_controller.dart';
+import '../../../core/widgets/glow_ring.dart';
+import '../../../core/widgets/gradient_button.dart';
 
 /// First-launch screen: create a new pair (host) or join one (guest).
 ///
-/// In production this orchestrates the Curve25519 ECDH exchange behind a
-/// 6-digit short code. For the foundation PR we only wire up the UI flow
-/// and persist a stub Connection so the rest of the app can be exercised.
-class PairingScreen extends ConsumerWidget {
+/// Visual layout matches the design mockup: a violet QR card framed by a
+/// soft halo, the 6-digit short code in monospace below it, and the
+/// language switcher pill (RU / EN) tucked into the top-right corner.
+class PairingScreen extends ConsumerStatefulWidget {
   const PairingScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<PairingScreen> createState() => _PairingScreenState();
+}
+
+class _PairingScreenState extends ConsumerState<PairingScreen> {
+  late final String _shortCode = _generateShortCode();
+  late final String _qrPayload = 'pulse://pair?code=$_shortCode';
+
+  static String _generateShortCode() {
+    final r = math.Random();
+    final code = r.nextInt(1000000).toString().padLeft(6, '0');
+    return code;
+  }
+
+  String get _formattedCode {
+    return '${_shortCode.substring(0, 3)} ${_shortCode.substring(3)}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final t = AppLocalizations.of(context)!;
 
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.symmetric(horizontal: 24),
           child: Column(
             children: [
-              const SizedBox(height: 40),
-              const _PulseGlyph(),
-              const SizedBox(height: 24),
-              Text(
-                t.appTitle,
-                style: const TextStyle(
-                  fontSize: 32,
-                  fontWeight: FontWeight.w300,
-                  letterSpacing: 4,
-                  color: AppColors.textPrimary,
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  const Spacer(),
+                  const _LanguageSwitcher(),
+                ],
+              ),
+              Expanded(
+                child: SingleChildScrollView(
+                  child: Column(
+                    children: [
+                      const SizedBox(height: 24),
+                      Text(
+                        t.appTitle.toUpperCase(),
+                        style: const TextStyle(
+                          color: AppColors.textPrimary,
+                          fontSize: 22,
+                          fontWeight: FontWeight.w300,
+                          letterSpacing: 8,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        t.pairingTitle,
+                        style: const TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 15,
+                        ),
+                      ),
+                      const SizedBox(height: 32),
+                      GlowRing(
+                        size: 240,
+                        color: AppColors.pulse,
+                        fill: AppColors.surface,
+                        strokeWidth: 1.5,
+                        blurRadius: 48,
+                        child: Padding(
+                          padding: const EdgeInsets.all(24),
+                          child: QrImageView(
+                            data: _qrPayload,
+                            backgroundColor: Colors.transparent,
+                            eyeStyle: const QrEyeStyle(
+                              eyeShape: QrEyeShape.square,
+                              color: AppColors.pulse,
+                            ),
+                            dataModuleStyle: const QrDataModuleStyle(
+                              dataModuleShape: QrDataModuleShape.square,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 28),
+                      Text(
+                        _formattedCode,
+                        style: const TextStyle(
+                          color: AppColors.textPrimary,
+                          fontSize: 32,
+                          fontWeight: FontWeight.w400,
+                          letterSpacing: 8,
+                          fontFamily: 'monospace',
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        t.pairingShareCode,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 13,
+                          height: 1.4,
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                    ],
+                  ),
                 ),
               ),
-              const Spacer(),
               SizedBox(
                 width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () => _onCreatePair(context, ref),
-                  child: Text(t.pairingCreate),
+                child: GradientButton(
+                  onPressed: () => _onCreatePair(context),
+                  label: t.pairingCreate,
                 ),
               ),
               const SizedBox(height: 12),
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton(
-                  onPressed: () => _onJoinPair(context, ref),
+                  onPressed: () => _onJoinPair(context),
                   child: Text(t.pairingJoin),
                 ),
               ),
-              const SizedBox(height: 40),
+              const SizedBox(height: 24),
             ],
           ),
         ),
@@ -62,90 +150,182 @@ class PairingScreen extends ConsumerWidget {
     );
   }
 
-  Future<void> _onCreatePair(BuildContext context, WidgetRef ref) async {
-    // TODO(pairing): generate Curve25519 keypair, derive 6-digit code, show
-    // it via a sheet, await partner's acknowledgement, persist via PairKeys.
-    await ref.read(connectionsControllerProvider.notifier).createStubConnection(
-          nickname: 'Demo',
-        );
-    if (context.mounted) context.go(Routes.hub);
+  void _onCreatePair(BuildContext context) {
+    context.go(Routes.connecting);
   }
 
-  Future<void> _onJoinPair(BuildContext context, WidgetRef ref) async {
-    // TODO(pairing): show 6-digit numeric input, complete ECDH on submit.
-    await ref.read(connectionsControllerProvider.notifier).createStubConnection(
-          nickname: 'Demo',
-        );
-    if (context.mounted) context.go(Routes.hub);
+  void _onJoinPair(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: AppColors.surfaceElevated,
+      isScrollControlled: true,
+      builder: (sheetContext) {
+        return const _JoinByCodeSheet();
+      },
+    );
   }
 }
 
-class _PulseGlyph extends StatefulWidget {
-  const _PulseGlyph();
+class _LanguageSwitcher extends ConsumerWidget {
+  const _LanguageSwitcher();
 
   @override
-  State<_PulseGlyph> createState() => _PulseGlyphState();
+  Widget build(BuildContext context, WidgetRef ref) {
+    final current = ref.watch(localeControllerProvider);
+    final code = current?.languageCode ?? 'ru';
+    final isRu = code == 'ru';
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.outline),
+      ),
+      padding: const EdgeInsets.all(2),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _LangPill(
+            label: 'RU',
+            active: isRu,
+            onTap: () => ref
+                .read(localeControllerProvider.notifier)
+                .setLocale(const Locale('ru')),
+          ),
+          _LangPill(
+            label: 'EN',
+            active: !isRu,
+            onTap: () => ref
+                .read(localeControllerProvider.notifier)
+                .setLocale(const Locale('en')),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
-class _PulseGlyphState extends State<_PulseGlyph>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _c;
+class _LangPill extends StatelessWidget {
+  const _LangPill({
+    required this.label,
+    required this.active,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool active;
+  final VoidCallback onTap;
 
   @override
-  void initState() {
-    super.initState();
-    _c = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1800),
-    )..repeat();
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        decoration: BoxDecoration(
+          color: active ? AppColors.pulse : Colors.transparent,
+          borderRadius: BorderRadius.circular(18),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: active ? Colors.white : AppColors.textSecondary,
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 1,
+          ),
+        ),
+      ),
+    );
   }
+}
+
+class _JoinByCodeSheet extends StatefulWidget {
+  const _JoinByCodeSheet();
+
+  @override
+  State<_JoinByCodeSheet> createState() => _JoinByCodeSheetState();
+}
+
+class _JoinByCodeSheetState extends State<_JoinByCodeSheet> {
+  final _controller = TextEditingController();
 
   @override
   void dispose() {
-    _c.dispose();
+    _controller.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _c,
-      builder: (context, _) {
-        final phase = _c.value;
-        return SizedBox(
-          width: 160,
-          height: 160,
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              for (final delay in const [0.0, 0.33, 0.66])
-                Transform.scale(
-                  scale: 0.4 + ((phase + delay) % 1.0) * 1.4,
-                  child: Opacity(
-                    opacity: (1 - ((phase + delay) % 1.0)).clamp(0.0, 1.0),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(color: AppColors.pulse, width: 1.4),
-                      ),
-                    ),
-                  ),
-                ),
-              Container(
-                width: 24,
-                height: 24,
-                decoration: const BoxDecoration(
-                  color: AppColors.pulse,
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(color: AppColors.pulseGlow, blurRadius: 24),
-                  ],
-                ),
-              ),
-            ],
+    final t = AppLocalizations.of(context)!;
+    final inset = MediaQuery.of(context).viewInsets.bottom;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(24, 16, 24, 24 + inset),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: AppColors.outline,
+              borderRadius: BorderRadius.circular(2),
+            ),
           ),
-        );
-      },
+          const SizedBox(height: 16),
+          Text(
+            t.pairingEnterCode,
+            style: const TextStyle(
+              color: AppColors.textPrimary,
+              fontSize: 18,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _controller,
+            keyboardType: TextInputType.number,
+            maxLength: 6,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: AppColors.textPrimary,
+              fontSize: 28,
+              letterSpacing: 8,
+              fontFamily: 'monospace',
+            ),
+            decoration: InputDecoration(
+              counterText: '',
+              filled: true,
+              fillColor: AppColors.surface,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: const BorderSide(color: AppColors.outline),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: const BorderSide(color: AppColors.pulse),
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+          SizedBox(
+            width: double.infinity,
+            child: GradientButton(
+              label: t.pairingJoin,
+              onPressed: () {
+                Navigator.of(context).pop();
+                context.go(Routes.connecting);
+              },
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text(t.pairingCancel),
+          ),
+        ],
+      ),
     );
   }
 }

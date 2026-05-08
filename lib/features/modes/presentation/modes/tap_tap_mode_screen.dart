@@ -2,16 +2,15 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_gen/gen_l10n/app_localizations.dart';
+import 'package:pulse/l10n/app_localizations.dart';
 
 import '../../../../core/theme/app_colors.dart';
 
-/// "Tap-Tap" — the simplest starter mode.
+/// "Tap-Tap" — concentric pulse rings on a near-black canvas.
 ///
-/// Each tap on this screen sends a single beat to the partner; a beat
-/// inbound from the partner blooms a soft ring at a random position with a
-/// short haptic pulse. The runner injects the inbound stream; for now we
-/// simulate it locally so the screen is usable in isolation.
+/// Each tap drops a soft ring at the touch point that expands and fades
+/// out. A continuous central pair of rings keeps the screen alive even
+/// when nobody is tapping, mirroring the "Тук-Тук" tile on the design.
 class TapTapModeScreen extends StatefulWidget {
   const TapTapModeScreen({super.key});
 
@@ -21,8 +20,18 @@ class TapTapModeScreen extends StatefulWidget {
 
 class _TapTapModeScreenState extends State<TapTapModeScreen>
     with TickerProviderStateMixin {
+  late final AnimationController _ambient;
   final List<_Ring> _rings = [];
   final _rng = math.Random();
+
+  @override
+  void initState() {
+    super.initState();
+    _ambient = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 3),
+    )..repeat();
+  }
 
   void _addRing(Offset position, {required bool isLocal}) {
     final controller = AnimationController(
@@ -46,8 +55,6 @@ class _TapTapModeScreenState extends State<TapTapModeScreen>
     _addRing(details.localPosition, isLocal: true);
     HapticFeedback.lightImpact();
 
-    // Locally simulate the partner answering for development.
-    // The mode runner replaces this once the real transport is wired up.
     Future.delayed(const Duration(milliseconds: 320), () {
       if (!mounted) return;
       _addRing(
@@ -63,6 +70,7 @@ class _TapTapModeScreenState extends State<TapTapModeScreen>
 
   @override
   void dispose() {
+    _ambient.dispose();
     for (final r in _rings) {
       r.controller.dispose();
     }
@@ -77,8 +85,24 @@ class _TapTapModeScreenState extends State<TapTapModeScreen>
       body: LayoutBuilder(
         builder: (context, constraints) {
           final size = Size(constraints.maxWidth, constraints.maxHeight);
+          final center = Offset(size.width / 2, size.height / 2);
           return Stack(
             children: [
+              // Ambient concentric rings around the center, perpetually
+              // breathing so the screen feels alive between taps.
+              Positioned.fill(
+                child: AnimatedBuilder(
+                  animation: _ambient,
+                  builder: (context, _) {
+                    return CustomPaint(
+                      painter: _AmbientRingsPainter(
+                        center: center,
+                        progress: _ambient.value,
+                      ),
+                    );
+                  },
+                ),
+              ),
               Positioned.fill(
                 child: GestureDetector(
                   behavior: HitTestBehavior.opaque,
@@ -107,7 +131,7 @@ class _TapTapModeScreenState extends State<TapTapModeScreen>
                               border: Border.all(
                                 color: ring.isLocal
                                     ? AppColors.pulse
-                                    : AppColors.transportLocal,
+                                    : AppColors.heart,
                                 width: 2,
                               ),
                             ),
@@ -149,6 +173,31 @@ class _TapTapModeScreenState extends State<TapTapModeScreen>
       ),
     );
   }
+}
+
+class _AmbientRingsPainter extends CustomPainter {
+  _AmbientRingsPainter({required this.center, required this.progress});
+
+  final Offset center;
+  final double progress;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.4;
+    for (var i = 0; i < 4; i++) {
+      final t = ((progress + i / 4) % 1.0);
+      final radius = 60 + t * 220;
+      final alpha = (1 - t).clamp(0.0, 1.0) * 0.4;
+      paint.color = AppColors.pulse.withValues(alpha: alpha);
+      canvas.drawCircle(center, radius, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_AmbientRingsPainter old) =>
+      old.progress != progress || old.center != center;
 }
 
 class _Ring {

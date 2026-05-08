@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import 'mode_close_button.dart';
 
 /// "Tap-Tap" — the simplest starter mode.
 ///
@@ -131,17 +132,10 @@ class _TapTapModeScreenState extends State<TapTapModeScreen>
                   ),
                 ),
               ),
-              Positioned(
+              const Positioned(
                 top: 16,
                 right: 16,
-                child: SafeArea(
-                  child: IconButton(
-                    onPressed: () => Navigator.of(context).maybePop(),
-                    icon: const Icon(Icons.close_rounded),
-                    color: AppColors.textSecondary,
-                    tooltip: t.hubExit,
-                  ),
-                ),
+                child: SafeArea(child: ModeCloseButton()),
               ),
             ],
           );

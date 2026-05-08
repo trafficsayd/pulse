@@ -205,10 +205,12 @@ class _ModeCarouselState extends ConsumerState<_ModeCarousel> {
         .read(subscriptionControllerProvider.notifier)
         .isModeUnlocked(descriptor.id);
     if (!unlocked) {
-      context.go(Routes.subscription);
+      context.push(Routes.subscription);
       return;
     }
-    context.go(Routes.modePath(descriptor.id.name));
+    // push() — not go() — so the mode screen's close X can pop back to /hub
+    // instead of getting stuck.
+    context.push(Routes.modePath(descriptor.id.name));
   }
 
   @override

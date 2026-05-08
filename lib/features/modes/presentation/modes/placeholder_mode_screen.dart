@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../../core/routing/routes.dart';
 import '../../../../core/theme/app_colors.dart';
 
 /// Generic placeholder for modes that have a registered descriptor but no
@@ -37,7 +39,13 @@ class PlaceholderModeScreen extends StatelessWidget {
               ),
               const SizedBox(height: 32),
               OutlinedButton(
-                onPressed: () => Navigator.of(context).maybePop(),
+                onPressed: () {
+                  if (context.canPop()) {
+                    context.pop();
+                  } else {
+                    context.go(Routes.hub);
+                  }
+                },
                 child: Text(t.hubExit),
               ),
             ],

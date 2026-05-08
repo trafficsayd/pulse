@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:pulse/l10n/app_localizations.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../../../../l10n/app_localizations.dart';
 
 /// Generic placeholder for modes that have a registered descriptor but no
 /// implementation yet. Used so the carousel can show all modes without
@@ -55,6 +55,14 @@ class PlaceholderModeScreen extends StatelessWidget {
         'modeBell' => t.modeBell,
         'modeRay' => t.modeRay,
         'modeConstellation' => t.modeConstellation,
+        'modeGoosebumps' => t.modeGoosebumps,
+        'modeThread' => t.modeThread,
+        'modeThunder' => t.modeThunder,
+        'modeFireworks' => t.modeFireworks,
+        'modeBalance' => t.modeBalance,
+        'modeSandbox' => t.modeSandbox,
+        'modeBreath' => t.modeBreath,
+        'modeSync' => t.modeSync,
         _ => key,
       };
 }

@@ -740,6 +740,72 @@ abstract class AppLocalizations {
   /// **'Hold the half on your side'**
   String get halfHeartHint;
 
+  /// No description provided for @sketchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Draw live or send a finished card'**
+  String get sketchHint;
+
+  /// No description provided for @sketchLive.
+  ///
+  /// In en, this message translates to:
+  /// **'LIVE'**
+  String get sketchLive;
+
+  /// No description provided for @sketchCard.
+  ///
+  /// In en, this message translates to:
+  /// **'Card'**
+  String get sketchCard;
+
+  /// No description provided for @sketchClear.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear'**
+  String get sketchClear;
+
+  /// No description provided for @sketchSend.
+  ///
+  /// In en, this message translates to:
+  /// **'Send'**
+  String get sketchSend;
+
+  /// No description provided for @sketchSendReady.
+  ///
+  /// In en, this message translates to:
+  /// **'Sketch prepared for sending'**
+  String get sketchSendReady;
+
+  /// No description provided for @sketchEffectClean.
+  ///
+  /// In en, this message translates to:
+  /// **'Clean brush'**
+  String get sketchEffectClean;
+
+  /// No description provided for @sketchEffectNeon.
+  ///
+  /// In en, this message translates to:
+  /// **'Neon'**
+  String get sketchEffectNeon;
+
+  /// No description provided for @sketchEffectGlow.
+  ///
+  /// In en, this message translates to:
+  /// **'Glow'**
+  String get sketchEffectGlow;
+
+  /// No description provided for @sketchEffectWatercolor.
+  ///
+  /// In en, this message translates to:
+  /// **'Watercolor'**
+  String get sketchEffectWatercolor;
+
+  /// No description provided for @sketchEffectSparkles.
+  ///
+  /// In en, this message translates to:
+  /// **'Sparkles'**
+  String get sketchEffectSparkles;
+
   /// No description provided for @settingsTitle.
   ///
   /// In en, this message translates to:

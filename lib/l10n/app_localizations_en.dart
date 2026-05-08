@@ -362,6 +362,39 @@ class AppLocalizationsEn extends AppLocalizations {
   String get halfHeartHint => 'Hold the half on your side';
 
   @override
+  String get sketchHint => 'Draw live or send a finished card';
+
+  @override
+  String get sketchLive => 'LIVE';
+
+  @override
+  String get sketchCard => 'Card';
+
+  @override
+  String get sketchClear => 'Clear';
+
+  @override
+  String get sketchSend => 'Send';
+
+  @override
+  String get sketchSendReady => 'Sketch prepared for sending';
+
+  @override
+  String get sketchEffectClean => 'Clean brush';
+
+  @override
+  String get sketchEffectNeon => 'Neon';
+
+  @override
+  String get sketchEffectGlow => 'Glow';
+
+  @override
+  String get sketchEffectWatercolor => 'Watercolor';
+
+  @override
+  String get sketchEffectSparkles => 'Sparkles';
+
+  @override
   String get settingsTitle => 'Settings';
 
   @override

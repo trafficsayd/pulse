@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../l10n/app_localizations.dart';
 import '../domain/pulse_mode.dart';
 import '../presentation/modes/half_heart_mode_screen.dart';
 import '../presentation/modes/placeholder_mode_screen.dart';
+import '../presentation/modes/ray_sketch_mode_screen.dart';
 import '../presentation/modes/tap_tap_mode_screen.dart';
 
 /// Tints used for mode tiles. Each starter mode owns a distinct hue so the
@@ -70,7 +72,7 @@ final List<PulseModeDescriptor> kAllModes = [
     isStarter: true,
     tint: _rayCyan,
     glyph: '✨',
-    builder: (context) => const PlaceholderModeScreen(titleKey: 'modeRay'),
+    builder: (context) => const RaySketchModeScreen(),
   ),
   PulseModeDescriptor(
     id: PulseModeId.constellation,
@@ -177,39 +179,37 @@ PulseModeDescriptor? findMode(PulseModeId id) {
 }
 
 /// Resolve the localized title for [m] from the supplied l10n object.
-/// Returns the raw [titleKey] as a last resort so test rigs without an
-/// AppLocalizations still surface a stable string.
-String localizedModeTitle(PulseModeDescriptor m, dynamic l10n) {
+String localizedModeTitle(PulseModeDescriptor m, AppLocalizations l10n) {
   switch (m.id) {
     case PulseModeId.tapTap:
-      return l10n.modeTapTap as String;
+      return l10n.modeTapTap;
     case PulseModeId.halfHeart:
-      return l10n.modeHalfHeart as String;
+      return l10n.modeHalfHeart;
     case PulseModeId.candle:
-      return l10n.modeCandle as String;
+      return l10n.modeCandle;
     case PulseModeId.whisper:
-      return l10n.modeWhisper as String;
+      return l10n.modeWhisper;
     case PulseModeId.bell:
-      return l10n.modeBell as String;
+      return l10n.modeBell;
     case PulseModeId.ray:
-      return l10n.modeRay as String;
+      return l10n.modeRay;
     case PulseModeId.constellation:
-      return l10n.modeConstellation as String;
+      return l10n.modeConstellation;
     case PulseModeId.goosebumps:
-      return l10n.modeGoosebumps as String;
+      return l10n.modeGoosebumps;
     case PulseModeId.thread:
-      return l10n.modeThread as String;
+      return l10n.modeThread;
     case PulseModeId.thunder:
-      return l10n.modeThunder as String;
+      return l10n.modeThunder;
     case PulseModeId.fireworks:
-      return l10n.modeFireworks as String;
+      return l10n.modeFireworks;
     case PulseModeId.balance:
-      return l10n.modeBalance as String;
+      return l10n.modeBalance;
     case PulseModeId.sandbox:
-      return l10n.modeSandbox as String;
+      return l10n.modeSandbox;
     case PulseModeId.breath:
-      return l10n.modeBreath as String;
+      return l10n.modeBreath;
     case PulseModeId.sync:
-      return l10n.modeSync as String;
+      return l10n.modeSync;
   }
 }

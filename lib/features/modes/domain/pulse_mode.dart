@@ -12,6 +12,8 @@ enum PulseModeId {
   bell,
   ray,
   constellation,
+  // LoveSketch-inspired drawing canvas with a daily-stroke quota.
+  sketch,
   // Paid modes (not yet implemented):
   goosebumps,
   thread,

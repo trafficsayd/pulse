@@ -76,9 +76,24 @@
   "modeBell": "Колокольчик",
   "modeRay": "Лучик",
   "modeConstellation": "Созвездие",
+  "modeSketch": "Скетч",
 
   "tapTapHint": "Стучи в любом месте",
   "halfHeartHint": "Удерживай свою половину",
+  "candleHint": "Тап — зажечь · долгое нажатие — задуть",
+  "whisperHint": "Удерживай палец, чтобы шептать",
+  "bellHint": "Постучи по колокольчику",
+  "rayHint": "Веди пальцем — рисуй лучик",
+  "constellationHint": "Тап — поставить звезду · долгое нажатие — очистить",
+  "sketchHint": "Рисуйте вместе",
+  "sketchClear": "Очистить холст",
+  "sketchLimitReached": "Дневной лимит штрихов исчерпан.",
+  "sketchStrokesRemaining": "{count, plural, =0{Сегодня штрихов больше нет} =1{Остался 1 штрих} few{Осталось {count} штриха} many{Осталось {count} штрихов} other{Осталось {count} штрихов}}",
+  "@sketchStrokesRemaining": {
+    "placeholders": {
+      "count": {"type": "int", "format": "decimalPattern"}
+    }
+  },
 
   "settingsLanguage": "Язык",
   "settingsLanguageSystem": "Системный",

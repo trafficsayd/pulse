@@ -57,6 +57,9 @@ class SubscriptionController extends Notifier<Entitlements> {
   /// Per-day-per-contact Sneak In quota.
   int get sneakInPerDayPerContact => state.sneakInPerDayPerContact;
 
+  /// Per-day shared sketch-stroke budget for the active tier.
+  int get dailyStrokesPerDay => state.dailyStrokesPerDay;
+
   bool _isStarter(PulseModeId mode) => switch (mode) {
         PulseModeId.tapTap ||
         PulseModeId.halfHeart ||

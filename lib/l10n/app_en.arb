@@ -133,10 +133,35 @@
   "modeConstellation": "Constellation",
   "@modeConstellation": {},
 
+  "modeSketch": "Sketch",
+  "@modeSketch": {},
+
   "tapTapHint": "Tap anywhere",
   "@tapTapHint": {},
   "halfHeartHint": "Hold the half on your side",
   "@halfHeartHint": {},
+  "candleHint": "Tap to light · long-press to blow out",
+  "@candleHint": {},
+  "whisperHint": "Touch and hold to whisper",
+  "@whisperHint": {},
+  "bellHint": "Tap the bell to ring it",
+  "@bellHint": {},
+  "rayHint": "Drag to draw a beam of light",
+  "@rayHint": {},
+  "constellationHint": "Tap stars · long-press to clear",
+  "@constellationHint": {},
+  "sketchHint": "Draw together",
+  "@sketchHint": {},
+  "sketchClear": "Clear canvas",
+  "@sketchClear": {},
+  "sketchLimitReached": "You're out of strokes for today.",
+  "@sketchLimitReached": {},
+  "sketchStrokesRemaining": "{count, plural, =0{No strokes left today} =1{1 stroke left} other{{count} strokes left}}",
+  "@sketchStrokesRemaining": {
+    "placeholders": {
+      "count": {"type": "int", "format": "decimalPattern"}
+    }
+  },
 
   "settingsLanguage": "Language",
   "@settingsLanguage": {},

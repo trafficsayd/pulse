@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../transport/transport.dart';
+import '../application/connections_controller.dart';
 
 /// Live connection diagnostics: which transport is in use, signal quality
 /// across all candidates (BLE, Wi-Fi Direct, WebRTC) and the standing
@@ -14,6 +15,7 @@ class ConnectionDetailsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = AppLocalizations.of(context)!;
+    final activeId = ref.watch(connectionsControllerProvider).activeId;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -43,6 +45,10 @@ class ConnectionDetailsScreen extends ConsumerWidget {
               kind: TransportKind.relay,
               bars: 2,
             ),
+            if (activeId != null) ...[
+              const SizedBox(height: 16),
+              _FingerprintCard(connectionId: activeId),
+            ],
             const SizedBox(height: 24),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -60,6 +66,78 @@ class ConnectionDetailsScreen extends ConsumerWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _FingerprintCard extends ConsumerWidget {
+  const _FingerprintCard({required this.connectionId});
+
+  final String connectionId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final t = AppLocalizations.of(context)!;
+    final manager = ref.watch(pulseKeyManagerProvider);
+    return FutureBuilder<String?>(
+      future: manager.localFingerprint(connectionId),
+      builder: (context, snapshot) {
+        final fingerprint = snapshot.data;
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: AppColors.outline),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: AppColors.pulse.withValues(alpha: 0.18),
+                ),
+                alignment: Alignment.center,
+                child: const Icon(
+                  Icons.fingerprint_rounded,
+                  color: AppColors.pulse,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      t.connectionKeyFingerprint,
+                      style: const TextStyle(
+                        color: AppColors.textPrimary,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      fingerprint ?? t.connectionKeyFingerprintUnavailable,
+                      style: TextStyle(
+                        color: fingerprint == null
+                            ? AppColors.textMuted
+                            : AppColors.textSecondary,
+                        fontSize: 13,
+                        fontFamily: 'monospace',
+                        letterSpacing: 1.2,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

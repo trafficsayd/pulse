@@ -167,6 +167,20 @@ class ConnectionsController extends Notifier<ConnectionsState> {
       activeId: state.activeId == id ? null : state.activeId,
     );
   }
+
+  /// Hard wipe used by Settings → "Wipe local data". Deletes every connection
+  /// record, every X25519 key material entry, and resets the active id. The
+  /// caller is responsible for resetting other controllers' persisted state
+  /// (settings, subscription, sketch quota, sneak in usage).
+  Future<void> wipeAll() async {
+    final repo = ref.read(connectionsRepositoryProvider);
+    final keys = ref.read(pulseKeyManagerProvider);
+    for (final c in state.connections) {
+      await repo.delete(c.id);
+      await keys.erase(c.id);
+    }
+    state = const ConnectionsState(loading: false);
+  }
 }
 
 /// Convenience: empty string -> null (used in [_bootstrap]).

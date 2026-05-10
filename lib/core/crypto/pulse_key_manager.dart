@@ -72,6 +72,20 @@ class PulseKeyManager {
     return raw == null ? null : base64.decode(raw);
   }
 
+  /// Short visual fingerprint of the local public key for [connectionId].
+  ///
+  /// Returns the first 8 base64-url characters of the public key — enough to
+  /// give the user something to recognise on the connection details screen
+  /// without dumping all 44 chars. Returns `null` if no key has been
+  /// provisioned yet.
+  Future<String?> localFingerprint(String connectionId) async {
+    final raw = await _keyStore.readString('$_prefix$connectionId$_pubSuffix');
+    if (raw == null) return null;
+    final pub = base64.decode(raw);
+    final encoded = base64Url.encode(pub).replaceAll('=', '');
+    return encoded.substring(0, encoded.length < 8 ? encoded.length : 8);
+  }
+
   /// Derives the 32-byte AES-256-GCM session secret for [connectionId], or
   /// returns `null` if either side of the handshake is missing.
   Future<List<int>?> sharedSecret(String connectionId) async {

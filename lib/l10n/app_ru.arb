@@ -48,6 +48,8 @@
   "connectionWifiDirect": "Wi-Fi Direct",
   "connectionWebrtc": "WebRTC",
   "connectionPrivacyNote": "Приложение работает без интернета и не собирает данные.",
+  "connectionKeyFingerprint": "Отпечаток ключа",
+  "connectionKeyFingerprintUnavailable": "—",
 
   "modesBrowserTitle": "Режимы",
   "modesAvailableInTrial": "Доступно в триале ({used}/{total})",
@@ -165,6 +167,11 @@
   "settingsLanguage": "Язык",
   "settingsLanguageSystem": "Системный",
   "settingsAboutBlurb": "Pulse — приложение для несловесного сенсорного общения. Никаких аккаунтов, лент и аналитики. Связи живут только на этом устройстве.",
+
+  "settingsWipeData": "Стереть локальные данные",
+  "settingsWipeDataConfirm": "Будут удалены все сохранённые связи, ключи и настройки на этом устройстве. Действие нельзя отменить.",
+  "settingsWipeDataConfirmCta": "Стереть",
+  "settingsWipeDataDone": "Локальные данные стёрты.",
 
   "subscriptionRestoreNone": "Покупка не найдена.",
   "subscriptionRestoreOk": "Подписка восстановлена.",

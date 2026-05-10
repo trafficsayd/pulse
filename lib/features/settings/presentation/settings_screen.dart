@@ -4,7 +4,7 @@ import 'package:pulse/l10n/app_localizations.dart';
 
 import '../../../core/locale/locale_controller.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../core/widgets/section_header.dart';
+import '../../../core/widgets/pulse_mockup.dart';
 
 /// App-wide settings — language, notifications, permissions, about,
 /// support, crash reports.
@@ -27,60 +27,121 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: PulseAppBar(title: t.settingsTitle),
-      body: ListView(
-        padding: const EdgeInsets.only(bottom: 24),
+      body: PulseBackdrop(
+        child: SafeArea(
+          child: ListView(
+            physics: const BouncingScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(20, 10, 20, 28),
+            children: [
+              PulseHeader(title: t.settingsTitle),
+              const SizedBox(height: 16),
+              _SectionCard(
+                title: t.settingsLanguageSection,
+                child: _LanguagePicker(currentCode: code),
+              ),
+              const SizedBox(height: 12),
+              _SectionCard(
+                title: t.settingsNotifications,
+                child: _SwitchTile(
+                  icon: Icons.notifications_active_rounded,
+                  label: t.settingsNotifications,
+                  value: _notifications,
+                  onChanged: (v) => setState(() => _notifications = v),
+                ),
+              ),
+              const SizedBox(height: 12),
+              _SectionCard(
+                title: t.settingsPermissions,
+                child: Column(
+                  children: [
+                    _NavTile(
+                      icon: Icons.bluetooth_rounded,
+                      label: 'Bluetooth',
+                      trailing: 'OK',
+                      trailingColor: AppColors.transportDirect,
+                    ),
+                    _NavTile(
+                      icon: Icons.wifi_rounded,
+                      label: 'Wi-Fi',
+                      trailing: 'OK',
+                      trailingColor: AppColors.transportDirect,
+                    ),
+                    _NavTile(
+                      icon: Icons.mic_rounded,
+                      label: t.settingsPermissions,
+                      trailing: 'OK',
+                      trailingColor: AppColors.transportDirect,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              _SectionCard(
+                title: t.settingsAbout,
+                child: Column(
+                  children: [
+                    _NavTile(
+                      icon: Icons.info_outline_rounded,
+                      label: t.settingsAbout,
+                    ),
+                    _NavTile(
+                      icon: Icons.help_outline_rounded,
+                      label: t.settingsSupport,
+                      subtitle: 'support@pulse.app',
+                    ),
+                    _NavTile(
+                      icon: Icons.tag_rounded,
+                      label: t.settingsVersion('0.1.0'),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              _SectionCard(
+                title: 'Crash reports',
+                child: _SwitchTile(
+                  icon: Icons.bug_report_outlined,
+                  label: t.settingsCrashReports,
+                  subtitle: t.settingsCrashReportsHint,
+                  value: _crashReports,
+                  onChanged: (v) => setState(() => _crashReports = v),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SectionCard extends StatelessWidget {
+  const _SectionCard({required this.title, required this.child});
+
+  final String title;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return PulsePanel(
+      radius: 28,
+      padding: const EdgeInsets.fromLTRB(14, 13, 14, 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SectionHeader(t.settingsLanguageSection),
-          _LanguagePicker(currentCode: code),
-          SectionHeader(t.settingsNotifications),
-          _SwitchTile(
-            icon: Icons.notifications_active_rounded,
-            label: t.settingsNotifications,
-            value: _notifications,
-            onChanged: (v) => setState(() => _notifications = v),
+          Padding(
+            padding: const EdgeInsets.only(left: 4, bottom: 10),
+            child: Text(
+              title,
+              style: const TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.7,
+              ),
+            ),
           ),
-          SectionHeader(t.settingsPermissions),
-          _NavTile(
-            icon: Icons.bluetooth_rounded,
-            label: 'Bluetooth',
-            trailing: 'OK',
-            trailingColor: AppColors.transportDirect,
-          ),
-          _NavTile(
-            icon: Icons.wifi_rounded,
-            label: 'Wi-Fi',
-            trailing: 'OK',
-            trailingColor: AppColors.transportDirect,
-          ),
-          _NavTile(
-            icon: Icons.mic_rounded,
-            label: t.settingsPermissions,
-            trailing: 'OK',
-            trailingColor: AppColors.transportDirect,
-          ),
-          SectionHeader(t.settingsAbout),
-          _NavTile(
-            icon: Icons.info_outline_rounded,
-            label: t.settingsAbout,
-          ),
-          _NavTile(
-            icon: Icons.help_outline_rounded,
-            label: t.settingsSupport,
-            subtitle: 'support@pulse.app',
-          ),
-          _NavTile(
-            icon: Icons.tag_rounded,
-            label: t.settingsVersion('0.1.0'),
-          ),
-          SectionHeader('Crash reports'),
-          _SwitchTile(
-            icon: Icons.bug_report_outlined,
-            label: t.settingsCrashReports,
-            subtitle: t.settingsCrashReportsHint,
-            value: _crashReports,
-            onChanged: (v) => setState(() => _crashReports = v),
-          ),
+          child,
         ],
       ),
     );
@@ -95,35 +156,32 @@ class _LanguagePicker extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = AppLocalizations.of(context)!;
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Container(
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: AppColors.outlineSoft),
-        ),
-        padding: const EdgeInsets.all(4),
-        child: Row(
-          children: [
-            _LangCell(
-              label: t.languageRu,
-              code: 'ru',
-              currentCode: currentCode,
-              onTap: () => ref
-                  .read(localeControllerProvider.notifier)
-                  .setLocale(const Locale('ru')),
-            ),
-            _LangCell(
-              label: t.languageEn,
-              code: 'en',
-              currentCode: currentCode,
-              onTap: () => ref
-                  .read(localeControllerProvider.notifier)
-                  .setLocale(const Locale('en')),
-            ),
-          ],
-        ),
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.background.withValues(alpha: 0.38),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.outlineSoft),
+      ),
+      padding: const EdgeInsets.all(4),
+      child: Row(
+        children: [
+          _LangCell(
+            label: t.languageRu,
+            code: 'ru',
+            currentCode: currentCode,
+            onTap: () => ref
+                .read(localeControllerProvider.notifier)
+                .setLocale(const Locale('ru')),
+          ),
+          _LangCell(
+            label: t.languageEn,
+            code: 'en',
+            currentCode: currentCode,
+            onTap: () => ref
+                .read(localeControllerProvider.notifier)
+                .setLocale(const Locale('en')),
+          ),
+        ],
       ),
     );
   }
@@ -188,11 +246,11 @@ class _SwitchTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      padding: const EdgeInsets.symmetric(vertical: 4),
       child: Container(
         decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(14),
+          color: AppColors.background.withValues(alpha: 0.28),
+          borderRadius: BorderRadius.circular(18),
           border: Border.all(color: AppColors.outlineSoft),
         ),
         child: SwitchListTile.adaptive(
@@ -200,11 +258,11 @@ class _SwitchTile extends StatelessWidget {
           onChanged: onChanged,
           activeColor: AppColors.pulse,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(18),
           ),
           secondary: Icon(icon, color: AppColors.textSecondary),
-          title: Text(label,
-              style: const TextStyle(color: AppColors.textPrimary)),
+          title:
+              Text(label, style: const TextStyle(color: AppColors.textPrimary)),
           subtitle: subtitle == null
               ? null
               : Text(
@@ -238,20 +296,20 @@ class _NavTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      padding: const EdgeInsets.symmetric(vertical: 4),
       child: Container(
         decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(14),
+          color: AppColors.background.withValues(alpha: 0.28),
+          borderRadius: BorderRadius.circular(18),
           border: Border.all(color: AppColors.outlineSoft),
         ),
         child: ListTile(
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(18),
           ),
           leading: Icon(icon, color: AppColors.textSecondary),
-          title: Text(label,
-              style: const TextStyle(color: AppColors.textPrimary)),
+          title:
+              Text(label, style: const TextStyle(color: AppColors.textPrimary)),
           subtitle: subtitle == null
               ? null
               : Text(

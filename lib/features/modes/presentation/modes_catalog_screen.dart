@@ -5,7 +5,7 @@ import 'package:pulse/l10n/app_localizations.dart';
 
 import '../../../core/routing/routes.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../core/widgets/section_header.dart';
+import '../../../core/widgets/pulse_mockup.dart';
 import '../../subscription/application/subscription_controller.dart';
 import '../application/mode_registry.dart';
 import '../domain/pulse_mode.dart';
@@ -25,16 +25,59 @@ class ModesCatalogScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: PulseAppBar(title: t.modesCatalogTitle),
-      body: ListView(
-        padding: const EdgeInsets.only(bottom: 24),
-        children: [
-          SectionHeader(
-            t.modesCatalogTrialSection(unlockedCount, starters.length),
+      body: PulseBackdrop(
+        child: SafeArea(
+          child: ListView(
+            physics: const BouncingScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(20, 10, 20, 28),
+            children: [
+              PulseHeader(title: t.modesCatalogTitle),
+              const SizedBox(height: 16),
+              _CatalogSection(
+                title:
+                    t.modesCatalogTrialSection(unlockedCount, starters.length),
+                modes: starters,
+              ),
+              const SizedBox(height: 12),
+              _CatalogSection(
+                title: t.modesCatalogPaidSection,
+                modes: paid,
+              ),
+            ],
           ),
-          _Grid(modes: starters),
-          SectionHeader(t.modesCatalogPaidSection),
-          _Grid(modes: paid),
+        ),
+      ),
+    );
+  }
+}
+
+class _CatalogSection extends StatelessWidget {
+  const _CatalogSection({required this.title, required this.modes});
+
+  final String title;
+  final List<PulseModeDescriptor> modes;
+
+  @override
+  Widget build(BuildContext context) {
+    return PulsePanel(
+      radius: 28,
+      padding: const EdgeInsets.fromLTRB(14, 13, 14, 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(left: 4, bottom: 12),
+            child: Text(
+              title,
+              style: const TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.6,
+              ),
+            ),
+          ),
+          _Grid(modes: modes),
         ],
       ),
     );
@@ -48,19 +91,16 @@ class _Grid extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: GridView.count(
-        physics: const NeverScrollableScrollPhysics(),
-        shrinkWrap: true,
-        crossAxisCount: 3,
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 12,
-        childAspectRatio: 0.95,
-        children: [
-          for (final m in modes) _ModeTile(mode: m),
-        ],
-      ),
+    return GridView.count(
+      physics: const NeverScrollableScrollPhysics(),
+      shrinkWrap: true,
+      crossAxisCount: 3,
+      crossAxisSpacing: 10,
+      mainAxisSpacing: 10,
+      childAspectRatio: 0.88,
+      children: [
+        for (final m in modes) _ModeTile(mode: m),
+      ],
     );
   }
 }
@@ -86,9 +126,21 @@ class _ModeTile extends ConsumerWidget {
       },
       child: Container(
         decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: AppColors.outlineSoft),
+          color: AppColors.background.withValues(alpha: 0.30),
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(
+            color: unlocked
+                ? color.withValues(alpha: 0.44)
+                : AppColors.outlineSoft,
+          ),
+          boxShadow: unlocked
+              ? [
+                  BoxShadow(
+                    color: color.withValues(alpha: 0.16),
+                    blurRadius: 18,
+                  ),
+                ]
+              : null,
         ),
         padding: const EdgeInsets.all(8),
         child: Stack(
@@ -96,18 +148,15 @@ class _ModeTile extends ConsumerWidget {
             Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Container(
-                  width: 56,
-                  height: 56,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: color.withValues(alpha: 0.16),
-                    border: Border.all(color: color, width: 1.4),
-                  ),
-                  alignment: Alignment.center,
+                PulseGlowCircle(
+                  size: 58,
+                  color: color,
+                  fill: color.withValues(alpha: unlocked ? 0.15 : 0.08),
+                  blur: unlocked ? 18 : 0,
+                  borderWidth: 1.2,
                   child: Text(
                     mode.glyph,
-                    style: const TextStyle(fontSize: 24),
+                    style: const TextStyle(fontSize: 25),
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -121,7 +170,7 @@ class _ModeTile extends ConsumerWidget {
                         ? AppColors.textPrimary
                         : AppColors.textSecondary,
                     fontSize: 12,
-                    fontWeight: FontWeight.w500,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
               ],

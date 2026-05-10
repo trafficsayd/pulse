@@ -3,7 +3,7 @@ import 'package:pulse/l10n/app_localizations.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/channel_bars.dart';
-import '../../../core/widgets/section_header.dart';
+import '../../../core/widgets/pulse_mockup.dart';
 import '../../transport/transport.dart';
 
 /// Connection status — shows BLE / Wi-Fi Direct / WebRTC channel state
@@ -17,42 +17,85 @@ class ConnectionStatusScreen extends StatelessWidget {
     final t = AppLocalizations.of(context)!;
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: PulseAppBar(title: t.connectionStatusTitle),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Column(
-            children: [
-              const SizedBox(height: 8),
-              const SectionHeader('TRANSPORT'),
-              _ChannelTile(
-                icon: Icons.bluetooth_rounded,
-                title: t.transportDirectBle,
-                bars: 4,
-                kind: TransportKind.direct,
-                active: true,
-              ),
-              _ChannelTile(
-                icon: Icons.wifi_rounded,
-                title: t.transportLocalWifi,
-                bars: 2,
-                kind: TransportKind.localNetwork,
-                active: false,
-              ),
-              _ChannelTile(
-                icon: Icons.cloud_outlined,
-                title: t.transportRelayWebrtc,
-                bars: 1,
-                kind: TransportKind.relay,
-                active: false,
-              ),
-              const Spacer(),
-              GhostBanner(
-                icon: Icons.shield_outlined,
-                text: t.connectionStatusOfflineNotice,
-              ),
-              const SizedBox(height: 24),
-            ],
+      body: PulseBackdrop(
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 10, 20, 24),
+            child: Column(
+              children: [
+                PulseHeader(title: t.connectionStatusTitle),
+                const SizedBox(height: 18),
+                PulsePanel(
+                  radius: 30,
+                  padding: const EdgeInsets.fromLTRB(14, 13, 14, 14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Padding(
+                        padding: EdgeInsets.only(left: 4, bottom: 10),
+                        child: Text(
+                          'TRANSPORT',
+                          style: TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.8,
+                          ),
+                        ),
+                      ),
+                      _ChannelTile(
+                        icon: Icons.bluetooth_rounded,
+                        title: t.transportDirectBle,
+                        bars: 4,
+                        kind: TransportKind.direct,
+                        active: true,
+                      ),
+                      _ChannelTile(
+                        icon: Icons.wifi_rounded,
+                        title: t.transportLocalWifi,
+                        bars: 2,
+                        kind: TransportKind.localNetwork,
+                        active: false,
+                      ),
+                      _ChannelTile(
+                        icon: Icons.cloud_outlined,
+                        title: t.transportRelayWebrtc,
+                        bars: 1,
+                        kind: TransportKind.relay,
+                        active: false,
+                      ),
+                    ],
+                  ),
+                ),
+                const Spacer(),
+                PulsePanel(
+                  radius: 24,
+                  padding: const EdgeInsets.all(16),
+                  borderColor: AppColors.pulse.withValues(alpha: 0.34),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.shield_outlined,
+                        color: AppColors.pulse,
+                        size: 22,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          t.connectionStatusOfflineNotice,
+                          style: const TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: 13,
+                            height: 1.3,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -89,25 +132,31 @@ class _ChannelTile extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Container(
         decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(16),
+          color: AppColors.background.withValues(alpha: 0.28),
+          borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: active ? color.withValues(alpha: 0.5) : AppColors.outlineSoft,
+            color:
+                active ? color.withValues(alpha: 0.55) : AppColors.outlineSoft,
           ),
+          boxShadow: active
+              ? [
+                  BoxShadow(
+                    color: color.withValues(alpha: 0.18),
+                    blurRadius: 20,
+                  ),
+                ]
+              : null,
         ),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
         child: Row(
           children: [
-            Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: color.withValues(alpha: 0.16),
-                border: Border.all(color: color),
-              ),
-              alignment: Alignment.center,
-              child: Icon(icon, color: color, size: 18),
+            PulseGlowCircle(
+              size: 40,
+              color: color,
+              fill: color.withValues(alpha: 0.14),
+              blur: active ? 16 : 0,
+              borderWidth: 1,
+              child: Icon(icon, color: color, size: 19),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -116,7 +165,7 @@ class _ChannelTile extends StatelessWidget {
                 style: const TextStyle(
                   color: AppColors.textPrimary,
                   fontSize: 14,
-                  fontWeight: FontWeight.w500,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
             ),

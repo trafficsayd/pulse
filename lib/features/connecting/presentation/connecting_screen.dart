@@ -6,6 +6,7 @@ import 'package:pulse/l10n/app_localizations.dart';
 
 import '../../../core/routing/routes.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/pulse_mockup.dart';
 
 /// "Establishing connection..." — animated handshake screen shown right
 /// after a pair is initiated.
@@ -61,73 +62,94 @@ class _ConnectingScreenState extends State<ConnectingScreen>
     final t = AppLocalizations.of(context)!;
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
-          child: Column(
-            children: [
-              const SizedBox(height: 60),
-              Text(
-                t.connectingTitle,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: AppColors.textPrimary,
-                  fontSize: 22,
-                  fontWeight: FontWeight.w400,
-                  letterSpacing: 0.4,
+      body: PulseBackdrop(
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 10, 20, 28),
+            child: Column(
+              children: [
+                PulseHeader(title: t.connectingTitle),
+                const SizedBox(height: 34),
+                Text(
+                  t.connectingTitle,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 28,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.35,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 60),
-              SizedBox(
-                width: 280,
-                height: 280,
-                child: AnimatedBuilder(
-                  animation: _orbit,
-                  builder: (context, _) {
-                    return CustomPaint(
-                      painter: _DottedRingPainter(progress: _orbit.value),
-                      child: const Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          Align(
-                            alignment: Alignment.centerLeft,
-                            child: _PhoneGlyph(rotated: false),
+                const SizedBox(height: 34),
+                PulsePanel(
+                  radius: 34,
+                  padding: const EdgeInsets.all(18),
+                  child: SizedBox(
+                    width: 286,
+                    height: 286,
+                    child: AnimatedBuilder(
+                      animation: _orbit,
+                      builder: (context, _) {
+                        return CustomPaint(
+                          painter: _DottedRingPainter(progress: _orbit.value),
+                          child: const Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              Align(
+                                alignment: Alignment.centerLeft,
+                                child: _PhoneGlyph(rotated: false),
+                              ),
+                              Align(
+                                alignment: Alignment.centerRight,
+                                child: _PhoneGlyph(rotated: true),
+                              ),
+                              PulseGlowCircle(
+                                size: 72,
+                                color: AppColors.pulse,
+                                fill: AppColors.surface,
+                                blur: 28,
+                                borderWidth: 1,
+                                child: Icon(
+                                  Icons.lock_rounded,
+                                  color: AppColors.pulse,
+                                  size: 28,
+                                ),
+                              ),
+                            ],
                           ),
-                          Align(
-                            alignment: Alignment.centerRight,
-                            child: _PhoneGlyph(rotated: true),
-                          ),
-                          Icon(
-                            Icons.lock_rounded,
-                            color: AppColors.pulse,
-                            size: 28,
-                          ),
-                        ],
+                        );
+                      },
+                    ),
+                  ),
+                ),
+                const Spacer(),
+                PulsePanel(
+                  radius: 28,
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      _StepRow(
+                        done: _step >= 1,
+                        inProgress: _step == 0,
+                        label: t.connectingKeyExchange,
                       ),
-                    );
-                  },
+                      const SizedBox(height: 14),
+                      _StepRow(
+                        done: _step >= 2,
+                        inProgress: _step == 1,
+                        label: t.connectingChannelEncrypted,
+                      ),
+                      const SizedBox(height: 14),
+                      _StepRow(
+                        done: _step >= 3,
+                        inProgress: _step == 2,
+                        label: t.connectingSecuredLink,
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              const Spacer(),
-              _StepRow(
-                done: _step >= 1,
-                inProgress: _step == 0,
-                label: t.connectingKeyExchange,
-              ),
-              const SizedBox(height: 14),
-              _StepRow(
-                done: _step >= 2,
-                inProgress: _step == 1,
-                label: t.connectingChannelEncrypted,
-              ),
-              const SizedBox(height: 14),
-              _StepRow(
-                done: _step >= 3,
-                inProgress: _step == 2,
-                label: t.connectingSecuredLink,
-              ),
-              const SizedBox(height: 48),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -186,8 +208,7 @@ class _DottedRingPainter extends CustomPainter {
       final angle = (i / totalDots) * 2 * math.pi;
       final shifted = (i / totalDots + progress) % 1.0;
       paint.color = AppColors.pulse.withValues(
-        alpha:
-            0.18 + 0.6 * (1 - (shifted - 0.5).abs() * 2).clamp(0.0, 1.0),
+        alpha: 0.18 + 0.6 * (1 - (shifted - 0.5).abs() * 2).clamp(0.0, 1.0),
       );
       final p = Offset(
         center.dx + radius * math.cos(angle),

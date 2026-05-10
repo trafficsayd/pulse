@@ -1,19 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:pulse/l10n/app_localizations.dart';
 import 'package:go_router/go_router.dart';
+import 'package:pulse/l10n/app_localizations.dart';
 
 import '../routing/routes.dart';
 import '../theme/app_colors.dart';
+import 'pulse_mockup.dart';
 
-/// Three-tab bottom navigation matching the design.
-///
-/// Tabs (left → right):
-/// - "Мои люди"   →  [Routes.people]
-/// - "Pulse"       →  [Routes.hub]   (the center, accentuated tab)
-/// - "Подкрасться" →  [Routes.sneakIn]
-///
-/// The center tab is rendered as a violet glowing disc with the Pulse
-/// glyph. Inactive tabs are textual icons in muted gray.
 enum BottomNavTab { people, pulse, sneakIn }
 
 class BottomNavShell extends StatelessWidget {
@@ -49,38 +41,60 @@ class BottomNavShell extends StatelessWidget {
       body: body,
       bottomNavigationBar: SafeArea(
         top: false,
-        child: Container(
-          height: 88,
-          decoration: const BoxDecoration(
-            color: AppColors.background,
-            border: Border(
-              top: BorderSide(color: AppColors.outlineSoft),
-            ),
-          ),
-          child: Row(
+        minimum: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+        child: SizedBox(
+          height: 86,
+          child: Stack(
+            clipBehavior: Clip.none,
+            alignment: Alignment.bottomCenter,
             children: [
-              Expanded(
-                child: _SideTab(
-                  icon: Icons.groups_2_rounded,
-                  label: t.navPeople,
-                  active: current == BottomNavTab.people,
-                  onTap: () => _go(context, BottomNavTab.people),
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: Container(
+                  height: 68,
+                  decoration: BoxDecoration(
+                    color: AppColors.surface.withValues(alpha: 0.94),
+                    borderRadius: BorderRadius.circular(30),
+                    border: Border.all(color: AppColors.outlineSoft),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.34),
+                        blurRadius: 26,
+                        offset: const Offset(0, 14),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: _SideTab(
+                          icon: Icons.groups_2_rounded,
+                          label: t.navPeople,
+                          active: current == BottomNavTab.people,
+                          onTap: () => _go(context, BottomNavTab.people),
+                        ),
+                      ),
+                      const SizedBox(width: 106),
+                      Expanded(
+                        child: _SideTab(
+                          icon: Icons.notifications_active_rounded,
+                          label: t.navSneakIn,
+                          active: current == BottomNavTab.sneakIn,
+                          onTap: () => _go(context, BottomNavTab.sneakIn),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-              SizedBox(
-                width: 96,
+              Positioned(
+                top: -2,
                 child: _CenterTab(
                   label: t.navPulse,
                   active: current == BottomNavTab.pulse,
                   onTap: () => _go(context, BottomNavTab.pulse),
-                ),
-              ),
-              Expanded(
-                child: _SideTab(
-                  icon: Icons.notifications_active_rounded,
-                  label: t.navSneakIn,
-                  active: current == BottomNavTab.sneakIn,
-                  onTap: () => _go(context, BottomNavTab.sneakIn),
                 ),
               ),
             ],
@@ -109,17 +123,21 @@ class _SideTab extends StatelessWidget {
     final color = active ? AppColors.pulse : AppColors.textSecondary;
     return InkWell(
       onTap: onTap,
+      borderRadius: BorderRadius.circular(28),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(icon, color: color, size: 22),
-          const SizedBox(height: 6),
+          const SizedBox(height: 4),
           Text(
             label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: TextStyle(
               color: color,
-              fontSize: 11,
-              fontWeight: FontWeight.w500,
+              fontSize: 10.5,
+              fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+              letterSpacing: -0.15,
             ),
           ),
         ],
@@ -143,36 +161,29 @@ class _CenterTab extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
+      borderRadius: BorderRadius.circular(42),
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Container(
-            width: 56,
-            height: 56,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: AppColors.pulse,
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.pulseGlow,
-                  blurRadius: 24,
-                  spreadRadius: 2,
-                ),
-              ],
-            ),
+          PulseGlowCircle(
+            size: 64,
+            color: AppColors.pulse,
+            fill: AppColors.pulse,
+            blur: 34,
+            borderWidth: 0,
             child: const Icon(
               Icons.graphic_eq_rounded,
               color: Colors.white,
-              size: 26,
+              size: 29,
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 2),
           Text(
             label,
             style: TextStyle(
               color: active ? AppColors.pulse : AppColors.textSecondary,
               fontSize: 11,
-              fontWeight: FontWeight.w500,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.2,
             ),
           ),
         ],

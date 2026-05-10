@@ -79,7 +79,8 @@ class SneakInController extends Notifier<SneakInUsageState> {
   bool canSend(String contactId, {DateTime? now}) {
     final rolled = state.rolledForward(now ?? DateTime.now());
     final used = rolled.usage[contactId] ?? 0;
-    final cap = ref.read(subscriptionControllerProvider.notifier)
+    final cap = ref
+        .read(subscriptionControllerProvider.notifier)
         .sneakInPerDayPerContact;
     return used < cap;
   }
@@ -87,7 +88,8 @@ class SneakInController extends Notifier<SneakInUsageState> {
   int remaining(String contactId, {DateTime? now}) {
     final rolled = state.rolledForward(now ?? DateTime.now());
     final used = rolled.usage[contactId] ?? 0;
-    final cap = ref.read(subscriptionControllerProvider.notifier)
+    final cap = ref
+        .read(subscriptionControllerProvider.notifier)
         .sneakInPerDayPerContact;
     return (cap - used).clamp(0, cap);
   }

@@ -9,8 +9,8 @@ import 'package:qr_flutter/qr_flutter.dart';
 import '../../../core/locale/locale_controller.dart';
 import '../../../core/routing/routes.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../core/widgets/glow_ring.dart';
 import '../../../core/widgets/gradient_button.dart';
+import '../../../core/widgets/pulse_mockup.dart';
 
 /// First-launch screen: create a new pair (host) or join one (guest).
 ///
@@ -44,106 +44,143 @@ class _PairingScreenState extends ConsumerState<PairingScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
-          child: Column(
-            children: [
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  const Spacer(),
-                  const _LanguageSwitcher(),
-                ],
-              ),
-              Expanded(
-                child: SingleChildScrollView(
-                  child: Column(
-                    children: [
-                      const SizedBox(height: 24),
-                      Text(
-                        t.appTitle.toUpperCase(),
-                        style: const TextStyle(
-                          color: AppColors.textPrimary,
-                          fontSize: 22,
-                          fontWeight: FontWeight.w300,
-                          letterSpacing: 8,
+      body: PulseBackdrop(
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 10, 20, 22),
+            child: Column(
+              children: [
+                PulseHeader(
+                  title: t.pairingTitle,
+                  leading: PulseRoundButton(
+                    icon: Icons.close_rounded,
+                    onTap: () {},
+                    subtle: true,
+                  ),
+                  trailing: const _LanguageSwitcher(),
+                ),
+                Expanded(
+                  child: SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    child: Column(
+                      children: [
+                        const SizedBox(height: 22),
+                        Text(
+                          t.appTitle.toUpperCase(),
+                          style: const TextStyle(
+                            color: AppColors.textPrimary,
+                            fontSize: 28,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 8,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        t.pairingTitle,
-                        style: const TextStyle(
-                          color: AppColors.textSecondary,
-                          fontSize: 15,
+                        const SizedBox(height: 10),
+                        Text(
+                          t.pairingShareCode,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: 13,
+                            height: 1.35,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 32),
-                      GlowRing(
-                        size: 240,
-                        color: AppColors.pulse,
-                        fill: AppColors.surface,
-                        strokeWidth: 1.5,
-                        blurRadius: 48,
-                        child: Padding(
-                          padding: const EdgeInsets.all(24),
-                          child: QrImageView(
-                            data: _qrPayload,
-                            backgroundColor: Colors.transparent,
-                            eyeStyle: const QrEyeStyle(
-                              eyeShape: QrEyeShape.square,
-                              color: AppColors.pulse,
+                        const SizedBox(height: 32),
+                        PulseGlowCircle(
+                          size: 264,
+                          color: AppColors.pulse,
+                          fill: AppColors.surface.withValues(alpha: 0.78),
+                          borderWidth: 1.2,
+                          blur: 54,
+                          child: Container(
+                            width: 202,
+                            height: 202,
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(28),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: AppColors.pulse.withValues(alpha: 0.2),
+                                  blurRadius: 26,
+                                ),
+                              ],
                             ),
-                            dataModuleStyle: const QrDataModuleStyle(
-                              dataModuleShape: QrDataModuleShape.square,
-                              color: AppColors.textPrimary,
+                            padding: const EdgeInsets.all(16),
+                            child: QrImageView(
+                              data: _qrPayload,
+                              backgroundColor: Colors.white,
+                              eyeStyle: const QrEyeStyle(
+                                eyeShape: QrEyeShape.square,
+                                color: AppColors.pulseDeep,
+                              ),
+                              dataModuleStyle: const QrDataModuleStyle(
+                                dataModuleShape: QrDataModuleShape.square,
+                                color: Color(0xFF181328),
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 28),
-                      Text(
-                        _formattedCode,
-                        style: const TextStyle(
-                          color: AppColors.textPrimary,
-                          fontSize: 32,
-                          fontWeight: FontWeight.w400,
-                          letterSpacing: 8,
-                          fontFamily: 'monospace',
+                        const SizedBox(height: 30),
+                        PulsePanel(
+                          radius: 28,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 22,
+                            vertical: 18,
+                          ),
+                          child: Column(
+                            children: [
+                              Text(
+                                _formattedCode,
+                                style: const TextStyle(
+                                  color: AppColors.textPrimary,
+                                  fontSize: 34,
+                                  height: 1,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 8,
+                                  fontFamily: 'monospace',
+                                ),
+                              ),
+                              const SizedBox(height: 10),
+                              Text(
+                                t.pairingEnterCode,
+                                style: const TextStyle(
+                                  color: AppColors.textMuted,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        t.pairingShareCode,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          color: AppColors.textSecondary,
-                          fontSize: 13,
-                          height: 1.4,
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                    ],
+                        const SizedBox(height: 24),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-              SizedBox(
-                width: double.infinity,
-                child: GradientButton(
-                  onPressed: () => _onCreatePair(context),
-                  label: t.pairingCreate,
+                Row(
+                  children: [
+                    Expanded(
+                      child: SizedBox(
+                        height: 56,
+                        child: GradientButton(
+                          onPressed: () => _onCreatePair(context),
+                          label: t.pairingCreate,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: SizedBox(
+                        height: 56,
+                        child: OutlinedButton(
+                          onPressed: () => _onJoinPair(context),
+                          child: Text(t.pairingJoin),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-              const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton(
-                  onPressed: () => _onJoinPair(context),
-                  child: Text(t.pairingJoin),
-                ),
-              ),
-              const SizedBox(height: 24),
-            ],
+              ],
+            ),
           ),
         ),
       ),

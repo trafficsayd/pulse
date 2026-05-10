@@ -49,7 +49,8 @@ class PermissionFlags {
         'confirmFirstSneakIn': confirmFirstSneakIn,
       };
 
-  factory PermissionFlags.fromJson(Map<String, Object?> json) => PermissionFlags(
+  factory PermissionFlags.fromJson(Map<String, Object?> json) =>
+      PermissionFlags(
         allowFullSessions: json['allowFullSessions'] as bool? ?? true,
         allowSneakIn: json['allowSneakIn'] as bool? ?? true,
         confirmFirstSneakIn: json['confirmFirstSneakIn'] as bool? ?? true,
@@ -64,5 +65,6 @@ class PermissionFlags {
           confirmFirstSneakIn == other.confirmFirstSneakIn;
 
   @override
-  int get hashCode => Object.hash(allowFullSessions, allowSneakIn, confirmFirstSneakIn);
+  int get hashCode =>
+      Object.hash(allowFullSessions, allowSneakIn, confirmFirstSneakIn);
 }

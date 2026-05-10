@@ -49,6 +49,25 @@ void main() {
       expect(e.sneakInPerDayPerContact, 1);
     });
 
+    test('dailyStrokes tracks tier (trial=50, expired=20, subscribed huge)',
+        () {
+      final trial = Entitlements(
+        tier: SubscriptionTier.trial,
+        trialStartedAt: start,
+      );
+      final expired = Entitlements(
+        tier: SubscriptionTier.expired,
+        trialStartedAt: start,
+      );
+      final paid = Entitlements(
+        tier: SubscriptionTier.subscribed,
+        trialStartedAt: start,
+      );
+      expect(trial.dailyStrokesPerDay, 50);
+      expect(expired.dailyStrokesPerDay, 20);
+      expect(paid.dailyStrokesPerDay, greaterThanOrEqualTo(10000));
+    });
+
     test('round-trips through JSON', () {
       final e = Entitlements(
         tier: SubscriptionTier.subscribed,

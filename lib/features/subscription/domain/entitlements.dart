@@ -69,6 +69,17 @@ class Entitlements {
         SubscriptionTier.trial || SubscriptionTier.expired => 1,
       };
 
+  /// Per-day shared sketch-stroke budget.
+  ///
+  /// Mirrors the LoveSketch-style daily-stroke cap (50 strokes/day on the
+  /// free tier). The Pulse spec ties this to the same trial/subscribed
+  /// gating used elsewhere — a subscriber gets the de-facto unlimited cap.
+  int get dailyStrokesPerDay => switch (tier) {
+        SubscriptionTier.subscribed => 100000, // de-facto unlimited
+        SubscriptionTier.trial => 50,
+        SubscriptionTier.expired => 20,
+      };
+
   Map<String, Object?> toJson() => {
         'tier': tier.name,
         'trialStartedAt': trialStartedAt.toIso8601String(),

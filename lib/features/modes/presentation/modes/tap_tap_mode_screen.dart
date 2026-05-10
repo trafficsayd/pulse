@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:pulse/l10n/app_localizations.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/widgets/pulse_mockup.dart';
 
 /// "Tap-Tap" — concentric pulse rings on a near-black canvas.
 ///
@@ -88,8 +89,7 @@ class _TapTapModeScreenState extends State<TapTapModeScreen>
           final center = Offset(size.width / 2, size.height / 2);
           return Stack(
             children: [
-              // Ambient concentric rings around the center, perpetually
-              // breathing so the screen feels alive between taps.
+              const Positioned.fill(child: PulseBackdrop(child: SizedBox())),
               Positioned.fill(
                 child: AnimatedBuilder(
                   animation: _ambient,
@@ -142,28 +142,41 @@ class _TapTapModeScreenState extends State<TapTapModeScreen>
                   ),
                 ),
               Positioned(
-                top: 24,
+                top: 0,
                 left: 0,
                 right: 0,
-                child: Center(
-                  child: Text(
-                    t.tapTapHint,
-                    style: const TextStyle(
-                      color: AppColors.textMuted,
-                      fontSize: 14,
+                child: SafeArea(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
+                    child: PulseHeader(
+                      title: t.modeTapTapTitle,
+                      trailing: PulseRoundButton(
+                        icon: Icons.close_rounded,
+                        onTap: () => Navigator.of(context).maybePop(),
+                        subtle: true,
+                      ),
                     ),
                   ),
                 ),
               ),
               Positioned(
-                top: 16,
-                right: 16,
-                child: SafeArea(
-                  child: IconButton(
-                    onPressed: () => Navigator.of(context).maybePop(),
-                    icon: const Icon(Icons.close_rounded),
-                    color: AppColors.textSecondary,
-                    tooltip: t.hubExit,
+                left: 24,
+                right: 24,
+                bottom: 34,
+                child: PulsePanel(
+                  radius: 24,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 18,
+                    vertical: 12,
+                  ),
+                  child: Text(
+                    t.tapTapHint,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
               ),

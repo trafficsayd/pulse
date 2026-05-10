@@ -107,8 +107,7 @@ class ConnectionsController extends Notifier<ConnectionsState> {
   Future<Connection> createStubConnection({String nickname = 'Demo'}) async {
     const palette = [0, 1, 2, 3, 4, 5, 6, 7];
     const emojis = ['🌞', '🌙', '✨', '☄️', '🪐', '🌟', '🌈', '🔮'];
-    final colorIndex =
-        palette[state.connections.length % palette.length];
+    final colorIndex = palette[state.connections.length % palette.length];
     final emoji = emojis[state.connections.length % emojis.length];
     final c = await _repo.create(
       nickname: nickname,

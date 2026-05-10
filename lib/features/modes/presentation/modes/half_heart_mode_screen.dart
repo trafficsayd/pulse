@@ -140,7 +140,8 @@ class _Half extends StatelessWidget {
       child: AnimatedBuilder(
         animation: pulse,
         builder: (context, _) {
-          final intensity = bothHeld ? (0.6 + 0.4 * pulse.value) : (isHeld ? 0.5 : 0.18);
+          final intensity =
+              bothHeld ? (0.6 + 0.4 * pulse.value) : (isHeld ? 0.5 : 0.18);
           return Container(
             decoration: BoxDecoration(
               gradient: LinearGradient(

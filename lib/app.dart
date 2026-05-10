@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/locale/locale_controller.dart';
 import 'core/routing/app_router.dart';
+import 'core/theme/app_colors.dart';
 import 'core/theme/app_theme.dart';
 
 /// Root [MaterialApp.router] for Pulse.
@@ -35,6 +36,17 @@ class _PulseAppState extends ConsumerState<PulseApp> {
       locale: locale,
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
+      builder: (context, child) {
+        return ColoredBox(
+          color: AppColors.background,
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 430),
+              child: child ?? const SizedBox.shrink(),
+            ),
+          ),
+        );
+      },
       routerConfig: _router,
     );
   }

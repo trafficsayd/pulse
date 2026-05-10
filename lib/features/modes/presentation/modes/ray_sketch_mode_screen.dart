@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/routing/routes.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/widgets/pulse_mockup.dart';
 import '../../../../l10n/app_localizations.dart';
 
 enum _BrushEffect { clean, neon, glow, watercolor, sparkles }
@@ -102,94 +103,96 @@ class _RaySketchModeScreenState extends State<RaySketchModeScreen> {
     final t = AppLocalizations.of(context)!;
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: SafeArea(
-        child: Stack(
-          children: [
-            Positioned.fill(
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onPanStart: _startStroke,
-                onPanUpdate: _extendStroke,
-                onPanEnd: (_) => _endStroke(),
-                onPanCancel: _endStroke,
-                child: CustomPaint(
-                  painter: _SketchPainter(
-                    strokes: _strokes,
-                    revision: _revision,
+      body: Stack(
+        children: [
+          const Positioned.fill(child: PulseBackdrop(child: SizedBox())),
+          SafeArea(
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onPanStart: _startStroke,
+                    onPanUpdate: _extendStroke,
+                    onPanEnd: (_) => _endStroke(),
+                    onPanCancel: _endStroke,
+                    child: CustomPaint(
+                      painter: _SketchPainter(
+                        strokes: _strokes,
+                        revision: _revision,
+                      ),
+                    ),
                   ),
                 ),
-              ),
-            ),
-            Positioned(
-              top: 8,
-              left: 8,
-              child: IconButton(
-                onPressed: () => context.go(Routes.hub),
-                icon: const Icon(Icons.arrow_back_rounded),
-                color: AppColors.textPrimary,
-                tooltip: t.hubExit,
-              ),
-            ),
-            Positioned(
-              top: 16,
-              left: 72,
-              right: 72,
-              child: Column(
-                children: [
-                  Text(
-                    t.modeRay,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: AppColors.textPrimary,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
+                Positioned(
+                  top: 10,
+                  left: 20,
+                  right: 20,
+                  child: PulseHeader(
+                    title: t.modeRay,
+                    leading: PulseRoundButton(
+                      icon: Icons.arrow_back_rounded,
+                      onTap: () => context.go(Routes.hub),
+                      subtle: true,
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    t.sketchHint,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: AppColors.textMuted,
-                      fontSize: 12,
+                ),
+                Positioned(
+                  top: 70,
+                  left: 28,
+                  right: 28,
+                  child: PulsePanel(
+                    radius: 22,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 10,
+                    ),
+                    child: Text(
+                      t.sketchHint,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
-                ],
-              ),
+                ),
+                Positioned(
+                  left: 16,
+                  right: 16,
+                  bottom: 16,
+                  child: _SketchToolbar(
+                    palette: _palette,
+                    brushSizes: _brushSizes,
+                    selectedColor: _selectedColor,
+                    selectedWidth: _selectedWidth,
+                    selectedEffect: _selectedEffect,
+                    liveMode: _liveMode,
+                    onColorSelected: (color) {
+                      setState(() => _selectedColor = color);
+                      HapticFeedback.selectionClick();
+                    },
+                    onWidthSelected: (width) {
+                      setState(() => _selectedWidth = width);
+                      HapticFeedback.selectionClick();
+                    },
+                    onEffectSelected: (effect) {
+                      setState(() => _selectedEffect = effect);
+                      HapticFeedback.selectionClick();
+                    },
+                    onModeChanged: (live) {
+                      setState(() => _liveMode = live);
+                      HapticFeedback.selectionClick();
+                    },
+                    onClear: _clear,
+                    onSend: _sendPostcard,
+                  ),
+                ),
+              ],
             ),
-            Positioned(
-              left: 16,
-              right: 16,
-              bottom: 16,
-              child: _SketchToolbar(
-                palette: _palette,
-                brushSizes: _brushSizes,
-                selectedColor: _selectedColor,
-                selectedWidth: _selectedWidth,
-                selectedEffect: _selectedEffect,
-                liveMode: _liveMode,
-                onColorSelected: (color) {
-                  setState(() => _selectedColor = color);
-                  HapticFeedback.selectionClick();
-                },
-                onWidthSelected: (width) {
-                  setState(() => _selectedWidth = width);
-                  HapticFeedback.selectionClick();
-                },
-                onEffectSelected: (effect) {
-                  setState(() => _selectedEffect = effect);
-                  HapticFeedback.selectionClick();
-                },
-                onModeChanged: (live) {
-                  setState(() => _liveMode = live);
-                  HapticFeedback.selectionClick();
-                },
-                onClear: _clear,
-                onSend: _sendPostcard,
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

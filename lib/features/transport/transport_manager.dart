@@ -17,7 +17,7 @@ class TransportManager {
     Transport? ble,
     Transport? localNetwork,
     Transport? relay,
-  })  : _transports = [
+  }) : _transports = [
           ble ?? BleTransport(),
           localNetwork ?? LocalNetworkTransport(),
           relay ?? WebRtcTransport(),

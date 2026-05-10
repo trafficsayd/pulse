@@ -7,6 +7,7 @@ import '../../../core/routing/routes.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/bottom_nav_shell.dart';
 import '../../../core/widgets/connection_avatar.dart';
+import '../../../core/widgets/pulse_mockup.dart';
 import '../../../core/widgets/section_header.dart';
 import '../../connections/application/connections_controller.dart';
 import '../../connections/domain/connection.dart';
@@ -30,69 +31,82 @@ class PeopleScreen extends ConsumerWidget {
 
     return BottomNavShell(
       current: BottomNavTab.people,
-      body: SafeArea(
-        bottom: false,
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      t.peopleTitle,
-                      style: const TextStyle(
-                        color: AppColors.textPrimary,
-                        fontSize: 26,
-                        fontWeight: FontWeight.w400,
-                      ),
-                    ),
+      body: PulseBackdrop(
+        child: SafeArea(
+          bottom: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(18, 10, 18, 104),
+            child: Column(
+              children: [
+                PulseHeader(
+                  title: t.peopleTitle,
+                  leading: PulseRoundButton(
+                    icon: Icons.settings_rounded,
+                    onTap: () => context.go(Routes.settings),
+                    subtle: true,
                   ),
-                  IconButton(
-                    onPressed: () => context.go(Routes.pairing),
-                    icon: const Icon(
-                      Icons.person_add_alt_1_rounded,
-                      color: AppColors.pulse,
-                    ),
-                    tooltip: t.peopleAdd,
+                  trailing: PulseRoundButton(
+                    icon: Icons.person_add_alt_1_rounded,
+                    onTap: () => context.go(Routes.pairing),
+                    color: AppColors.pulse,
+                    subtle: true,
                   ),
-                ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Text(
-                t.peopleLongPressHint,
-                style: const TextStyle(
-                  color: AppColors.textMuted,
-                  fontSize: 12,
                 ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Expanded(
-              child: state.connections.isEmpty
-                  ? Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(32),
+                const SizedBox(height: 14),
+                PulsePanel(
+                  radius: 24,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.lock_outline_rounded,
+                        color: AppColors.pulse,
+                        size: 17,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
                         child: Text(
-                          t.peopleEmpty,
-                          textAlign: TextAlign.center,
+                          t.peopleLongPressHint,
                           style: const TextStyle(
                             color: AppColors.textSecondary,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
                       ),
-                    )
-                  : ListView(
-                      padding: const EdgeInsets.only(bottom: 24),
-                      children: [
-                        for (final c in state.connections)
-                          _PersonRow(connection: c),
-                      ],
-                    ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Expanded(
+                  child: state.connections.isEmpty
+                      ? Center(
+                          child: PulsePanel(
+                            child: Text(
+                              t.peopleEmpty,
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                          ),
+                        )
+                      : ListView.separated(
+                          physics: const BouncingScrollPhysics(),
+                          padding: const EdgeInsets.only(bottom: 24),
+                          itemCount: state.connections.length,
+                          separatorBuilder: (_, __) =>
+                              const SizedBox(height: 10),
+                          itemBuilder: (context, index) =>
+                              _PersonRow(connection: state.connections[index]),
+                        ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -133,52 +147,85 @@ class _PersonRow extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final t = AppLocalizations.of(context)!;
     final muted = connection.status == ConnectionStatus.archived;
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: () =>
-            context.go(Routes.connectionSettingsPath(connection.id)),
-        onLongPress: () => _showActions(context, ref),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-          child: Row(
-            children: [
-              Opacity(
-                opacity: muted ? 0.5 : 1,
-                child: ConnectionAvatar(
-                  emoji: connection.emoji,
-                  colorIndex: connection.colorIndex,
-                  size: 48,
+    return PulsePanel(
+      radius: 26,
+      padding: EdgeInsets.zero,
+      borderColor: connection.status == ConnectionStatus.active
+          ? AppColors.pulse.withValues(alpha: 0.42)
+          : null,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(26),
+          onTap: () => context.go(Routes.connectionSettingsPath(connection.id)),
+          onLongPress: () => _showActions(context, ref),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(14, 14, 12, 14),
+            child: Row(
+              children: [
+                Opacity(
+                  opacity: muted ? 0.45 : 1,
+                  child: ConnectionAvatar(
+                    emoji: connection.emoji,
+                    colorIndex: connection.colorIndex,
+                    size: 56,
+                    glow: connection.status == ConnectionStatus.active,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      connection.nickname,
-                      style: TextStyle(
-                        color: muted
-                            ? AppColors.textSecondary
-                            : AppColors.textPrimary,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        connection.nickname,
+                        style: TextStyle(
+                          color: muted
+                              ? AppColors.textSecondary
+                              : AppColors.textPrimary,
+                          fontSize: 17,
+                          height: 1.1,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: -0.2,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      _statusLabel(t),
-                      style: TextStyle(
-                        color: _statusColor(),
-                        fontSize: 12,
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          Container(
+                            width: 7,
+                            height: 7,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: _statusColor(),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: _statusColor().withValues(alpha: 0.5),
+                                  blurRadius: 8,
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 7),
+                          Expanded(
+                            child: Text(
+                              _statusLabel(t),
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: _statusColor(),
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-              _TrailingAction(connection: connection),
-            ],
+                _TrailingAction(connection: connection),
+              ],
+            ),
           ),
         ),
       ),

@@ -37,9 +37,7 @@ class ChannelBars extends StatelessWidget {
               child: Container(
                 height: height * (0.4 + 0.2 * i),
                 decoration: BoxDecoration(
-                  color: i < activeBars
-                      ? color
-                      : color.withValues(alpha: 0.18),
+                  color: i < activeBars ? color : color.withValues(alpha: 0.18),
                   borderRadius: BorderRadius.circular(barWidth / 2),
                 ),
               ),

@@ -5,6 +5,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/routing/routes.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../shared/widgets/pulse_bottom_nav.dart';
+import '../../../shared/widgets/pulse_drawer.dart';
 import '../../connections/application/connections_controller.dart';
 import '../../connections/domain/connection.dart';
 import '../../modes/application/mode_registry.dart';
@@ -12,9 +14,10 @@ import '../../modes/domain/pulse_mode.dart';
 import '../../subscription/application/subscription_controller.dart';
 import '../../transport/transport.dart';
 
-/// Main canvas after pairing. A horizontal carousel of mode icons; long
-/// press to enter a mode. Top corner shows the active partner avatar and
-/// transport indicator (the small color dot from [AppColors.transport*]).
+/// Main canvas after pairing. The mockup lays modes out in a 3-column grid
+/// with the active mode highlighted in the centre, a top bar with a drawer
+/// trigger and a transport pill, and a bottom nav exposing My People /
+/// Pulse / Sneak In.
 class HubScreen extends ConsumerWidget {
   const HubScreen({super.key});
 
@@ -26,28 +29,36 @@ class HubScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: SafeArea(
-        child: Column(
-          children: [
-            _HubHeader(active: activeConnection),
-            const Spacer(),
-            if (activeConnection == null)
-              _NoActiveBanner(
-                title: t.hubNoActiveConnection,
-                subtitle: t.hubChooseSomeone,
-              )
-            else
-              _ModeCarousel(activeConnection: activeConnection),
-            const SizedBox(height: 24),
-            Text(
-              t.hubLongPressToStart,
-              style: const TextStyle(
-                color: AppColors.textMuted,
-                fontSize: 12,
+      drawer: const PulseDrawer(),
+      body: DecoratedBox(
+        decoration: const BoxDecoration(gradient: AppColors.backgroundGradient),
+        child: SafeArea(
+          child: Column(
+            children: [
+              const _HubHeader(),
+              const SizedBox(height: 12),
+              Expanded(
+                child: _ModeGrid(activeConnection: activeConnection),
               ),
-            ),
-            const SizedBox(height: 32),
-          ],
+              if (activeConnection == null)
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 32, vertical: 12),
+                  child: Text(
+                    t.hubChooseSomeone,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: AppColors.textMuted,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+              const _PaginationDots(active: 0, count: 3),
+              const SizedBox(height: 16),
+              const PulseBottomNav(active: PulseNavTab.hub),
+              const SizedBox(height: 8),
+            ],
+          ),
         ),
       ),
     );
@@ -55,124 +66,73 @@ class HubScreen extends ConsumerWidget {
 }
 
 class _HubHeader extends StatelessWidget {
-  const _HubHeader({required this.active});
-
-  final Connection? active;
+  const _HubHeader();
 
   @override
   Widget build(BuildContext context) {
-    final t = AppLocalizations.of(context)!;
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 8),
       child: Row(
         children: [
-          if (active != null) ...[
-            _AvatarDot(connection: active!),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                active!.nickname,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: AppColors.textPrimary,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-            const _TransportDot(kind: TransportKind.searching),
-          ] else ...[
-            Expanded(
-              child: Text(
-                t.hubModesTitle,
-                style: const TextStyle(
-                  color: AppColors.textPrimary,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ],
           IconButton(
-            icon: const Icon(Icons.people_alt_rounded),
+            icon: const Icon(Icons.menu_rounded),
             color: AppColors.textSecondary,
-            onPressed: () => context.go(Routes.people),
+            onPressed: () => Scaffold.of(context).openDrawer(),
           ),
+          const Spacer(),
+          const _TransportPill(kind: TransportKind.direct),
+          const SizedBox(width: 4),
         ],
       ),
     );
   }
 }
 
-class _AvatarDot extends StatelessWidget {
-  const _AvatarDot({required this.connection});
-
-  final Connection connection;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = AppColors
-        .avatarPalette[connection.colorIndex % AppColors.avatarPalette.length];
-    return Container(
-      width: 32,
-      height: 32,
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.18),
-        shape: BoxShape.circle,
-        border: Border.all(color: color, width: 1.4),
-      ),
-      alignment: Alignment.center,
-      child: Text(
-        connection.emoji,
-        style: const TextStyle(fontSize: 16),
-      ),
-    );
-  }
-}
-
-class _TransportDot extends StatelessWidget {
-  const _TransportDot({required this.kind});
+class _TransportPill extends StatelessWidget {
+  const _TransportPill({required this.kind});
 
   final TransportKind kind;
 
   @override
   Widget build(BuildContext context) {
-    final color = switch (kind) {
-      TransportKind.direct => AppColors.transportDirect,
-      TransportKind.localNetwork => AppColors.transportLocal,
-      TransportKind.relay => AppColors.transportRelay,
-      TransportKind.searching => AppColors.transportSearching,
+    final t = AppLocalizations.of(context)!;
+    final (color, label) = switch (kind) {
+      TransportKind.direct => (
+          AppColors.transportDirect,
+          '${t.transportDirect} (${t.connectionBle})'
+        ),
+      TransportKind.localNetwork => (
+          AppColors.transportLocal,
+          t.transportLocal,
+        ),
+      TransportKind.relay => (AppColors.transportRelay, t.transportRelay),
+      TransportKind.searching => (
+          AppColors.transportSearching,
+          t.transportSearching,
+        ),
     };
     return Container(
-      width: 10,
-      height: 10,
-      decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-    );
-  }
-}
-
-class _NoActiveBanner extends StatelessWidget {
-  const _NoActiveBanner({required this.title, required this.subtitle});
-  final String title;
-  final String subtitle;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 32),
-      child: Column(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.outline),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Text(
-            title,
-            style: const TextStyle(
-              color: AppColors.textPrimary,
-              fontSize: 18,
-              fontWeight: FontWeight.w500,
-            ),
+          Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(width: 6),
           Text(
-            subtitle,
-            textAlign: TextAlign.center,
-            style: const TextStyle(color: AppColors.textSecondary),
+            label,
+            style: const TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 12,
+            ),
           ),
         ],
       ),
@@ -180,68 +140,33 @@ class _NoActiveBanner extends StatelessWidget {
   }
 }
 
-class _ModeCarousel extends ConsumerStatefulWidget {
-  const _ModeCarousel({required this.activeConnection});
+class _ModeGrid extends ConsumerWidget {
+  const _ModeGrid({required this.activeConnection});
 
-  final Connection activeConnection;
-
-  @override
-  ConsumerState<_ModeCarousel> createState() => _ModeCarouselState();
-}
-
-class _ModeCarouselState extends ConsumerState<_ModeCarousel> {
-  late final PageController _controller =
-      PageController(viewportFraction: 0.45);
-  int _index = 0;
+  final Connection? activeConnection;
 
   @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  void _onSelectMode(PulseModeDescriptor descriptor) {
-    final unlocked = ref
-        .read(subscriptionControllerProvider.notifier)
-        .isModeUnlocked(descriptor.id);
-    if (!unlocked) {
-      context.push(Routes.subscription);
-      return;
-    }
-    // push() — not go() — so the mode screen's close X can pop back to /hub
-    // instead of getting stuck.
-    context.push(Routes.modePath(descriptor.id.name));
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 220,
-      child: PageView.builder(
-        controller: _controller,
-        itemCount: kAllModes.length,
-        onPageChanged: (i) => setState(() => _index = i),
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: GridView.builder(
+        physics: const BouncingScrollPhysics(),
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 3,
+          mainAxisSpacing: 16,
+          crossAxisSpacing: 16,
+          childAspectRatio: 0.85,
+        ),
+        itemCount: kAllModes.length + 1,
         itemBuilder: (context, i) {
+          if (i == kAllModes.length) return const _MoreTile();
           final mode = kAllModes[i];
-          final isCenter = i == _index;
-          final unlocked = ref
-              .read(subscriptionControllerProvider.notifier)
-              .isModeUnlocked(mode.id);
-          return AnimatedScale(
-            scale: isCenter ? 1.0 : 0.78,
-            duration: const Duration(milliseconds: 220),
-            curve: Curves.easeOut,
-            child: GestureDetector(
-              onLongPress: () => _onSelectMode(mode),
-              onTap: () {
-                _controller.animateToPage(
-                  i,
-                  duration: const Duration(milliseconds: 240),
-                  curve: Curves.easeOut,
-                );
-              },
-              child: _ModeTile(mode: mode, locked: !unlocked),
-            ),
+          final isFeatured =
+              mode.id == PulseModeId.halfHeart && activeConnection != null;
+          return _ModeGridTile(
+            mode: mode,
+            featured: isFeatured,
+            connection: activeConnection,
           );
         },
       ),
@@ -249,41 +174,174 @@ class _ModeCarouselState extends ConsumerState<_ModeCarousel> {
   }
 }
 
-class _ModeTile extends StatelessWidget {
-  const _ModeTile({required this.mode, required this.locked});
+class _ModeGridTile extends ConsumerWidget {
+  const _ModeGridTile({
+    required this.mode,
+    required this.featured,
+    required this.connection,
+  });
 
   final PulseModeDescriptor mode;
-  final bool locked;
+  final bool featured;
+  final Connection? connection;
 
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 24),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(36),
-        border: Border.all(color: AppColors.outline),
-      ),
-      child: Stack(
-        alignment: Alignment.center,
+  Widget build(BuildContext context, WidgetRef ref) {
+    final t = AppLocalizations.of(context)!;
+    final unlocked = ref
+        .read(subscriptionControllerProvider.notifier)
+        .isModeUnlocked(mode.id);
+    final color = unlocked ? AppColors.pulse : AppColors.textMuted;
+    return GestureDetector(
+      onTap: () => _enter(context, ref),
+      onLongPress: () => _enter(context, ref),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            mode.icon,
-            size: 56,
-            color: locked ? AppColors.textMuted : AppColors.pulse,
+          Container(
+            width: featured ? 86 : 68,
+            height: featured ? 86 : 68,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: featured ? AppColors.heroGradient : null,
+              color: featured ? null : AppColors.surface,
+              border: Border.all(
+                color: featured ? Colors.transparent : AppColors.outline,
+                width: 1.2,
+              ),
+              boxShadow: featured
+                  ? const [
+                      BoxShadow(color: AppColors.pulseHalo, blurRadius: 24),
+                    ]
+                  : null,
+            ),
+            alignment: Alignment.center,
+            child: featured && connection != null
+                ? Text(
+                    connection!.emoji,
+                    style: const TextStyle(fontSize: 28),
+                  )
+                : Icon(mode.icon, size: 30, color: color),
           ),
-          if (locked)
-            const Positioned(
-              top: 12,
-              right: 12,
+          const SizedBox(height: 8),
+          Text(
+            _modeLabel(t, mode.id),
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: featured ? AppColors.textPrimary : AppColors.textSecondary,
+              fontSize: 11,
+              fontWeight: featured ? FontWeight.w600 : FontWeight.w400,
+            ),
+          ),
+          if (!unlocked)
+            const Padding(
+              padding: EdgeInsets.only(top: 2),
               child: Icon(
                 Icons.lock_outline_rounded,
-                size: 16,
+                size: 12,
                 color: AppColors.textMuted,
               ),
             ),
         ],
       ),
+    );
+  }
+
+  void _enter(BuildContext context, WidgetRef ref) {
+    final unlocked = ref
+        .read(subscriptionControllerProvider.notifier)
+        .isModeUnlocked(mode.id);
+    if (!unlocked) {
+      context.push(Routes.subscription);
+      return;
+    }
+    // push() — not go() — so the mode screen's close X pops cleanly.
+    context.push(Routes.modePath(mode.id.name));
+  }
+}
+
+String _modeLabel(AppLocalizations t, PulseModeId id) => switch (id) {
+      PulseModeId.tapTap => t.modeTapTap,
+      PulseModeId.halfHeart => t.modeHalfHeart,
+      PulseModeId.candle => t.modeCandle,
+      PulseModeId.whisper => t.modeWhisper,
+      PulseModeId.bell => t.modeBell,
+      PulseModeId.ray => t.modeRay,
+      PulseModeId.constellation => t.modeConstellation,
+      PulseModeId.sketch => t.modeSketch,
+      PulseModeId.goosebumps ||
+      PulseModeId.thread ||
+      PulseModeId.thunder ||
+      PulseModeId.fireworks ||
+      PulseModeId.balance ||
+      PulseModeId.sandbox ||
+      PulseModeId.breath ||
+      PulseModeId.sync =>
+        t.modesPaidLocked,
+    };
+
+class _MoreTile extends StatelessWidget {
+  const _MoreTile();
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context)!;
+    return GestureDetector(
+      onTap: () => context.push(Routes.modesBrowser),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            width: 68,
+            height: 68,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: AppColors.surface,
+              border: Border.all(color: AppColors.outline, width: 1.2),
+            ),
+            alignment: Alignment.center,
+            child: const Icon(
+              Icons.add_rounded,
+              size: 30,
+              color: AppColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            t.modeMore,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 11,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PaginationDots extends StatelessWidget {
+  const _PaginationDots({required this.active, required this.count});
+  final int active;
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: List.generate(count, (i) {
+        final isActive = i == active;
+        return Container(
+          width: isActive ? 18 : 6,
+          height: 6,
+          margin: const EdgeInsets.symmetric(horizontal: 3),
+          decoration: BoxDecoration(
+            color: isActive ? AppColors.pulse : AppColors.outline,
+            borderRadius: BorderRadius.circular(3),
+          ),
+        );
+      }),
     );
   }
 }

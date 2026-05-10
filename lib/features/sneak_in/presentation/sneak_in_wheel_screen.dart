@@ -6,6 +6,7 @@ import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../shared/widgets/pulse_bottom_nav.dart';
 import '../../connections/application/connections_controller.dart';
 import '../../connections/domain/connection.dart';
 import '../application/sneak_in_controller.dart';
@@ -37,29 +38,34 @@ class _SneakInWheelScreenState extends ConsumerState<SneakInWheelScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(title: Text(t.sneakInTitle)),
-      body: SafeArea(
-        child: Column(
-          children: [
-            Expanded(
-              child: Center(
-                child: _SignalWheel(
-                  selectedIndex: _selected,
-                  onSelect: (i) => setState(() => _selected = i),
+      appBar: AppBar(title: Text(t.sneakInPickSound)),
+      body: DecoratedBox(
+        decoration: const BoxDecoration(gradient: AppColors.backgroundGradient),
+        child: SafeArea(
+          child: Column(
+            children: [
+              Expanded(
+                child: Center(
+                  child: _SignalWheel(
+                    selectedIndex: _selected,
+                    onSelect: (i) => setState(() => _selected = i),
+                  ),
                 ),
               ),
-            ),
-            const _SwipeUpAffordance(),
-            const SizedBox(height: 8),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: _Targets(
-                targets: pausedTargets,
-                selectedSignalIndex: _selected,
+              const _SwipeUpAffordance(),
+              const SizedBox(height: 8),
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: _Targets(
+                  targets: pausedTargets,
+                  selectedSignalIndex: _selected,
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
-          ],
+              const PulseBottomNav(active: PulseNavTab.sneakIn),
+              const SizedBox(height: 8),
+            ],
+          ),
         ),
       ),
     );

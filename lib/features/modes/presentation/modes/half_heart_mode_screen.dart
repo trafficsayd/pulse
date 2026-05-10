@@ -136,25 +136,27 @@ class _Half extends StatelessWidget {
       child: AnimatedBuilder(
         animation: pulse,
         builder: (context, _) {
-          final intensity = bothHeld ? (0.6 + 0.4 * pulse.value) : (isHeld ? 0.5 : 0.18);
+          final intensity =
+              bothHeld ? (0.6 + 0.4 * pulse.value) : (isHeld ? 0.5 : 0.18);
+          // Each side leans into a different end of the pink→violet hero
+          // gradient so the heart visually completes when held together.
+          final accent = isLeft ? AppColors.pulsePink : AppColors.pulse;
           return Container(
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: isLeft ? Alignment.centerLeft : Alignment.centerRight,
                 end: isLeft ? Alignment.centerRight : Alignment.centerLeft,
                 colors: [
-                  AppColors.pulse.withValues(alpha: intensity),
+                  accent.withValues(alpha: intensity),
                   AppColors.background,
                 ],
               ),
             ),
             child: Center(
               child: Icon(
-                isLeft
-                    ? Icons.favorite_border_rounded
-                    : Icons.favorite_border_rounded,
+                Icons.favorite_rounded,
                 size: 96,
-                color: AppColors.pulse.withValues(
+                color: accent.withValues(
                   alpha: bothHeld ? 1.0 : (isHeld ? 0.7 : 0.25),
                 ),
               ),

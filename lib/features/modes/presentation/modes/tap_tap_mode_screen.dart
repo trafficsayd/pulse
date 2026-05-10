@@ -75,74 +75,150 @@ class _TapTapModeScreenState extends State<TapTapModeScreen>
     final t = AppLocalizations.of(context)!;
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          final size = Size(constraints.maxWidth, constraints.maxHeight);
-          return Stack(
-            children: [
-              Positioned.fill(
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTapDown: (d) => _onTap(d, size),
-                ),
-              ),
-              for (final ring in _rings)
-                Positioned(
-                  left: ring.position.dx - 60,
-                  top: ring.position.dy - 60,
-                  width: 120,
-                  height: 120,
-                  child: AnimatedBuilder(
-                    animation: ring.controller,
-                    builder: (context, _) {
-                      final progress = ring.controller.value;
-                      final scale = 0.4 + progress * 1.6;
-                      final opacity = (1 - progress).clamp(0.0, 1.0);
-                      return Transform.scale(
-                        scale: scale,
-                        child: Opacity(
-                          opacity: opacity,
-                          child: Container(
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: ring.isLocal
-                                    ? AppColors.pulse
-                                    : AppColors.transportLocal,
-                                width: 2,
-                              ),
-                            ),
-                          ),
-                        ),
-                      );
-                    },
+      body: DecoratedBox(
+        decoration: const BoxDecoration(gradient: AppColors.backgroundGradient),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final size = Size(constraints.maxWidth, constraints.maxHeight);
+            return Stack(
+              children: [
+                Positioned.fill(
+                  child: CustomPaint(
+                    painter: _ScatterDotsPainter(seed: 7),
                   ),
                 ),
-              Positioned(
-                top: 24,
-                left: 0,
-                right: 0,
-                child: Center(
-                  child: Text(
-                    t.tapTapHint,
-                    style: const TextStyle(
-                      color: AppColors.textMuted,
-                      fontSize: 14,
+                Positioned.fill(
+                  child: Center(
+                    child: CustomPaint(
+                      size: Size.square(math.min(size.width, size.height) * 0.7),
+                      painter: const _ConcentricRingsPainter(),
                     ),
                   ),
                 ),
-              ),
-              const Positioned(
-                top: 16,
-                right: 16,
-                child: SafeArea(child: ModeCloseButton()),
-              ),
-            ],
-          );
-        },
+                Positioned.fill(
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTapDown: (d) => _onTap(d, size),
+                  ),
+                ),
+                for (final ring in _rings)
+                  Positioned(
+                    left: ring.position.dx - 60,
+                    top: ring.position.dy - 60,
+                    width: 120,
+                    height: 120,
+                    child: AnimatedBuilder(
+                      animation: ring.controller,
+                      builder: (context, _) {
+                        final progress = ring.controller.value;
+                        final scale = 0.4 + progress * 1.6;
+                        final opacity = (1 - progress).clamp(0.0, 1.0);
+                        return Transform.scale(
+                          scale: scale,
+                          child: Opacity(
+                            opacity: opacity,
+                            child: Container(
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: ring.isLocal
+                                      ? AppColors.pulse
+                                      : AppColors.pulsePink,
+                                  width: 2,
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                Positioned(
+                  top: 24,
+                  left: 0,
+                  right: 0,
+                  child: SafeArea(
+                    child: Center(
+                      child: Text(
+                        t.tapTapHint,
+                        style: const TextStyle(
+                          color: AppColors.textMuted,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const Positioned(
+                  top: 16,
+                  right: 16,
+                  child: SafeArea(child: ModeCloseButton()),
+                ),
+              ],
+            );
+          },
+        ),
       ),
     );
   }
+}
+
+class _ConcentricRingsPainter extends CustomPainter {
+  const _ConcentricRingsPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = size.center(Offset.zero);
+    final maxR = size.width / 2;
+    for (var i = 0; i < 4; i++) {
+      final r = maxR * (1 - i * 0.2);
+      canvas.drawCircle(
+        center,
+        r,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1
+          ..color = AppColors.pulse.withValues(alpha: 0.18 + i * 0.05),
+      );
+    }
+    canvas.drawCircle(
+      center,
+      8,
+      Paint()..color = AppColors.pulse,
+    );
+    canvas.drawCircle(
+      center,
+      24,
+      Paint()..color = AppColors.pulseGlow,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _ConcentricRingsPainter oldDelegate) => false;
+}
+
+class _ScatterDotsPainter extends CustomPainter {
+  _ScatterDotsPainter({required this.seed});
+  final int seed;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rng = math.Random(seed);
+    for (var i = 0; i < 60; i++) {
+      final x = rng.nextDouble() * size.width;
+      final y = rng.nextDouble() * size.height;
+      final r = 1.0 + rng.nextDouble() * 1.6;
+      final alpha = 0.06 + rng.nextDouble() * 0.18;
+      canvas.drawCircle(
+        Offset(x, y),
+        r,
+        Paint()..color = AppColors.pulse.withValues(alpha: alpha),
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _ScatterDotsPainter oldDelegate) => false;
 }
 
 class _Ring {

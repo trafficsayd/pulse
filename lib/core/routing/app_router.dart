@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../features/connections/presentation/connection_details_screen.dart';
+import '../../features/connections/presentation/connection_setup_screen.dart';
 import '../../features/hub/presentation/hub_screen.dart';
 import '../../features/modes/presentation/mode_runner_screen.dart';
+import '../../features/modes/presentation/modes_browser_screen.dart';
 import '../../features/pairing/presentation/pairing_screen.dart';
 import '../../features/people/presentation/people_screen.dart';
+import '../../features/settings/presentation/settings_screen.dart';
+import '../../features/sneak_in/presentation/sneak_in_received_screen.dart';
 import '../../features/sneak_in/presentation/sneak_in_wheel_screen.dart';
 import '../../features/subscription/presentation/subscription_screen.dart';
 import 'routes.dart';
@@ -24,6 +29,10 @@ GoRouter buildRouter() {
         builder: (context, state) => const PairingScreen(),
       ),
       GoRoute(
+        path: Routes.connectionSetup,
+        builder: (context, state) => const ConnectionSetupScreen(),
+      ),
+      GoRoute(
         path: Routes.hub,
         builder: (context, state) => const HubScreen(),
       ),
@@ -36,8 +45,24 @@ GoRouter buildRouter() {
         builder: (context, state) => const SneakInWheelScreen(),
       ),
       GoRoute(
+        path: Routes.sneakInReceived,
+        builder: (context, state) => const SneakInReceivedScreen(),
+      ),
+      GoRoute(
         path: Routes.subscription,
         builder: (context, state) => const SubscriptionScreen(),
+      ),
+      GoRoute(
+        path: Routes.settings,
+        builder: (context, state) => const SettingsScreen(),
+      ),
+      GoRoute(
+        path: Routes.connectionDetails,
+        builder: (context, state) => const ConnectionDetailsScreen(),
+      ),
+      GoRoute(
+        path: Routes.modesBrowser,
+        builder: (context, state) => const ModesBrowserScreen(),
       ),
       GoRoute(
         path: Routes.mode,

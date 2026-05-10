@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/crypto/pulse_key_manager.dart';
 import '../../../core/storage/secure_key_store.dart';
 import '../data/connections_repository.dart';
 import '../domain/connection.dart';
@@ -9,6 +10,11 @@ import '../domain/permission_flags.dart';
 /// Provides the singleton [SecureKeyStore].
 final secureKeyStoreProvider = Provider<SecureKeyStore>((ref) {
   return SecureKeyStore();
+});
+
+/// Provides the singleton [PulseKeyManager], wired to [secureKeyStoreProvider].
+final pulseKeyManagerProvider = Provider<PulseKeyManager>((ref) {
+  return PulseKeyManager(keyStore: ref.watch(secureKeyStoreProvider));
 });
 
 /// Provides the singleton [ConnectionsRepository].
@@ -80,6 +86,12 @@ class ConnectionsController extends Notifier<ConnectionsState> {
 
   /// Stub used until real pairing lands. Creates a paused connection so the
   /// rest of the app can be exercised without a partner device.
+  ///
+  /// As soon as a connection record exists we provision a fresh X25519 key
+  /// pair for it via [PulseKeyManager.getOrCreate]. Persisting the seed up
+  /// front means the handshake (when it lands) only has to exchange public
+  /// keys — the local private material is already at rest in the secure
+  /// store.
   Future<void> createStubConnection({required String nickname}) async {
     final repo = ref.read(connectionsRepositoryProvider);
     final created = await repo.create(
@@ -87,6 +99,7 @@ class ConnectionsController extends Notifier<ConnectionsState> {
       colorIndex: state.connections.length % 8,
       emoji: '✨',
     );
+    await ref.read(pulseKeyManagerProvider).getOrCreate(created.id);
     state = state.copyWith(connections: [...state.connections, created]);
   }
 
@@ -146,6 +159,9 @@ class ConnectionsController extends Notifier<ConnectionsState> {
   Future<void> delete(String id) async {
     final repo = ref.read(connectionsRepositoryProvider);
     await repo.delete(id);
+    // Wipe per-connection X25519 key material so a deleted contact leaves no
+    // recoverable bytes behind in secure storage.
+    await ref.read(pulseKeyManagerProvider).erase(id);
     state = state.copyWith(
       connections: state.connections.where((c) => c.id != id).toList(),
       activeId: state.activeId == id ? null : state.activeId,

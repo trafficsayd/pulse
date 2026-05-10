@@ -17,11 +17,11 @@ import 'package:cryptography/cryptography.dart';
 /// transmitting the framed ciphertext bytes; this class handles only the
 /// crypto primitives.
 class PulseCrypto {
-  PulseCrypto({KeyExchangeAlgorithm? kex, Cipher? cipher})
+  PulseCrypto({X25519? kex, Cipher? cipher})
       : _kex = kex ?? X25519(),
         _cipher = cipher ?? AesGcm.with256bits();
 
-  final KeyExchangeAlgorithm _kex;
+  final X25519 _kex;
   final Cipher _cipher;
 
   /// Generates a fresh X25519 key pair. Private bytes never leave the device;
@@ -29,7 +29,22 @@ class PulseCrypto {
   Future<PulseKeyPair> generateKeyPair() async {
     final pair = await _kex.newKeyPair();
     final pub = await pair.extractPublicKey();
-    return PulseKeyPair._(pair, pub);
+    final seed = await pair.extractPrivateKeyBytes();
+    return PulseKeyPair._(pair, pub, Uint8List.fromList(seed));
+  }
+
+  /// Restores a key pair from a previously saved 32-byte seed. The seed must
+  /// have been produced by [PulseKeyPair.privateSeed]; passing arbitrary bytes
+  /// throws [ArgumentError].
+  Future<PulseKeyPair> keyPairFromSeed(List<int> seed) async {
+    if (seed.length != 32) {
+      throw ArgumentError(
+        'PulseCrypto.keyPairFromSeed: seed must be 32 bytes, got ${seed.length}',
+      );
+    }
+    final pair = await _kex.newKeyPairFromSeed(List<int>.from(seed));
+    final pub = await pair.extractPublicKey();
+    return PulseKeyPair._(pair, pub, Uint8List.fromList(seed));
   }
 
   /// Derives the 32-byte shared secret from this device's [keyPair] and the
@@ -104,10 +119,11 @@ class PulseCrypto {
 /// A handle around an [`X25519`] [KeyPair] that keeps the matching public key
 /// cached so callers can serialize / send it without an extra await.
 class PulseKeyPair {
-  PulseKeyPair._(this._inner, this._publicKey);
+  PulseKeyPair._(this._inner, this._publicKey, this._privateSeed);
 
   final KeyPair _inner;
   final PublicKey _publicKey;
+  final Uint8List _privateSeed;
 
   /// Raw 32-byte public key. Safe to share with the peer.
   List<int> get publicKey => List<int>.unmodifiable(
@@ -116,4 +132,8 @@ class PulseKeyPair {
 
   /// Convenience: base64-url encoded public key for QR / NFC / pairing wires.
   String get publicKeyBase64 => base64Url.encode(publicKey);
+
+  /// Raw 32-byte private seed. Must be persisted in [SecureKeyStore]; never
+  /// transmit it.
+  List<int> get privateSeed => List<int>.unmodifiable(_privateSeed);
 }

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import '../../core/crypto/pulse_crypto.dart';
+import '../../core/crypto/pulse_key_manager.dart';
 import 'ble_transport.dart';
 import 'local_network_transport.dart';
 import 'transport.dart';
@@ -24,12 +25,14 @@ class TransportManager {
     Transport? localNetwork,
     Transport? relay,
     PulseCrypto? crypto,
+    PulseKeyManager? keyManager,
   })  : _transports = [
           ble ?? BleTransport(),
           localNetwork ?? LocalNetworkTransport(),
           relay ?? WebRtcTransport(),
         ],
-        _crypto = crypto ?? PulseCrypto();
+        _crypto = crypto ?? PulseCrypto(),
+        _keyManager = keyManager;
 
   /// In priority order: direct → local network → relay.
   final List<Transport> _transports;
@@ -38,6 +41,12 @@ class TransportManager {
   /// reused for all connections.
   final PulseCrypto _crypto;
   PulseCrypto get crypto => _crypto;
+
+  /// Optional [PulseKeyManager] hook. When wired, [ensureSharedSecret] will
+  /// derive secrets directly from saved X25519 material rather than relying
+  /// on callers to pre-load them via [setSharedSecret]. Tests pass `null`
+  /// here.
+  final PulseKeyManager? _keyManager;
 
   /// Per-connection 32-byte shared secret keyed by connection id.
   ///
@@ -60,6 +69,20 @@ class TransportManager {
 
   bool hasSharedSecret(String connectionId) =>
       _sharedSecrets.containsKey(connectionId);
+
+  /// Lazily fills the in-memory secret cache for [connectionId] by asking the
+  /// [PulseKeyManager] to derive one from the saved X25519 material. Returns
+  /// `true` if a secret is available afterward. No-op when the manager is not
+  /// wired or the handshake hasn't completed yet.
+  Future<bool> ensureSharedSecret(String connectionId) async {
+    if (_sharedSecrets.containsKey(connectionId)) return true;
+    final manager = _keyManager;
+    if (manager == null) return false;
+    final secret = await manager.sharedSecret(connectionId);
+    if (secret == null || secret.length != 32) return false;
+    _sharedSecrets[connectionId] = List<int>.unmodifiable(secret);
+    return true;
+  }
 
   final _state = StreamController<TransportKind>.broadcast();
   Stream<TransportKind> get state => _state.stream;

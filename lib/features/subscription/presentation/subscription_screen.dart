@@ -5,7 +5,6 @@ import 'package:pulse/l10n/app_localizations.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/gradient_button.dart';
 import '../../../core/widgets/pulse_mockup.dart';
-import '../../../core/widgets/section_header.dart';
 import '../application/subscription_controller.dart';
 import '../domain/entitlements.dart';
 

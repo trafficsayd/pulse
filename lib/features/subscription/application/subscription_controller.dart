@@ -42,6 +42,21 @@ class SubscriptionController extends Notifier<Entitlements> {
         .writeJson(_storageKey, next.toJson());
   }
 
+  /// Stub for IAP "Restore purchases". A real impl would talk to App Store /
+  /// Play Billing receipts; for now we re-read whatever is in secure storage,
+  /// roll the trial forward, and report whether the result is a paid tier.
+  ///
+  /// Returns true iff the user is now on [SubscriptionTier.subscribed].
+  Future<bool> restorePurchases() async {
+    final store = ref.read(secureKeyStoreProvider);
+    final json = await store.readJson(_storageKey);
+    if (json == null) return false;
+    final restored = Entitlements.fromJson(json).rolledForward();
+    state = restored;
+    await store.writeJson(_storageKey, restored.toJson());
+    return restored.tier == SubscriptionTier.subscribed;
+  }
+
   /// True if [mode] is reachable on the current tier.
   bool isModeUnlocked(PulseModeId mode) {
     return switch (state.tier) {

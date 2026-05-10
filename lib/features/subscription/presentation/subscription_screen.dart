@@ -68,8 +68,21 @@ class SubscriptionScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: 12),
                 TextButton(
-                  onPressed: () {
-                    // TODO(iap): hook into Apple/Google restore-purchase APIs.
+                  onPressed: () async {
+                    final controller =
+                        ref.read(subscriptionControllerProvider.notifier);
+                    final restored = await controller.restorePurchases();
+                    if (!context.mounted) return;
+                    final messenger = ScaffoldMessenger.of(context);
+                    messenger.showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          restored
+                              ? t.subscriptionRestoreOk
+                              : t.subscriptionRestoreNone,
+                        ),
+                      ),
+                    );
                   },
                   child: Text(
                     t.subscriptionRestore,

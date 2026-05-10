@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/routing/app_router.dart';
 import 'core/theme/app_theme.dart';
+import 'features/settings/application/settings_controller.dart';
 
 /// Root [MaterialApp.router] for Pulse.
 ///
@@ -23,12 +24,16 @@ class _PulseAppState extends ConsumerState<PulseApp> {
 
   @override
   Widget build(BuildContext context) {
+    final settings = ref.watch(settingsControllerProvider);
     return MaterialApp.router(
-      onGenerateTitle: (context) => AppLocalizations.of(context)?.appTitle ?? 'Pulse',
+      onGenerateTitle: (context) =>
+          AppLocalizations.of(context)?.appTitle ?? 'Pulse',
       theme: buildPulseTheme(),
       darkTheme: buildPulseTheme(),
       themeMode: ThemeMode.dark,
       debugShowCheckedModeBanner: false,
+      // null = follow system locale; otherwise the user's persisted choice.
+      locale: settings.locale,
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       routerConfig: _router,

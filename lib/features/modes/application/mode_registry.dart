@@ -1,13 +1,21 @@
 import 'package:flutter/material.dart';
 
 import '../domain/pulse_mode.dart';
+import '../presentation/modes/balance_mode_screen.dart';
 import '../presentation/modes/bell_mode_screen.dart';
+import '../presentation/modes/breath_mode_screen.dart';
 import '../presentation/modes/candle_mode_screen.dart';
 import '../presentation/modes/constellation_mode_screen.dart';
+import '../presentation/modes/fireworks_mode_screen.dart';
+import '../presentation/modes/goosebumps_mode_screen.dart';
 import '../presentation/modes/half_heart_mode_screen.dart';
 import '../presentation/modes/ray_mode_screen.dart';
+import '../presentation/modes/sandbox_mode_screen.dart';
 import '../presentation/modes/sketch_mode_screen.dart';
+import '../presentation/modes/sync_mode_screen.dart';
 import '../presentation/modes/tap_tap_mode_screen.dart';
+import '../presentation/modes/thread_mode_screen.dart';
+import '../presentation/modes/thunder_mode_screen.dart';
 import '../presentation/modes/whisper_mode_screen.dart';
 
 /// The full ordered set of modes available in the carousel.
@@ -71,6 +79,63 @@ final List<PulseModeDescriptor> kAllModes = [
     titleKey: 'modeSketch',
     isStarter: true,
     builder: (context) => const SketchModeScreen(),
+  ),
+  // Paid modes (locked unless on a paid tier).
+  PulseModeDescriptor(
+    id: PulseModeId.goosebumps,
+    icon: Icons.blur_on_rounded,
+    titleKey: 'modeGoosebumps',
+    isStarter: false,
+    builder: (context) => const GoosebumpsModeScreen(),
+  ),
+  PulseModeDescriptor(
+    id: PulseModeId.thread,
+    icon: Icons.timeline_rounded,
+    titleKey: 'modeThread',
+    isStarter: false,
+    builder: (context) => const ThreadModeScreen(),
+  ),
+  PulseModeDescriptor(
+    id: PulseModeId.thunder,
+    icon: Icons.bolt_rounded,
+    titleKey: 'modeThunder',
+    isStarter: false,
+    builder: (context) => const ThunderModeScreen(),
+  ),
+  PulseModeDescriptor(
+    id: PulseModeId.fireworks,
+    icon: Icons.celebration_rounded,
+    titleKey: 'modeFireworks',
+    isStarter: false,
+    builder: (context) => const FireworksModeScreen(),
+  ),
+  PulseModeDescriptor(
+    id: PulseModeId.balance,
+    icon: Icons.balance_rounded,
+    titleKey: 'modeBalance',
+    isStarter: false,
+    builder: (context) => const BalanceModeScreen(),
+  ),
+  PulseModeDescriptor(
+    id: PulseModeId.sandbox,
+    icon: Icons.grain_rounded,
+    titleKey: 'modeSandbox',
+    isStarter: false,
+    builder: (context) => const SandboxModeScreen(),
+  ),
+  PulseModeDescriptor(
+    id: PulseModeId.breath,
+    icon: Icons.air_rounded,
+    titleKey: 'modeBreath',
+    isStarter: false,
+    builder: (context) => const BreathModeScreen(),
+  ),
+  PulseModeDescriptor(
+    id: PulseModeId.sync,
+    icon: Icons.sync_rounded,
+    titleKey: 'modeSync',
+    isStarter: false,
+    builder: (context) => const SyncModeScreen(),
   ),
 ];
 

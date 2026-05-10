@@ -8,6 +8,73 @@
   "pairingEnterCode": "Введи шестизначный код",
   "pairingCancel": "Отмена",
   "pairingNicknameHint": "Псевдоним (видно только тебе)",
+  "pairingScreenTitle": "Создать пару",
+  "pairingShowCodeOrQr": "Покажите партнёру код или QR",
+  "pairingLanguageRu": "RU",
+  "pairingLanguageEn": "EN",
+
+  "connSetupTitle": "Устанавливаем связь…",
+  "connSetupKeys": "Обмен ключами",
+  "connSetupEncrypt": "Шифрование канала",
+  "connSetupSecure": "Создание защищённой связи",
+
+  "navMyPeople": "Мои люди",
+  "navPulse": "Pulse",
+  "navSneakIn": "Подкрасться",
+
+  "drawerSettings": "Настройки",
+  "drawerConnection": "Подключение",
+  "drawerModes": "Режимы",
+  "drawerSubscription": "Подписка",
+
+  "settingsTitle": "Настройки",
+  "settingsLanguageRussian": "Русский",
+  "settingsLanguageEnglish": "English",
+  "settingsNotifications": "Уведомления",
+  "settingsPermissions": "Разрешения",
+  "settingsAbout": "О приложении",
+  "settingsSupport": "Служба поддержки",
+  "settingsVersion": "Версия {version}",
+  "@settingsVersion": {
+    "placeholders": {
+      "version": {"type": "String"}
+    }
+  },
+  "settingsCrashReports": "Crash reports",
+  "settingsCrashReportsHint": "Отправлять анонимно",
+
+  "connectionDetailsTitle": "Подключение",
+  "connectionBle": "BLE",
+  "connectionWifiDirect": "Wi-Fi Direct",
+  "connectionWebrtc": "WebRTC",
+  "connectionPrivacyNote": "Приложение работает без интернета и не собирает данные.",
+
+  "modesBrowserTitle": "Режимы",
+  "modesAvailableInTrial": "Доступно в триале ({used}/{total})",
+  "@modesAvailableInTrial": {
+    "placeholders": {
+      "used": {"type": "int"},
+      "total": {"type": "int"}
+    }
+  },
+  "modesAvailableOnSubscription": "Доступно по подписке",
+
+  "subscriptionFeatureAllModes": "Все текущие и будущие режимы",
+  "subscriptionFeatureUnlimitedSneakIn": "Безлимитный Sneak In",
+  "subscriptionFeatureUpToTen": "До 10 сохранённых связей",
+  "subscriptionFeaturePriority": "Приоритет новых функций",
+  "subscriptionTryFree": "Попробовать бесплатно 7 дней",
+  "subscriptionFreeForSeven": "7 дней бесплатно",
+  "subscriptionTermsAndPrivacy": "Условия использования · Политика конфиденциальности",
+
+  "sneakInReceivedTitle": "Sneak In!",
+  "sneakInSentYouASignal": "отправил вам сигнал",
+  "sneakInPullDownToReply": "Потяните вниз, чтобы ответить",
+  "sneakInIgnore": "Игнорировать",
+  "sneakInPickSound": "Выберите звук",
+
+  "modesPaidLocked": "Заблокировано",
+  "modeMore": "Ещё",
 
   "hubModesTitle": "Режимы",
   "hubLongPressToStart": "Долгое нажатие — запустить",

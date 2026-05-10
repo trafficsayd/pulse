@@ -38,7 +38,14 @@ ThemeData buildPulseTheme() {
       elevation: 0,
       centerTitle: true,
       foregroundColor: AppColors.textPrimary,
+      titleTextStyle: TextStyle(
+        color: AppColors.textPrimary,
+        fontSize: 18,
+        fontWeight: FontWeight.w500,
+        letterSpacing: 0.3,
+      ),
     ),
+    iconTheme: const IconThemeData(color: AppColors.textSecondary),
     bottomSheetTheme: const BottomSheetThemeData(
       backgroundColor: AppColors.surfaceElevated,
       surfaceTintColor: Colors.transparent,

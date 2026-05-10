@@ -50,7 +50,7 @@ void main() {
     });
 
     test('fromJson with absent locale falls back to system', () {
-      final restored = SettingsState.fromJson({
+      final restored = SettingsState.fromJson(const {
         'notifications': true,
         'crashReports': true,
       });

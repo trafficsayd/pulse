@@ -164,6 +164,28 @@
 
   "settingsLanguage": "Язык",
   "settingsLanguageSystem": "Системный",
+  "settingsAboutBlurb": "Pulse — приложение для несловесного сенсорного общения. Никаких аккаунтов, лент и аналитики. Связи живут только на этом устройстве.",
+
+  "subscriptionRestoreNone": "Покупка не найдена.",
+  "subscriptionRestoreOk": "Подписка восстановлена.",
+
+  "modeGoosebumps": "Мурашки",
+  "modeThread": "Ниточка",
+  "modeThunder": "Гром",
+  "modeFireworks": "Фейерверк",
+  "modeBalance": "Баланс",
+  "modeSandbox": "Песочница",
+  "modeBreath": "Дыхание",
+  "modeSync": "Синхро",
+
+  "goosebumpsHint": "Тап — волна мурашек партнёру",
+  "threadHint": "Веди пальцем — натягивается ниточка",
+  "thunderHint": "Быстрые тапы — раскат грома",
+  "fireworksHint": "Тап — запуск фейерверка",
+  "balanceHint": "Удерживайте точку в центре вместе",
+  "sandboxHint": "Веди пальцем — рассыпай песок",
+  "breathHint": "Дыши вместе с кругом",
+  "syncHint": "Поймай ритм партнёра",
 
   "errorGeneric": "Что-то пошло не так"
 }

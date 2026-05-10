@@ -3,24 +3,24 @@ import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../application/settings_controller.dart';
 
 /// Settings is intentionally a single column of toggles + chevrons that
-/// mirrors the mockup. Most rows are stubs today: language and crash
-/// reports are wired through, the rest funnel into placeholder dialogs.
-class SettingsScreen extends ConsumerStatefulWidget {
+/// mirrors the mockup. Language, notifications and crash-reports rows are
+/// wired through [SettingsController]; the rest funnel into placeholder
+/// dialogs.
+class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
 
   @override
-  ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
-}
-
-class _SettingsScreenState extends ConsumerState<SettingsScreen> {
-  bool _crashReports = false;
-  bool _notifications = true;
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final t = AppLocalizations.of(context)!;
+    final settings = ref.watch(settingsControllerProvider);
+    final controller = ref.read(settingsControllerProvider.notifier);
+    // Treat "follow system" as English in the UI for now — the segmented
+    // toggle intentionally collapses null → en so the user always sees a
+    // selection, matching the design mockup.
+    final activeCode = settings.locale?.languageCode ?? 'en';
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -37,12 +37,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               children: [
                 _LanguageRow(
                   label: t.settingsLanguageRussian,
-                  active: false,
+                  active: activeCode == 'ru',
+                  onTap: () => controller.setLocale(const Locale('ru')),
                 ),
                 const _CardDivider(),
                 _LanguageRow(
                   label: t.settingsLanguageEnglish,
-                  active: true,
+                  active: activeCode == 'en',
+                  onTap: () => controller.setLocale(const Locale('en')),
                 ),
               ],
             ),
@@ -52,26 +54,26 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 _ToggleRow(
                   icon: Icons.notifications_rounded,
                   label: t.settingsNotifications,
-                  value: _notifications,
-                  onChanged: (v) => setState(() => _notifications = v),
+                  value: settings.notifications,
+                  onChanged: controller.setNotifications,
                 ),
                 const _CardDivider(),
                 _ChevronRow(
                   icon: Icons.security_rounded,
                   label: t.settingsPermissions,
-                  onTap: () {},
+                  onTap: () => _showPlaceholder(context, t.settingsPermissions),
                 ),
                 const _CardDivider(),
                 _ChevronRow(
                   icon: Icons.info_outline_rounded,
                   label: t.settingsAbout,
-                  onTap: () {},
+                  onTap: () => _showAbout(context, t),
                 ),
                 const _CardDivider(),
                 _ChevronRow(
                   icon: Icons.support_agent_rounded,
                   label: t.settingsSupport,
-                  onTap: () {},
+                  onTap: () => _showPlaceholder(context, t.settingsSupport),
                 ),
               ],
             ),
@@ -82,15 +84,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   icon: Icons.bug_report_outlined,
                   label: t.settingsCrashReports,
                   hint: t.settingsCrashReportsHint,
-                  value: _crashReports,
-                  onChanged: (v) => setState(() => _crashReports = v),
+                  value: settings.crashReports,
+                  onChanged: controller.setCrashReports,
                 ),
               ],
             ),
             const SizedBox(height: 24),
             Center(
               child: Text(
-                t.settingsVersion('0.3.0'),
+                t.settingsVersion('0.5.0'),
                 style: const TextStyle(
                   color: AppColors.textMuted,
                   fontSize: 12,
@@ -101,6 +103,42 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  void _showPlaceholder(BuildContext context, String title) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surfaceElevated,
+        title: Text(title),
+        content: const Text(
+          '...',
+          style: TextStyle(color: AppColors.textSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showAbout(BuildContext context, AppLocalizations t) {
+    showAboutDialog(
+      context: context,
+      applicationName: 'Pulse',
+      applicationVersion: '0.5.0',
+      applicationLegalese: '© 2025',
+      children: [
+        const SizedBox(height: 12),
+        Text(
+          t.settingsAboutBlurb,
+          style: const TextStyle(color: AppColors.textSecondary),
+        ),
+      ],
     );
   }
 }
@@ -158,19 +196,25 @@ class _CardDivider extends StatelessWidget {
 }
 
 class _LanguageRow extends StatelessWidget {
-  const _LanguageRow({required this.label, required this.active});
+  const _LanguageRow({
+    required this.label,
+    required this.active,
+    required this.onTap,
+  });
   final String label;
   final bool active;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     return ListTile(
-      leading: const Icon(Icons.language_rounded, color: AppColors.textSecondary),
+      leading:
+          const Icon(Icons.language_rounded, color: AppColors.textSecondary),
       title: Text(label, style: const TextStyle(color: AppColors.textPrimary)),
       trailing: active
           ? const Icon(Icons.check_rounded, color: AppColors.pulse)
           : null,
-      onTap: () {},
+      onTap: onTap,
     );
   }
 }

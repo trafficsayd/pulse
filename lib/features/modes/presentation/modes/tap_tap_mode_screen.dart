@@ -149,7 +149,7 @@ class _TapTapModeScreenState extends State<TapTapModeScreen>
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
                     child: PulseHeader(
-                      title: t.modeTapTapTitle,
+                      title: t.modeTapTap,
                       trailing: PulseRoundButton(
                         icon: Icons.close_rounded,
                         onTap: () => Navigator.of(context).maybePop(),

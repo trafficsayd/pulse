@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/storage/secure_key_store.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../connections/application/connections_controller.dart';
 import '../application/settings_controller.dart';
 
 /// Settings is intentionally a single column of toggles + chevrons that
@@ -89,10 +91,21 @@ class SettingsScreen extends ConsumerWidget {
                 ),
               ],
             ),
+            const SizedBox(height: 16),
+            _SettingsCard(
+              children: [
+                _ChevronRow(
+                  icon: Icons.delete_forever_rounded,
+                  label: t.settingsWipeData,
+                  destructive: true,
+                  onTap: () => _confirmWipe(context, ref, t),
+                ),
+              ],
+            ),
             const SizedBox(height: 24),
             Center(
               child: Text(
-                t.settingsVersion('0.5.0'),
+                t.settingsVersion('0.7.0'),
                 style: const TextStyle(
                   color: AppColors.textMuted,
                   fontSize: 12,
@@ -130,7 +143,7 @@ class SettingsScreen extends ConsumerWidget {
     showAboutDialog(
       context: context,
       applicationName: 'Pulse',
-      applicationVersion: '0.5.0',
+      applicationVersion: '0.7.0',
       applicationLegalese: '© 2025',
       children: [
         const SizedBox(height: 12),
@@ -141,6 +154,52 @@ class SettingsScreen extends ConsumerWidget {
       ],
     );
   }
+
+  /// Drops every persisted byte: secure-storage entries, connections, key
+  /// material, settings. The router stays mounted, so once the wipe finishes
+  /// the user just sees an empty pristine state.
+  Future<void> _confirmWipe(
+    BuildContext context,
+    WidgetRef ref,
+    AppLocalizations t,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surfaceElevated,
+        title: Text(t.settingsWipeData),
+        content: Text(
+          t.settingsWipeDataConfirm,
+          style: const TextStyle(color: AppColors.textSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(t.pairingCancel),
+          ),
+          TextButton(
+            style: TextButton.styleFrom(foregroundColor: Colors.redAccent),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(t.settingsWipeDataConfirmCta),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    // Wipe order: connections + key manager first (per-connection entries),
+    // then nuke the secure store wholesale to also blow away the
+    // settings.v1 / subscription / sketch-quota / sneak-in usage rows.
+    await ref.read(connectionsControllerProvider.notifier).wipeAll();
+    await _wipeSecureStore(ref.read(secureKeyStoreProvider));
+
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(t.settingsWipeDataDone)),
+    );
+  }
+
+  Future<void> _wipeSecureStore(SecureKeyStore store) => store.deleteAll();
 }
 
 class _SectionLabel extends StatelessWidget {
@@ -260,17 +319,20 @@ class _ChevronRow extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.onTap,
+    this.destructive = false,
   });
 
   final IconData icon;
   final String label;
   final VoidCallback onTap;
+  final bool destructive;
 
   @override
   Widget build(BuildContext context) {
+    final fg = destructive ? Colors.redAccent : AppColors.textPrimary;
     return ListTile(
-      leading: Icon(icon, color: AppColors.textSecondary),
-      title: Text(label, style: const TextStyle(color: AppColors.textPrimary)),
+      leading: Icon(icon, color: destructive ? Colors.redAccent : AppColors.textSecondary),
+      title: Text(label, style: TextStyle(color: fg)),
       trailing:
           const Icon(Icons.chevron_right_rounded, color: AppColors.textMuted),
       onTap: onTap,

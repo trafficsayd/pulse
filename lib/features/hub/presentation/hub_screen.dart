@@ -269,15 +269,14 @@ String _modeLabel(AppLocalizations t, PulseModeId id) => switch (id) {
       PulseModeId.ray => t.modeRay,
       PulseModeId.constellation => t.modeConstellation,
       PulseModeId.sketch => t.modeSketch,
-      PulseModeId.goosebumps ||
-      PulseModeId.thread ||
-      PulseModeId.thunder ||
-      PulseModeId.fireworks ||
-      PulseModeId.balance ||
-      PulseModeId.sandbox ||
-      PulseModeId.breath ||
-      PulseModeId.sync =>
-        t.modesPaidLocked,
+      PulseModeId.goosebumps => t.modeGoosebumps,
+      PulseModeId.thread => t.modeThread,
+      PulseModeId.thunder => t.modeThunder,
+      PulseModeId.fireworks => t.modeFireworks,
+      PulseModeId.balance => t.modeBalance,
+      PulseModeId.sandbox => t.modeSandbox,
+      PulseModeId.breath => t.modeBreath,
+      PulseModeId.sync => t.modeSync,
     };
 
 class _MoreTile extends StatelessWidget {

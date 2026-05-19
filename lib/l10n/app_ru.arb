@@ -10,6 +10,7 @@
   "pairingCreate": "Создать пару",
   "pairingJoin": "Присоединиться",
   "pairingEnterCode": "Введите шестизначный код",
+  "pairingDerivingCode": "Вычисляем безопасный код…",
   "pairingCancel": "Отмена",
   "pairingNicknameHint": "Псевдоним (видно только тебе)",
 

@@ -20,6 +20,8 @@
   "@pairingJoin": {},
   "pairingEnterCode": "Enter the 6-digit code",
   "@pairingEnterCode": {},
+  "pairingDerivingCode": "Deriving secure code…",
+  "@pairingDerivingCode": {},
   "pairingCancel": "Cancel",
   "@pairingCancel": {},
   "pairingNicknameHint": "Local nickname (only visible to you)",

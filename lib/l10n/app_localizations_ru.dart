@@ -1,5 +1,5 @@
-// ignore: unused_import
 import 'package:intl/intl.dart' as intl;
+
 import 'app_localizations.dart';
 
 // ignore_for_file: type=lint
@@ -302,6 +302,47 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get subscriptionConnectionLimitReached =>
       'Достигнут лимит связей для текущего тарифа.';
+
+  @override
+  String get subscriptionRestoring => 'Восстановление…';
+
+  @override
+  String get subscriptionRestoreNothing => 'Ничего не найдено';
+
+  @override
+  String get subscriptionRestoreSuccess => 'Подписка восстановлена';
+
+  @override
+  String get subscriptionPurchaseError => 'Не удалось оформить подписку';
+
+  @override
+  String get subscriptionPurchasePending => 'Платёж обрабатывается';
+
+  @override
+  String subscriptionActiveUntil(String date) {
+    return 'Подписка активна до $date';
+  }
+
+  @override
+  String get subscriptionManage => 'Управление подпиской';
+
+  @override
+  String get subscriptionErrorPaymentInvalid =>
+      'Способ оплаты не поддерживается';
+
+  @override
+  String get subscriptionErrorPaymentNotAllowed =>
+      'Покупки запрещены в настройках';
+
+  @override
+  String get subscriptionErrorBillingUnavailable =>
+      'Магазин временно недоступен';
+
+  @override
+  String get subscriptionErrorItemUnavailable => 'Подписка пока недоступна';
+
+  @override
+  String get subscriptionErrorGeneric => 'Произошла ошибка. Попробуйте ещё раз';
 
   @override
   String get modesCatalogTitle => 'Режимы';

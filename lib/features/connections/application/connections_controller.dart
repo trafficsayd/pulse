@@ -63,25 +63,25 @@ class ConnectionsController extends Notifier<ConnectionsState> {
 
   Future<List<Connection>> _seedDemoConnections() async {
     final demos = <_SeedSpec>[
-      _SeedSpec(
+      const _SeedSpec(
         nickname: 'Солнце',
         emoji: '🌞',
         colorIndex: 0,
         status: ConnectionStatus.active,
       ),
-      _SeedSpec(
+      const _SeedSpec(
         nickname: 'Луна',
         emoji: '🌙',
         colorIndex: 1,
         status: ConnectionStatus.paused,
       ),
-      _SeedSpec(
+      const _SeedSpec(
         nickname: 'Звезда',
         emoji: '✨',
         colorIndex: 2,
         status: ConnectionStatus.paused,
       ),
-      _SeedSpec(
+      const _SeedSpec(
         nickname: 'Комета',
         emoji: '☄️',
         colorIndex: 3,

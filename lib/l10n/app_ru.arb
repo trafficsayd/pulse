@@ -164,8 +164,14 @@
       "version": {"type": "String"}
     }
   },
-  "settingsCrashReports": "Crash reports",
+  "settingsCrashReports": "Отчёты о сбоях",
   "settingsCrashReportsHint": "Отправлять анонимно",
+  "settingsCrashReportsSection": "Отчёты о сбоях",
+  "settingsPermissionBluetooth": "Bluetooth",
+  "settingsPermissionWifi": "Wi-Fi",
+  "settingsPermissionMicrophone": "Микрофон",
+  "settingsPermissionGranted": "Разрешено",
+  "settingsSupportEmail": "support@pulse.app",
 
   "connectionStatusTitle": "Подключение",
   "connectionStatusOfflineNotice": "Приложение работает без интернета и не собирает данные",

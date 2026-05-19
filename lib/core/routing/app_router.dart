@@ -9,6 +9,7 @@ import '../../features/modes/presentation/mode_runner_screen.dart';
 import '../../features/modes/presentation/modes_catalog_screen.dart';
 import '../../features/pairing/presentation/pairing_screen.dart';
 import '../../features/people/presentation/people_screen.dart';
+import '../../features/settings/presentation/diagnostics_screen.dart';
 import '../../features/settings/presentation/settings_screen.dart';
 import '../../features/sneak_in/presentation/sneak_in_incoming_screen.dart';
 import '../../features/sneak_in/presentation/sneak_in_wheel_screen.dart';
@@ -60,6 +61,10 @@ GoRouter buildRouter() {
       GoRoute(
         path: Routes.settings,
         builder: (context, state) => const SettingsScreen(),
+      ),
+      GoRoute(
+        path: Routes.diagnostics,
+        builder: (context, state) => const DiagnosticsScreen(),
       ),
       GoRoute(
         path: Routes.connectionStatus,

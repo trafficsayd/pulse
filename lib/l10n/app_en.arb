@@ -312,6 +312,47 @@
   "connectionStatusOfflineNotice": "The app works offline and collects no data",
   "@connectionStatusOfflineNotice": {},
 
+  "settingsDiagnostics": "Device diagnostics",
+  "@settingsDiagnostics": {},
+  "settingsDiagnosticsHint": "What works on this phone",
+  "@settingsDiagnosticsHint": {},
+  "diagnosticsTitle": "Diagnostics",
+  "@diagnosticsTitle": {},
+  "diagnosticsHardwareSection": "Hardware",
+  "@diagnosticsHardwareSection": {},
+  "diagnosticsModesSection": "Modes",
+  "@diagnosticsModesSection": {},
+  "diagnosticsCapabilityMicrophone": "Microphone",
+  "@diagnosticsCapabilityMicrophone": {},
+  "diagnosticsCapabilityAccelerometer": "Accelerometer",
+  "@diagnosticsCapabilityAccelerometer": {},
+  "diagnosticsCapabilityVibration": "Vibration",
+  "@diagnosticsCapabilityVibration": {},
+  "diagnosticsCapabilityVibrationAmplitude": "Variable vibration",
+  "@diagnosticsCapabilityVibrationAmplitude": {},
+  "diagnosticsCapabilityFlashlight": "Flashlight",
+  "@diagnosticsCapabilityFlashlight": {},
+  "diagnosticsCapabilityCamera": "Camera",
+  "@diagnosticsCapabilityCamera": {},
+  "diagnosticsCapabilityBluetoothLe": "Bluetooth LE",
+  "@diagnosticsCapabilityBluetoothLe": {},
+  "diagnosticsCapabilityLocalNetwork": "Local network",
+  "@diagnosticsCapabilityLocalNetwork": {},
+  "diagnosticsStatusOk": "Available",
+  "@diagnosticsStatusOk": {},
+  "diagnosticsStatusMissing": "Unavailable",
+  "@diagnosticsStatusMissing": {},
+  "diagnosticsStatusProbing": "Probing…",
+  "@diagnosticsStatusProbing": {},
+  "diagnosticsModeAvailable": "Ready",
+  "@diagnosticsModeAvailable": {},
+  "diagnosticsModeMissing": "Missing: {what}",
+  "@diagnosticsModeMissing": {
+    "placeholders": {
+      "what": {"type": "String"}
+    }
+  },
+
   "errorGeneric": "Something went wrong",
   "@errorGeneric": {}
 }

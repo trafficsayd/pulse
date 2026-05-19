@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../capabilities/domain/device_capability.dart';
 import '../domain/pulse_mode.dart';
 import '../presentation/modes/half_heart_mode_screen.dart';
 import '../presentation/modes/placeholder_mode_screen.dart';
@@ -54,6 +55,10 @@ final List<PulseModeDescriptor> kAllModes = [
     isStarter: true,
     tint: _whisperBlue,
     glyph: '🌬️',
+    requiredCapabilities: const {
+      DeviceCapability.microphone,
+      DeviceCapability.vibration,
+    },
     builder: (context) => const PlaceholderModeScreen(titleKey: 'modeWhisper'),
   ),
   PulseModeDescriptor(
@@ -63,6 +68,7 @@ final List<PulseModeDescriptor> kAllModes = [
     isStarter: true,
     tint: _bellYellow,
     glyph: '🔔',
+    requiredCapabilities: const {DeviceCapability.accelerometer},
     builder: (context) => const PlaceholderModeScreen(titleKey: 'modeBell'),
   ),
   PulseModeDescriptor(
@@ -93,6 +99,10 @@ final List<PulseModeDescriptor> kAllModes = [
     isStarter: false,
     tint: AppColors.textSecondary,
     glyph: '💫',
+    requiredCapabilities: const {
+      DeviceCapability.vibration,
+      DeviceCapability.vibrationAmplitude,
+    },
     builder: (context) =>
         const PlaceholderModeScreen(titleKey: 'modeGoosebumps'),
   ),
@@ -112,6 +122,10 @@ final List<PulseModeDescriptor> kAllModes = [
     isStarter: false,
     tint: AppColors.textSecondary,
     glyph: '⚡',
+    requiredCapabilities: const {
+      DeviceCapability.microphone,
+      DeviceCapability.flashlight,
+    },
     builder: (context) => const PlaceholderModeScreen(titleKey: 'modeThunder'),
   ),
   PulseModeDescriptor(
@@ -131,6 +145,7 @@ final List<PulseModeDescriptor> kAllModes = [
     isStarter: false,
     tint: AppColors.textSecondary,
     glyph: '⚖️',
+    requiredCapabilities: const {DeviceCapability.accelerometer},
     builder: (context) => const PlaceholderModeScreen(titleKey: 'modeBalance'),
   ),
   PulseModeDescriptor(
@@ -149,6 +164,7 @@ final List<PulseModeDescriptor> kAllModes = [
     isStarter: false,
     tint: AppColors.textSecondary,
     glyph: '🌀',
+    requiredCapabilities: const {DeviceCapability.microphone},
     builder: (context) => const PlaceholderModeScreen(titleKey: 'modeBreath'),
   ),
   PulseModeDescriptor(

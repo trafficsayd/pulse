@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
 
+import '../../capabilities/domain/device_capability.dart';
+
 /// Stable identifier for a built-in mode. The string value is what's stored
 /// on disk (last-used mode, analytics if ever opted in, etc.) — do NOT
 /// rename existing entries.
@@ -34,6 +36,7 @@ class PulseModeDescriptor {
     required this.builder,
     required this.tint,
     required this.glyph,
+    this.requiredCapabilities = const <DeviceCapability>{},
   });
 
   final PulseModeId id;
@@ -61,4 +64,9 @@ class PulseModeDescriptor {
   /// Single emoji shown inside the carousel disc. Pulse is icon-first so
   /// every mode also gets a glyph that reads at small sizes.
   final String glyph;
+
+  /// Hardware/OS capabilities this mode requires to run. The catalog grid
+  /// and Hub carousel grey out tiles whose requirements aren't met on
+  /// this device, and the diagnostics screen explains *why*.
+  final Set<DeviceCapability> requiredCapabilities;
 }

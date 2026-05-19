@@ -175,5 +175,29 @@
   "connectionStatusTitle": "Подключение",
   "connectionStatusOfflineNotice": "Приложение работает без интернета и не собирает данные",
 
+  "settingsDiagnostics": "Диагностика устройства",
+  "settingsDiagnosticsHint": "Какие функции доступны на твоём телефоне",
+  "diagnosticsTitle": "Диагностика",
+  "diagnosticsHardwareSection": "Оборудование",
+  "diagnosticsModesSection": "Режимы",
+  "diagnosticsCapabilityMicrophone": "Микрофон",
+  "diagnosticsCapabilityAccelerometer": "Акселерометр",
+  "diagnosticsCapabilityVibration": "Вибрация",
+  "diagnosticsCapabilityVibrationAmplitude": "Тонкая вибрация",
+  "diagnosticsCapabilityFlashlight": "Вспышка",
+  "diagnosticsCapabilityCamera": "Камера",
+  "diagnosticsCapabilityBluetoothLe": "Bluetooth LE",
+  "diagnosticsCapabilityLocalNetwork": "Локальная сеть",
+  "diagnosticsStatusOk": "Доступно",
+  "diagnosticsStatusMissing": "Недоступно",
+  "diagnosticsStatusProbing": "Проверка...",
+  "diagnosticsModeAvailable": "Готово",
+  "diagnosticsModeMissing": "Не хватает: {what}",
+  "@diagnosticsModeMissing": {
+    "placeholders": {
+      "what": {"type": "String"}
+    }
+  },
+
   "errorGeneric": "Что-то пошло не так"
 }

@@ -36,6 +36,14 @@ dependencies:
   uuid: ^4.5.1
   meta: ^1.15.0
 
+  # Mode primitives (Track C).
+  # NOTE: lock to exact minor versions, never `any`, so a transitive bump
+  # cannot silently change microphone / sensor behaviour between releases.
+  sensors_plus: ^4.0.2
+  vibration: ^1.9.0
+  record: ^5.1.2
+  permission_handler: ^11.3.1
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

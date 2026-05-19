@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../../l10n/app_localizations.dart';
 
 import '../../../core/locale/locale_controller.dart';
+import '../../../core/routing/routes.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/pulse_mockup.dart';
 
@@ -80,6 +82,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 title: t.settingsAbout,
                 child: Column(
                   children: [
+                    _NavTile(
+                      icon: Icons.science_outlined,
+                      label: t.settingsDiagnostics,
+                      subtitle: t.settingsDiagnosticsHint,
+                      onTap: () => context.go(Routes.diagnostics),
+                    ),
                     _NavTile(
                       icon: Icons.info_outline_rounded,
                       label: t.settingsAbout,
@@ -285,6 +293,7 @@ class _NavTile extends StatelessWidget {
     this.subtitle,
     this.trailing,
     this.trailingColor,
+    this.onTap,
   });
 
   final IconData icon;
@@ -292,6 +301,7 @@ class _NavTile extends StatelessWidget {
   final String? subtitle;
   final String? trailing;
   final Color? trailingColor;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -304,6 +314,7 @@ class _NavTile extends StatelessWidget {
           border: Border.all(color: AppColors.outlineSoft),
         ),
         child: ListTile(
+          onTap: onTap,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(18),
           ),

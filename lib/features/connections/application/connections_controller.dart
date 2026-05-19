@@ -206,5 +206,5 @@ final uuidProvider = Provider<Uuid>((ref) => const Uuid());
 
 final connectionsControllerProvider =
     NotifierProvider<ConnectionsController, ConnectionsState>(
-      ConnectionsController.new,
-    );
+  ConnectionsController.new,
+);

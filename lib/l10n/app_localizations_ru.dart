@@ -434,6 +434,24 @@ class AppLocalizationsRu extends AppLocalizations {
   String get settingsCrashReportsHint => 'Отправлять анонимно';
 
   @override
+  String get settingsCrashReportsSection => 'Отчёты о сбоях';
+
+  @override
+  String get settingsPermissionBluetooth => 'Bluetooth';
+
+  @override
+  String get settingsPermissionWifi => 'Wi-Fi';
+
+  @override
+  String get settingsPermissionMicrophone => 'Микрофон';
+
+  @override
+  String get settingsPermissionGranted => 'Разрешено';
+
+  @override
+  String get settingsSupportEmail => 'support@pulse.app';
+
+  @override
   String get connectionStatusTitle => 'Подключение';
 
   @override

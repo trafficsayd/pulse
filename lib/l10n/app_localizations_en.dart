@@ -430,6 +430,24 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsCrashReportsHint => 'Send anonymously';
 
   @override
+  String get settingsCrashReportsSection => 'Crash reports';
+
+  @override
+  String get settingsPermissionBluetooth => 'Bluetooth';
+
+  @override
+  String get settingsPermissionWifi => 'Wi-Fi';
+
+  @override
+  String get settingsPermissionMicrophone => 'Microphone';
+
+  @override
+  String get settingsPermissionGranted => 'OK';
+
+  @override
+  String get settingsSupportEmail => 'support@pulse.app';
+
+  @override
   String get connectionStatusTitle => 'Connection';
 
   @override

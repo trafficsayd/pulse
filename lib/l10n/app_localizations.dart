@@ -872,6 +872,42 @@ abstract class AppLocalizations {
   /// **'Send anonymously'**
   String get settingsCrashReportsHint;
 
+  /// No description provided for @settingsCrashReportsSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Crash reports'**
+  String get settingsCrashReportsSection;
+
+  /// No description provided for @settingsPermissionBluetooth.
+  ///
+  /// In en, this message translates to:
+  /// **'Bluetooth'**
+  String get settingsPermissionBluetooth;
+
+  /// No description provided for @settingsPermissionWifi.
+  ///
+  /// In en, this message translates to:
+  /// **'Wi-Fi'**
+  String get settingsPermissionWifi;
+
+  /// No description provided for @settingsPermissionMicrophone.
+  ///
+  /// In en, this message translates to:
+  /// **'Microphone'**
+  String get settingsPermissionMicrophone;
+
+  /// No description provided for @settingsPermissionGranted.
+  ///
+  /// In en, this message translates to:
+  /// **'OK'**
+  String get settingsPermissionGranted;
+
+  /// No description provided for @settingsSupportEmail.
+  ///
+  /// In en, this message translates to:
+  /// **'support@pulse.app'**
+  String get settingsSupportEmail;
+
   /// No description provided for @connectionStatusTitle.
   ///
   /// In en, this message translates to:

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 /// Smoothed three-axis accelerometer sample emitted by
 /// [Accelerometer3DStream]. Values are in m/s² (matching `sensors_plus`).
@@ -15,8 +16,8 @@ class Accel3 {
   /// still on a table.
   double get netMagnitude {
     const gravity = 9.81;
-    final mag = (x * x + y * y + z * z) - gravity * gravity;
-    return mag.abs();
+    final totalMag = math.sqrt(x * x + y * y + z * z);
+    return (totalMag - gravity).abs();
   }
 }
 

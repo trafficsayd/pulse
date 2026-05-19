@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:pulse/l10n/app_localizations.dart';
+import '../../../l10n/app_localizations.dart';
 
 import '../../../core/locale/locale_controller.dart';
 import '../../../core/theme/app_colors.dart';
@@ -56,20 +56,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   children: [
                     _NavTile(
                       icon: Icons.bluetooth_rounded,
-                      label: 'Bluetooth',
-                      trailing: 'OK',
+                      label: t.settingsPermissionBluetooth,
+                      trailing: t.settingsPermissionGranted,
                       trailingColor: AppColors.transportDirect,
                     ),
                     _NavTile(
                       icon: Icons.wifi_rounded,
-                      label: 'Wi-Fi',
-                      trailing: 'OK',
+                      label: t.settingsPermissionWifi,
+                      trailing: t.settingsPermissionGranted,
                       trailingColor: AppColors.transportDirect,
                     ),
                     _NavTile(
                       icon: Icons.mic_rounded,
-                      label: t.settingsPermissions,
-                      trailing: 'OK',
+                      label: t.settingsPermissionMicrophone,
+                      trailing: t.settingsPermissionGranted,
                       trailingColor: AppColors.transportDirect,
                     ),
                   ],
@@ -87,7 +87,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     _NavTile(
                       icon: Icons.help_outline_rounded,
                       label: t.settingsSupport,
-                      subtitle: 'support@pulse.app',
+                      subtitle: t.settingsSupportEmail,
                     ),
                     _NavTile(
                       icon: Icons.tag_rounded,
@@ -98,7 +98,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
               const SizedBox(height: 12),
               _SectionCard(
-                title: 'Crash reports',
+                title: t.settingsCrashReportsSection,
                 child: _SwitchTile(
                   icon: Icons.bug_report_outlined,
                   label: t.settingsCrashReports,
@@ -256,7 +256,7 @@ class _SwitchTile extends StatelessWidget {
         child: SwitchListTile.adaptive(
           value: value,
           onChanged: onChanged,
-          activeColor: AppColors.pulse,
+          activeThumbColor: AppColors.pulse,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(18),
           ),

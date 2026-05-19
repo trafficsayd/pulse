@@ -54,13 +54,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 title: t.settingsPermissions,
                 child: Column(
                   children: [
-                    const _NavTile(
+                    _NavTile(
                       icon: Icons.bluetooth_rounded,
                       label: t.settingsPermissionBluetooth,
                       trailing: t.settingsPermissionGranted,
                       trailingColor: AppColors.transportDirect,
                     ),
-                    const _NavTile(
+                    _NavTile(
                       icon: Icons.wifi_rounded,
                       label: t.settingsPermissionWifi,
                       trailing: t.settingsPermissionGranted,

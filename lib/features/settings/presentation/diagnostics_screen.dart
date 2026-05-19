@@ -174,7 +174,7 @@ class _ModeRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final ok = missing.isEmpty;
     final statusColor = ok ? AppColors.pulse : AppColors.textMuted;
-    final missingLabels = missing.map((c) => _capLabel(c)).join(', ');
+    final missingLabels = missing.map(_capLabel).join(', ');
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),

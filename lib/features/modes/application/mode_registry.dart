@@ -55,7 +55,7 @@ final List<PulseModeDescriptor> kAllModes = [
     isStarter: true,
     tint: _whisperBlue,
     glyph: '🌬️',
-    requiredCapabilities: {
+    requiredCapabilities: const {
       DeviceCapability.microphone,
       DeviceCapability.vibration,
     },
@@ -68,7 +68,7 @@ final List<PulseModeDescriptor> kAllModes = [
     isStarter: true,
     tint: _bellYellow,
     glyph: '🔔',
-    requiredCapabilities: {DeviceCapability.accelerometer},
+    requiredCapabilities: const {DeviceCapability.accelerometer},
     builder: (context) => const PlaceholderModeScreen(titleKey: 'modeBell'),
   ),
   PulseModeDescriptor(
@@ -99,7 +99,7 @@ final List<PulseModeDescriptor> kAllModes = [
     isStarter: false,
     tint: AppColors.textSecondary,
     glyph: '💫',
-    requiredCapabilities: {
+    requiredCapabilities: const {
       DeviceCapability.vibration,
       DeviceCapability.vibrationAmplitude,
     },
@@ -122,7 +122,7 @@ final List<PulseModeDescriptor> kAllModes = [
     isStarter: false,
     tint: AppColors.textSecondary,
     glyph: '⚡',
-    requiredCapabilities: {
+    requiredCapabilities: const {
       DeviceCapability.microphone,
       DeviceCapability.flashlight,
     },
@@ -145,7 +145,7 @@ final List<PulseModeDescriptor> kAllModes = [
     isStarter: false,
     tint: AppColors.textSecondary,
     glyph: '⚖️',
-    requiredCapabilities: {DeviceCapability.accelerometer},
+    requiredCapabilities: const {DeviceCapability.accelerometer},
     builder: (context) => const PlaceholderModeScreen(titleKey: 'modeBalance'),
   ),
   PulseModeDescriptor(
@@ -164,7 +164,7 @@ final List<PulseModeDescriptor> kAllModes = [
     isStarter: false,
     tint: AppColors.textSecondary,
     glyph: '🌀',
-    requiredCapabilities: {DeviceCapability.microphone},
+    requiredCapabilities: const {DeviceCapability.microphone},
     builder: (context) => const PlaceholderModeScreen(titleKey: 'modeBreath'),
   ),
   PulseModeDescriptor(

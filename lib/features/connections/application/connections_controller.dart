@@ -13,21 +13,15 @@ import '../domain/permission_flags.dart';
 /// Aggregated read-model exposed to the UI.
 @immutable
 class ConnectionsState {
-  const ConnectionsState({
-    this.connections = const [],
-    this.isLoading = true,
-  });
+  const ConnectionsState({this.connections = const [], this.isLoading = true});
 
   final List<Connection> connections;
   final bool isLoading;
 
-  Connection? get active => connections
-      .firstWhereOrNull((c) => c.status == ConnectionStatus.active);
+  Connection? get active =>
+      connections.firstWhereOrNull((c) => c.status == ConnectionStatus.active);
 
-  ConnectionsState copyWith({
-    List<Connection>? connections,
-    bool? isLoading,
-  }) =>
+  ConnectionsState copyWith({List<Connection>? connections, bool? isLoading}) =>
       ConnectionsState(
         connections: connections ?? this.connections,
         isLoading: isLoading ?? this.isLoading,
@@ -212,5 +206,5 @@ final uuidProvider = Provider<Uuid>((ref) => const Uuid());
 
 final connectionsControllerProvider =
     NotifierProvider<ConnectionsController, ConnectionsState>(
-  ConnectionsController.new,
-);
+      ConnectionsController.new,
+    );

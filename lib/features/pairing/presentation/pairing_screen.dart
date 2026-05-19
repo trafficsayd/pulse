@@ -29,7 +29,12 @@ class _PairingScreenState extends ConsumerState<PairingScreen> {
   late final String _qrPayload = 'pulse://pair?code=$_shortCode';
 
   static String _generateShortCode() {
-    final r = math.Random();
+    // Random.secure() is backed by the platform CSPRNG. We use it for the
+    // pairing code so two phones starting at the same wall-clock time on
+    // separate networks cannot collide deterministically, and so an
+    // attacker who observes one short code cannot trivially predict the
+    // next one.
+    final r = math.Random.secure();
     final code = r.nextInt(1000000).toString().padLeft(6, '0');
     return code;
   }

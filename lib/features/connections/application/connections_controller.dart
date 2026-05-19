@@ -1,3 +1,5 @@
+import 'package:collection/collection.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:meta/meta.dart';
 import 'package:uuid/uuid.dart';
@@ -20,9 +22,7 @@ class ConnectionsState {
   final bool isLoading;
 
   Connection? get active => connections
-      .where((c) => c.status == ConnectionStatus.active)
-      .cast<Connection?>()
-      .firstWhere((_) => true, orElse: () => null);
+      .firstWhereOrNull((c) => c.status == ConnectionStatus.active);
 
   ConnectionsState copyWith({
     List<Connection>? connections,
@@ -49,11 +49,11 @@ class ConnectionsController extends Notifier<ConnectionsState> {
 
   Future<void> _bootstrap() async {
     final existing = await _repo.loadAll();
-    if (existing.isEmpty) {
+    if (existing.isEmpty && kDebugMode) {
       // Seed demo data so the UI redesign is immediately visible without
       // having to walk through pairing every time. These records live only
-      // on this device and never leave it; once real pairing is wired up
-      // the seeder can be removed.
+      // on this device and never leave it. Skipped in release builds so
+      // real users start from an empty connections book per the spec.
       final seeded = await _seedDemoConnections();
       state = ConnectionsState(connections: seeded, isLoading: false);
       return;

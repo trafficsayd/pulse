@@ -31,19 +31,47 @@
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
-		<string>UIInterfaceOrientationLandscapeLeft</string>
-		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
 	<key>UISupportedInterfaceOrientations~ipad</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
 		<string>UIInterfaceOrientationPortraitUpsideDown</string>
-		<string>UIInterfaceOrientationLandscapeLeft</string>
-		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>Pulse uses Bluetooth Low Energy to discover and connect to a paired phone nearby. No data leaves the two devices.</string>
+	<key>NSBluetoothPeripheralUsageDescription</key>
+	<string>Pulse uses Bluetooth Low Energy to be discovered by a paired phone nearby. No data leaves the two devices.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Pulse uses the local Wi-Fi network to keep your direct connection alive when Bluetooth is out of range. No data leaves the local network.</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_pulse._tcp</string>
+		<string>_pulse._udp</string>
+	</array>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Pulse uses the microphone to detect whispers, blowing, and ambient sound in modes like Whisper, Candle, and Bubble. Audio never leaves your phone.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Pulse uses the camera to capture colors and light pulses in modes like Lens and Morse. Frames never leave your phone.</string>
+	<key>NSMotionUsageDescription</key>
+	<string>Pulse uses motion sensors for modes like Bell, Cradle, and Balance.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>bluetooth-central</string>
+		<string>bluetooth-peripheral</string>
+		<string>audio</string>
+		<string>voip</string>
+	</array>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+	<key>UIRequiresFullScreen</key>
+	<false/>
+	<key>UIStatusBarStyle</key>
+	<string>UIStatusBarStyleLightContent</string>
+	<key>UIViewControllerBasedStatusBarAppearance</key>
+	<false/>
 </dict>
 </plist>

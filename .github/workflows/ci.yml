@@ -29,6 +29,12 @@ jobs:
       - name: Generate localizations
         run: flutter gen-l10n
 
+      - name: Show format diff
+        run: |
+          dart format .
+          git diff
+          git checkout -- .
+
       - name: Verify formatting
         run: dart format --output=none --set-exit-if-changed .
 

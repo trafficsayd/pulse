@@ -64,6 +64,7 @@ class PairChannel {
   final _controller = StreamController<PulsePacket>.broadcast();
   StreamSubscription<Uint8List>? _sub;
   bool _started = false;
+  Future<void> _packetQueue = Future<void>.value();
 
   /// Decrypted, authenticated packets in arrival order.
   Stream<PulsePacket> get incoming => _controller.stream;
@@ -83,7 +84,11 @@ class PairChannel {
     _sub = _transport.incoming.listen(_onPacket, onError: _errors.add);
   }
 
-  Future<void> _onPacket(Uint8List bytes) async {
+  void _onPacket(Uint8List bytes) {
+    _packetQueue = _packetQueue.then((_) => _processPacket(bytes));
+  }
+
+  Future<void> _processPacket(Uint8List bytes) async {
     try {
       final expected = await _inbound.peek();
       final plain = await _sealer.open(

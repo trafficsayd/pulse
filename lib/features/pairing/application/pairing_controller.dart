@@ -101,6 +101,7 @@ class PairingController extends Notifier<PairingState> {
 
   @override
   PairingState build() {
+    _disposed = false;
     ref.onDispose(_handleDispose);
     return const PairingState();
   }

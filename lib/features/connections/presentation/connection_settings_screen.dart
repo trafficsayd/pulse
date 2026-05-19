@@ -256,7 +256,7 @@ class _PermissionTile extends StatelessWidget {
               fontSize: 14,
             ),
           ),
-          activeColor: AppColors.pulse,
+          activeThumbColor: AppColors.pulse,
           onChanged: onChanged,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(18),

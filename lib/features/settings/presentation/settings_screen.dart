@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:pulse/l10n/app_localizations.dart';
+import '../../../l10n/app_localizations.dart';
 
 import '../../../core/locale/locale_controller.dart';
 import '../../../core/theme/app_colors.dart';
@@ -256,7 +256,7 @@ class _SwitchTile extends StatelessWidget {
         child: SwitchListTile.adaptive(
           value: value,
           onChanged: onChanged,
-          activeColor: AppColors.pulse,
+          activeThumbColor: AppColors.pulse,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(18),
           ),

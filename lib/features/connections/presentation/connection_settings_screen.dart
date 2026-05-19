@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:pulse/l10n/app_localizations.dart';
+import '../../../l10n/app_localizations.dart';
 
 import '../../../core/routing/routes.dart';
 import '../../../core/theme/app_colors.dart';
@@ -256,7 +256,7 @@ class _PermissionTile extends StatelessWidget {
               fontSize: 14,
             ),
           ),
-          activeColor: AppColors.pulse,
+          activeThumbColor: AppColors.pulse,
           onChanged: onChanged,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(18),

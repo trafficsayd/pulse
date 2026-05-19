@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:pulse/l10n/app_localizations.dart';
+import '../../l10n/app_localizations.dart';
 
 import '../routing/routes.dart';
 import '../theme/app_colors.dart';
@@ -164,13 +164,13 @@ class _CenterTab extends StatelessWidget {
       borderRadius: BorderRadius.circular(42),
       child: Column(
         children: [
-          PulseGlowCircle(
+          const PulseGlowCircle(
             size: 64,
             color: AppColors.pulse,
             fill: AppColors.pulse,
             blur: 34,
             borderWidth: 0,
-            child: const Icon(
+            child: Icon(
               Icons.graphic_eq_rounded,
               color: Colors.white,
               size: 29,

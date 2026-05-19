@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:pulse/l10n/app_localizations.dart';
+import '../../../l10n/app_localizations.dart';
 
 import '../../../core/locale/locale_controller.dart';
 import '../../../core/theme/app_colors.dart';
@@ -54,13 +54,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 title: t.settingsPermissions,
                 child: Column(
                   children: [
-                    _NavTile(
+                    const _NavTile(
                       icon: Icons.bluetooth_rounded,
                       label: 'Bluetooth',
                       trailing: 'OK',
                       trailingColor: AppColors.transportDirect,
                     ),
-                    _NavTile(
+                    const _NavTile(
                       icon: Icons.wifi_rounded,
                       label: 'Wi-Fi',
                       trailing: 'OK',

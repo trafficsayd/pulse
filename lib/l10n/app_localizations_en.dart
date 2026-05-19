@@ -1,5 +1,5 @@
-// ignore: unused_import
 import 'package:intl/intl.dart' as intl;
+
 import 'app_localizations.dart';
 
 // ignore_for_file: type=lint
@@ -32,6 +32,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get pairingEnterCode => 'Enter the 6-digit code';
+
+  @override
+  String get pairingDerivingCode => 'Deriving secure code…';
 
   @override
   String get pairingCancel => 'Cancel';

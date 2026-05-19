@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:pulse/l10n/app_localizations.dart';
+import 'l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/locale/locale_controller.dart';

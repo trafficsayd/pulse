@@ -1,4 +1,7 @@
+import 'dart:convert';
 import 'dart:typed_data';
+
+import '../../core/storage/secure_key_store.dart';
 
 /// Cryptographic material for a single saved connection.
 ///
@@ -31,6 +34,67 @@ class PairKeys {
   /// Local Curve25519 private key. Generated once per connection and never
   /// reused across connections.
   final Uint8List localPrivateKey;
+
+  /// Secure-storage key for this connection's serialized [PairKeys].
+  static String storageKey(String connectionId) => 'pair_keys::$connectionId';
+
+  /// Storage key for the outbound nonce counter associated with this
+  /// pair. Kept here so every layer agrees on the same naming.
+  static String outboundNonceKey(String connectionId) =>
+      'pair_nonce::out::$connectionId';
+
+  /// Storage key for the inbound nonce counter associated with this pair.
+  static String inboundNonceKey(String connectionId) =>
+      'pair_nonce::in::$connectionId';
+
+  Map<String, Object?> toJson() => <String, Object?>{
+        'connectionId': connectionId,
+        'symmetricKey': base64.encode(symmetricKey),
+        'partnerPublicKey': base64.encode(partnerPublicKey),
+        'localPrivateKey': base64.encode(localPrivateKey),
+      };
+
+  factory PairKeys.fromJson(Map<String, Object?> json) {
+    Uint8List decode(Object? v) =>
+        Uint8List.fromList(base64.decode(v! as String));
+    return PairKeys(
+      connectionId: json['connectionId']! as String,
+      symmetricKey: decode(json['symmetricKey']),
+      partnerPublicKey: decode(json['partnerPublicKey']),
+      localPrivateKey: decode(json['localPrivateKey']),
+    );
+  }
+
+  /// Persist this pair to [SecureKeyStore] under [storageKey].
+  Future<void> persist(SecureKeyStore store) =>
+      store.writeJson(storageKey(connectionId), toJson());
+
+  /// Read a previously persisted [PairKeys] for [connectionId], or null
+  /// if nothing is on disk yet.
+  static Future<PairKeys?> load(
+    SecureKeyStore store,
+    String connectionId,
+  ) async {
+    final raw = await store.readJson(storageKey(connectionId));
+    if (raw == null) return null;
+    return PairKeys.fromJson(raw);
+  }
+
+  /// Delete the persisted keys and nonce counters for [connectionId].
+  ///
+  /// Implements the "паническое стирание" requirement from §6 of the
+  /// spec: after this call there is no way to recover the symmetric
+  /// key, the partner's public key, or our local private key.
+  static Future<void> wipe(
+    SecureKeyStore store,
+    String connectionId,
+  ) async {
+    await store.delete(storageKey(connectionId));
+    await store.delete(outboundNonceKey(connectionId));
+    await store.delete('${outboundNonceKey(connectionId)}::hwm');
+    await store.delete(inboundNonceKey(connectionId));
+    await store.delete('${inboundNonceKey(connectionId)}::hwm');
+  }
 }
 
 /// Pairing operations contract.

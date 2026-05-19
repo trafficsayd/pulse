@@ -18,7 +18,7 @@ import 'app_localizations_ru.dart';
 /// `supportedLocales` list. For example:
 ///
 /// ```dart
-/// import 'l10n/app_localizations.dart';
+/// import 'gen_l10n/app_localizations.dart';
 ///
 /// return MaterialApp(
 ///   localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -145,6 +145,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Enter the 6-digit code'**
   String get pairingEnterCode;
+
+  /// No description provided for @pairingDerivingCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Deriving secure code…'**
+  String get pairingDerivingCode;
 
   /// No description provided for @pairingCancel.
   ///

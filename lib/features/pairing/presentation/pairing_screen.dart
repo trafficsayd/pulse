@@ -1,9 +1,6 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:pulse/l10n/app_localizations.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 import '../../../core/locale/locale_controller.dart';
@@ -11,6 +8,8 @@ import '../../../core/routing/routes.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/gradient_button.dart';
 import '../../../core/widgets/pulse_mockup.dart';
+import '../../../l10n/app_localizations.dart';
+import '../application/pairing_controller.dart';
 
 /// First-launch screen: create a new pair (host) or join one (guest).
 ///
@@ -25,22 +24,37 @@ class PairingScreen extends ConsumerStatefulWidget {
 }
 
 class _PairingScreenState extends ConsumerState<PairingScreen> {
-  late final String _shortCode = _generateShortCode();
-  late final String _qrPayload = 'pulse://pair?code=$_shortCode';
-
-  static String _generateShortCode() {
-    final r = math.Random();
-    final code = r.nextInt(1000000).toString().padLeft(6, '0');
-    return code;
+  @override
+  void initState() {
+    super.initState();
+    // Kick the handshake off the moment we land on this screen so that
+    // by the time the user finishes reading "share this code" the SAS
+    // has already been derived from the real ECDH secret.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(pairingControllerProvider.notifier).startHostHandshake();
+    });
   }
 
-  String get _formattedCode {
-    return '${_shortCode.substring(0, 3)} ${_shortCode.substring(3)}';
+  String _formatCode(String code) {
+    if (code.length != 6) return code;
+    return '${code.substring(0, 3)} ${code.substring(3)}';
+  }
+
+  String _qrPayload(PairingState pairing) {
+    final pub = pairing.localPublicKeyBase64;
+    if (pub == null) {
+      // Generation in flight — fall back to a placeholder URI so the QR
+      // widget doesn't crash on an empty string.
+      return 'pulse://pair?pending=1';
+    }
+    return 'pulse://pair?v=1&pk=$pub';
   }
 
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context)!;
+    final pairing = ref.watch(pairingControllerProvider);
+    final displayCode = pairing.sasCode ?? '······';
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -106,7 +120,7 @@ class _PairingScreenState extends ConsumerState<PairingScreen> {
                             ),
                             padding: const EdgeInsets.all(16),
                             child: QrImageView(
-                              data: _qrPayload,
+                              data: _qrPayload(pairing),
                               backgroundColor: Colors.white,
                               eyeStyle: const QrEyeStyle(
                                 eyeShape: QrEyeShape.square,
@@ -129,7 +143,7 @@ class _PairingScreenState extends ConsumerState<PairingScreen> {
                           child: Column(
                             children: [
                               Text(
-                                _formattedCode,
+                                _formatCode(displayCode),
                                 style: const TextStyle(
                                   color: AppColors.textPrimary,
                                   fontSize: 34,
@@ -141,7 +155,9 @@ class _PairingScreenState extends ConsumerState<PairingScreen> {
                               ),
                               const SizedBox(height: 10),
                               Text(
-                                t.pairingEnterCode,
+                                pairing.hasShortCode
+                                    ? t.pairingEnterCode
+                                    : t.pairingDerivingCode,
                                 style: const TextStyle(
                                   color: AppColors.textMuted,
                                   fontSize: 12,
@@ -162,7 +178,9 @@ class _PairingScreenState extends ConsumerState<PairingScreen> {
                       child: SizedBox(
                         height: 56,
                         child: GradientButton(
-                          onPressed: () => _onCreatePair(context),
+                          onPressed: pairing.isReadyToConfirm
+                              ? () => _onCreatePair(context)
+                              : null,
                           label: t.pairingCreate,
                         ),
                       ),

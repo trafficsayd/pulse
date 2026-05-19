@@ -1,34 +1,37 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../../l10n/app_localizations.dart';
 
 import '../../../core/routing/routes.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/pulse_mockup.dart';
+import '../../../l10n/app_localizations.dart';
+import '../../pairing/application/pairing_controller.dart';
 
 /// "Establishing connection..." — animated handshake screen shown right
 /// after a pair is initiated.
 ///
 /// Two phone glyphs face each other across a dotted ring; below, three
 /// progressive checklist items light up as the handshake advances:
-///   1. Key exchange
-///   2. Channel encrypted
-///   3. Secure link established
+///   1. Key exchange  (ECDH on Curve25519)
+///   2. Channel encrypted  (HKDF-SHA-256 + AES-256-GCM ready)
+///   3. Secure link established  (PairKeys persisted to SecureKeyStore)
 ///
 /// After the third item lights, the screen auto-routes into the hub.
-class ConnectingScreen extends StatefulWidget {
+class ConnectingScreen extends ConsumerStatefulWidget {
   const ConnectingScreen({super.key});
 
   @override
-  State<ConnectingScreen> createState() => _ConnectingScreenState();
+  ConsumerState<ConnectingScreen> createState() => _ConnectingScreenState();
 }
 
-class _ConnectingScreenState extends State<ConnectingScreen>
+class _ConnectingScreenState extends ConsumerState<ConnectingScreen>
     with TickerProviderStateMixin {
   late final AnimationController _orbit;
-  int _step = 0;
+  bool _persisting = false;
+  bool _routed = false;
 
   @override
   void initState() {
@@ -37,17 +40,25 @@ class _ConnectingScreenState extends State<ConnectingScreen>
       vsync: this,
       duration: const Duration(seconds: 4),
     )..repeat();
-    _runHandshake();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _finalizePairing());
   }
 
-  Future<void> _runHandshake() async {
-    for (var i = 1; i <= 3; i++) {
-      await Future<void>.delayed(const Duration(milliseconds: 900));
-      if (!mounted) return;
-      setState(() => _step = i);
-    }
-    await Future<void>.delayed(const Duration(milliseconds: 700));
+  Future<void> _finalizePairing() async {
+    if (_persisting || _routed) return;
+    _persisting = true;
+    final controller = ref.read(pairingControllerProvider.notifier);
+    final result = await controller.confirmAndPersist();
     if (!mounted) return;
+    if (result == null) {
+      // Persistence failed — bounce back to pairing so the user can
+      // retry. Avoids leaving them on a stuck "establishing" spinner.
+      context.go(Routes.pairing);
+      return;
+    }
+    // Give the orbit animation a beat to feel intentional, then hub.
+    await Future<void>.delayed(const Duration(milliseconds: 700));
+    if (!mounted || _routed) return;
+    _routed = true;
     context.go(Routes.hub);
   }
 
@@ -60,6 +71,8 @@ class _ConnectingScreenState extends State<ConnectingScreen>
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context)!;
+    final state = ref.watch(pairingControllerProvider);
+    final step = _stepFromPhase(state.phase);
     return Scaffold(
       backgroundColor: AppColors.background,
       body: PulseBackdrop(
@@ -129,20 +142,20 @@ class _ConnectingScreenState extends State<ConnectingScreen>
                   child: Column(
                     children: [
                       _StepRow(
-                        done: _step >= 1,
-                        inProgress: _step == 0,
+                        done: step >= 1,
+                        inProgress: step == 0,
                         label: t.connectingKeyExchange,
                       ),
                       const SizedBox(height: 14),
                       _StepRow(
-                        done: _step >= 2,
-                        inProgress: _step == 1,
+                        done: step >= 2,
+                        inProgress: step == 1,
                         label: t.connectingChannelEncrypted,
                       ),
                       const SizedBox(height: 14),
                       _StepRow(
-                        done: _step >= 3,
-                        inProgress: _step == 2,
+                        done: step >= 3,
+                        inProgress: step == 2,
                         label: t.connectingSecuredLink,
                       ),
                     ],
@@ -154,6 +167,26 @@ class _ConnectingScreenState extends State<ConnectingScreen>
         ),
       ),
     );
+  }
+
+  /// Map an opaque [PairingPhase] onto the 0..3 progress indicator that
+  /// the three-step checklist understands.
+  int _stepFromPhase(PairingPhase phase) {
+    switch (phase) {
+      case PairingPhase.idle:
+      case PairingPhase.generatingKeys:
+      case PairingPhase.awaitingPartner:
+        return 0;
+      case PairingPhase.derivingSecret:
+      case PairingPhase.awaitingConfirmation:
+        return 1;
+      case PairingPhase.persisting:
+        return 2;
+      case PairingPhase.ready:
+        return 3;
+      case PairingPhase.failed:
+        return 0;
+    }
   }
 }
 

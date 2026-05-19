@@ -34,6 +34,9 @@ class AppLocalizationsRu extends AppLocalizations {
   String get pairingEnterCode => 'Введите шестизначный код';
 
   @override
+  String get pairingDerivingCode => 'Вычисляем безопасный код…';
+
+  @override
   String get pairingCancel => 'Отмена';
 
   @override

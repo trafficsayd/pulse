@@ -11,6 +11,7 @@ abstract final class Routes {
   static const sneakIn = '/sneak-in';
   static const sneakInIncoming = '/sneak-in/incoming';
   static const settings = '/settings';
+  static const diagnostics = '/settings/diagnostics';
   static const connectionStatus = '/connection-status';
   static const modesCatalog = '/modes';
   static const connectionSettings = '/people/:connectionId/settings';

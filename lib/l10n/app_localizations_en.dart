@@ -34,6 +34,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get pairingEnterCode => 'Enter the 6-digit code';
 
   @override
+  String get pairingDerivingCode => 'Deriving secure code…';
+
+  @override
   String get pairingCancel => 'Cancel';
 
   @override

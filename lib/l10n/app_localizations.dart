@@ -146,6 +146,12 @@ abstract class AppLocalizations {
   /// **'Enter the 6-digit code'**
   String get pairingEnterCode;
 
+  /// No description provided for @pairingDerivingCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Deriving secure code…'**
+  String get pairingDerivingCode;
+
   /// No description provided for @pairingCancel.
   ///
   /// In en, this message translates to:

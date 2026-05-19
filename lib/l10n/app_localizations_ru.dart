@@ -428,7 +428,7 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
-  String get settingsCrashReports => 'Crash reports';
+  String get settingsCrashReports => 'Отчёты о сбоях';
 
   @override
   String get settingsCrashReportsHint => 'Отправлять анонимно';

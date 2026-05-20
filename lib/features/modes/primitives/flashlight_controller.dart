@@ -52,6 +52,7 @@ class FlashlightController {
 
   final FlashlightBackend _backend;
   Completer<void>? _pulseGuard;
+  Future<void>? _pulseFuture;
 
   Future<bool> isAvailable() => _backend.isAvailable();
 
@@ -59,7 +60,7 @@ class FlashlightController {
     if (!await _backend.isAvailable()) {
       return;
     }
-    await _cancelInFlight();
+    await _cancelInFlightAndAwait();
     await _backend.turnOn();
   }
 
@@ -67,7 +68,7 @@ class FlashlightController {
     if (!await _backend.isAvailable()) {
       return;
     }
-    await _cancelInFlight();
+    await _cancelInFlightAndAwait();
     await _backend.turnOff();
   }
 
@@ -81,18 +82,25 @@ class FlashlightController {
   ) async {
     if (count <= 0) return;
     if (!await _backend.isAvailable()) return;
-    await _cancelInFlight();
+    await _cancelInFlightAndAwait();
     final guard = Completer<void>();
     _pulseGuard = guard;
+    _pulseFuture = _runPulse(guard, onDuration, offDuration, count);
+    await _pulseFuture;
+  }
+
+  Future<void> _runPulse(
+    Completer<void> guard,
+    Duration onDuration,
+    Duration offDuration,
+    int count,
+  ) async {
     try {
       for (var i = 0; i < count; i++) {
         if (guard.isCompleted) return;
         await _backend.turnOn();
         await Future<void>.delayed(onDuration);
-        if (guard.isCompleted) {
-          await _backend.turnOff();
-          return;
-        }
+        if (guard.isCompleted) return;
         await _backend.turnOff();
         if (i != count - 1) {
           await Future<void>.delayed(offDuration);
@@ -100,15 +108,21 @@ class FlashlightController {
       }
     } finally {
       if (!guard.isCompleted) guard.complete();
-      if (identical(_pulseGuard, guard)) _pulseGuard = null;
+      if (identical(_pulseGuard, guard)) {
+        _pulseGuard = null;
+        _pulseFuture = null;
+      }
     }
   }
 
-  Future<void> _cancelInFlight() async {
+  Future<void> _cancelInFlightAndAwait() async {
     final inFlight = _pulseGuard;
+    final future = _pulseFuture;
     if (inFlight != null && !inFlight.isCompleted) {
       inFlight.complete();
-      _pulseGuard = null;
     }
+    _pulseGuard = null;
+    _pulseFuture = null;
+    if (future != null) await future;
   }
 }

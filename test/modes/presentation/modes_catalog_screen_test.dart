@@ -63,6 +63,19 @@ void main() {
     },
   );
 
+  testWidgets(
+    'error in capability probe degrades to none — modes appear unavailable',
+    (tester) async {
+      await _pumpCatalog(
+        tester,
+        detector: _FailingCapabilityDetector(),
+      );
+      // With DeviceCapabilities.none() fallback, sensor-driven modes
+      // should show the "Unavailable" caption.
+      expect(find.text('Unavailable on this device'), findsWidgets);
+    },
+  );
+
   testWidgets('capabilityLabel maps every enum value', (tester) async {
     late AppLocalizations t;
     await tester.pumpWidget(
@@ -87,8 +100,11 @@ void main() {
 
 Future<void> _pumpCatalog(
   WidgetTester tester, {
-  required Set<DeviceCapability> capabilities,
+  Set<DeviceCapability>? capabilities,
+  CapabilityDetector? detector,
 }) async {
+  final effectiveDetector = detector ??
+      FakeCapabilityDetector(capabilities ?? const <DeviceCapability>{});
   final router = GoRouter(
     initialLocation: '/modes',
     routes: [
@@ -105,9 +121,7 @@ Future<void> _pumpCatalog(
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
-        capabilityDetectorProvider.overrideWithValue(
-          FakeCapabilityDetector(capabilities),
-        ),
+        capabilityDetectorProvider.overrideWithValue(effectiveDetector),
       ],
       child: MaterialApp.router(
         routerConfig: router,
@@ -126,4 +140,10 @@ Future<void> _pumpCatalog(
   await tester.pump();
   await tester.pump();
   await tester.pump(const Duration(milliseconds: 16));
+}
+
+class _FailingCapabilityDetector implements CapabilityDetector {
+  @override
+  Future<DeviceCapabilities> probe() async =>
+      throw Exception('platform channel broken');
 }

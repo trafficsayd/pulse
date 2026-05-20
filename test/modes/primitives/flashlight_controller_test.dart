@@ -42,6 +42,27 @@ void main() {
       expect(backend.offCalls, 0);
     });
 
+    test('on() after cancelled pulse leaves torch on (no orphaned turnOff)',
+        () async {
+      final backend = _RecordingBackend(available: true);
+      final controller = FlashlightController(backend: backend);
+      // Start a long pulse in the background.
+      final pulseFuture = controller.pulse(
+        const Duration(seconds: 10),
+        const Duration(seconds: 10),
+        5,
+      );
+      // Give the pulse loop time to start (turnOn is called).
+      await Future<void>.delayed(Duration.zero);
+      // Now call on() — this should cancel the pulse and then turnOn.
+      await controller.on();
+      // Wait for the cancelled pulse to finish.
+      await pulseFuture;
+      // The last action must be 'on' from controller.on(), NOT 'off'
+      // from the cancelled pulse cleanup.
+      expect(backend.transcript.last, 'on');
+    });
+
     test('pulse short-circuits when the device has no torch', () async {
       final backend = _RecordingBackend(available: false);
       final controller = FlashlightController(backend: backend);

@@ -56,6 +56,11 @@ dependencies:
   record: ^5.1.2
   permission_handler: ^11.3.1
 
+  # Track F1 — real Bluetooth Low Energy transport (central + Android
+  # peripheral scaffolding). Pinned to a minor floor so a transitive bump
+  # cannot silently change GATT behaviour between releases.
+  flutter_blue_plus: ^1.32.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

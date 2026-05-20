@@ -472,10 +472,85 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
-  String get settingsCrashReports => 'Crash reports';
+  String get settingsCrashReports => 'Отчёты о сбоях';
 
   @override
   String get settingsCrashReportsHint => 'Отправлять анонимно';
+
+  @override
+  String get settingsCrashReportsSection => 'Отчёты о сбоях';
+
+  @override
+  String get settingsPermissionBluetooth => 'Bluetooth';
+
+  @override
+  String get settingsPermissionWifi => 'Wi-Fi';
+
+  @override
+  String get settingsPermissionMicrophone => 'Микрофон';
+
+  @override
+  String get settingsPermissionGranted => 'Разрешено';
+
+  @override
+  String get settingsSupportEmail => 'support@pulse.app';
+
+  @override
+  String get settingsDiagnostics => 'Диагностика устройства';
+
+  @override
+  String get settingsDiagnosticsHint =>
+      'Какие функции доступны на твоём телефоне';
+
+  @override
+  String get diagnosticsTitle => 'Диагностика';
+
+  @override
+  String get diagnosticsHardwareSection => 'Оборудование';
+
+  @override
+  String get diagnosticsModesSection => 'Режимы';
+
+  @override
+  String get diagnosticsCapabilityMicrophone => 'Микрофон';
+
+  @override
+  String get diagnosticsCapabilityAccelerometer => 'Акселерометр';
+
+  @override
+  String get diagnosticsCapabilityVibration => 'Вибрация';
+
+  @override
+  String get diagnosticsCapabilityVibrationAmplitude => 'Тонкая вибрация';
+
+  @override
+  String get diagnosticsCapabilityFlashlight => 'Вспышка';
+
+  @override
+  String get diagnosticsCapabilityCamera => 'Камера';
+
+  @override
+  String get diagnosticsCapabilityBluetoothLe => 'Bluetooth LE';
+
+  @override
+  String get diagnosticsCapabilityLocalNetwork => 'Локальная сеть';
+
+  @override
+  String get diagnosticsStatusOk => 'Доступно';
+
+  @override
+  String get diagnosticsStatusMissing => 'Недоступно';
+
+  @override
+  String get diagnosticsStatusProbing => 'Проверка...';
+
+  @override
+  String get diagnosticsModeAvailable => 'Готово';
+
+  @override
+  String diagnosticsModeMissing(String what) {
+    return 'Не хватает: $what';
+  }
 
   @override
   String get connectionStatusTitle => 'Подключение';

@@ -1,5 +1,5 @@
+// ignore: unused_import
 import 'package:intl/intl.dart' as intl;
-
 import 'app_localizations.dart';
 
 // ignore_for_file: type=lint
@@ -476,11 +476,93 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsCrashReportsHint => 'Send anonymously';
 
   @override
+  String get settingsCrashReportsSection => 'Crash reports';
+
+  @override
+  String get settingsPermissionBluetooth => 'Bluetooth';
+
+  @override
+  String get settingsPermissionWifi => 'Wi-Fi';
+
+  @override
+  String get settingsPermissionMicrophone => 'Microphone';
+
+  @override
+  String get settingsPermissionGranted => 'OK';
+
+  @override
+  String get settingsSupportEmail => 'support@pulse.app';
+
+  @override
   String get connectionStatusTitle => 'Connection';
 
   @override
   String get connectionStatusOfflineNotice =>
       'The app works offline and collects no data';
+
+  @override
+  String get settingsDiagnostics => 'Device diagnostics';
+
+  @override
+  String get settingsDiagnosticsHint => 'What works on this phone';
+
+  @override
+  String get diagnosticsTitle => 'Diagnostics';
+
+  @override
+  String get diagnosticsHardwareSection => 'Hardware';
+
+  @override
+  String get diagnosticsModesSection => 'Modes';
+
+  @override
+  String get diagnosticsCapabilityMicrophone => 'Microphone';
+
+  @override
+  String get diagnosticsCapabilityAccelerometer => 'Accelerometer';
+
+  @override
+  String get diagnosticsCapabilityVibration => 'Vibration';
+
+  @override
+  String get diagnosticsCapabilityVibrationAmplitude => 'Variable vibration';
+
+  @override
+  String get diagnosticsCapabilityFlashlight => 'Flashlight';
+
+  @override
+  String get diagnosticsCapabilityCamera => 'Camera';
+
+  @override
+  String get diagnosticsCapabilityBluetoothLe => 'Bluetooth LE';
+
+  @override
+  String get diagnosticsCapabilityLocalNetwork => 'Local network';
+
+  @override
+  String get diagnosticsStatusOk => 'Available';
+
+  @override
+  String get diagnosticsStatusMissing => 'Unavailable';
+
+  @override
+  String get diagnosticsStatusProbing => 'Probing…';
+
+  @override
+  String get diagnosticsModeAvailable => 'Ready';
+
+  @override
+  String diagnosticsModeMissing(String what) {
+    return 'Missing: $what';
+  }
+
+  @override
+  String get modesUnavailableCaption => 'Unavailable on this device';
+
+  @override
+  String modesUnavailableReason(String what) {
+    return 'This mode needs $what, which isn\'t available on this device.';
+  }
 
   @override
   String get errorGeneric => 'Something went wrong';

@@ -216,6 +216,13 @@
       "what": {"type": "String"}
     }
   },
+  "modesUnavailableCaption": "Недоступно на этом устройстве",
+  "modesUnavailableReason": "Этому режиму нужен {what}, которого нет на устройстве.",
+  "@modesUnavailableReason": {
+    "placeholders": {
+      "what": {"type": "String"}
+    }
+  },
 
   "errorGeneric": "Что-то пошло не так"
 }

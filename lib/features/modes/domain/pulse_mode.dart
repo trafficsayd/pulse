@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
 
 import '../../capabilities/domain/device_capability.dart';
+import 'mode_participant_range.dart';
 
 /// Stable identifier for a built-in mode. The string value is what's stored
 /// on disk (last-used mode, analytics if ever opted in, etc.) — do NOT
@@ -37,6 +38,7 @@ class PulseModeDescriptor {
     required this.tint,
     required this.glyph,
     this.requiredCapabilities = const <DeviceCapability>{},
+    this.participants = ModeParticipantRange.pair,
   });
 
   final PulseModeId id;
@@ -69,4 +71,10 @@ class PulseModeDescriptor {
   /// and Hub carousel grey out tiles whose requirements aren't met on
   /// this device, and the diagnostics screen explains *why*.
   final Set<DeviceCapability> requiredCapabilities;
+
+  /// Allowed participant count for this mode. Defaults to a strict pair
+  /// ([ModeParticipantRange.pair]); solo modes and group experiences set
+  /// this explicitly so the runner can refuse to launch with the wrong
+  /// number of partners.
+  final ModeParticipantRange participants;
 }

@@ -380,6 +380,14 @@
       "what": {"type": "String"}
     }
   },
+  "modesUnavailableCaption": "Unavailable on this device",
+  "@modesUnavailableCaption": {},
+  "modesUnavailableReason": "This mode needs {what}, which isn't available on this device.",
+  "@modesUnavailableReason": {
+    "placeholders": {
+      "what": {"type": "String"}
+    }
+  },
 
   "errorGeneric": "Something went wrong",
   "@errorGeneric": {}

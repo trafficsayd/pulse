@@ -7,16 +7,16 @@ of DTLS-SRTP, so this server cannot see anything sensitive.
 
 ## Routes
 
-| Method | Path | Auth | Purpose |
-| ------ | ---- | ---- | ------- |
-| `POST` | `/session` | none | Create a new signaling session. Body: `{ "pairingCode": "..." }`. Returns `{ sessionId, token, expiresAt }`. |
-| `POST` | `/session/:id/offer` | bearer | Store the SDP offer (and optional initial ICE candidates). |
-| `GET`  | `/session/:id/offer` | bearer | Read the stored offer. `204` if not yet posted. |
-| `POST` | `/session/:id/answer` | bearer | Store the SDP answer. |
-| `GET`  | `/session/:id/answer` | bearer | Read the stored answer. `204` if not yet posted. |
-| `POST` | `/session/:id/ice` | bearer | Append one trickle-ICE candidate. |
-| `GET`  | `/session/:id/ice?since=N` | bearer | Long-poll (up to 25 s) for ICE candidates after cursor `N`. Returns `204` on timeout. |
-| `GET`  | `/health` | none | Liveness probe. |
+| Method | Path                       | Auth   | Purpose                                                                                                      |
+| ------ | -------------------------- | ------ | ------------------------------------------------------------------------------------------------------------ |
+| `POST` | `/session`                 | none   | Create a new signaling session. Body: `{ "pairingCode": "..." }`. Returns `{ sessionId, token, expiresAt }`. |
+| `POST` | `/session/:id/offer`       | bearer | Store the SDP offer (and optional initial ICE candidates).                                                   |
+| `GET`  | `/session/:id/offer`       | bearer | Read the stored offer. `204` if not yet posted.                                                              |
+| `POST` | `/session/:id/answer`      | bearer | Store the SDP answer.                                                                                        |
+| `GET`  | `/session/:id/answer`      | bearer | Read the stored answer. `204` if not yet posted.                                                             |
+| `POST` | `/session/:id/ice`         | bearer | Append one trickle-ICE candidate.                                                                            |
+| `GET`  | `/session/:id/ice?since=N` | bearer | Long-poll (up to 25 s) for ICE candidates after cursor `N`. Returns `204` on timeout.                        |
+| `GET`  | `/health`                  | none   | Liveness probe.                                                                                              |
 
 ### Auth model
 
@@ -61,12 +61,12 @@ wrangler deploy
 
 `wrangler.toml` also exposes a few tunable variables under `[vars]`:
 
-| Var | Default | Description |
-| --- | ------- | ----------- |
-| `ICE_LONG_POLL_TIMEOUT_MS` | `25000` | Max time `GET /session/:id/ice` will hold the request open. |
-| `ICE_LONG_POLL_INTERVAL_MS` | `500` | Poll interval inside the long-poll loop. |
-| `RATE_LIMIT_PER_MINUTE` | `30` | Per-IP request budget. |
-| `SESSION_TTL_SECONDS` | `600` | TTL applied to every KV entry. |
+| Var                         | Default | Description                                                 |
+| --------------------------- | ------- | ----------------------------------------------------------- |
+| `ICE_LONG_POLL_TIMEOUT_MS`  | `25000` | Max time `GET /session/:id/ice` will hold the request open. |
+| `ICE_LONG_POLL_INTERVAL_MS` | `500`   | Poll interval inside the long-poll loop.                    |
+| `RATE_LIMIT_PER_MINUTE`     | `30`    | Per-IP request budget.                                      |
+| `SESSION_TTL_SECONDS`       | `600`   | TTL applied to every KV entry.                              |
 
 ## Local development
 

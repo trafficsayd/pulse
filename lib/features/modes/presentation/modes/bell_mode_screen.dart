@@ -245,6 +245,7 @@ class _BellModeViewState extends State<_BellModeView>
               right: 24,
               bottom: 32,
               child: Column(
+                mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(

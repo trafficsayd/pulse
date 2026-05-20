@@ -31,6 +31,15 @@ dependencies:
   # QR rendering for the pairing screen
   qr_flutter: ^4.1.0
 
+  # In-app purchases (Pulse Premium subscription via App Store / Play Store)
+  in_app_purchase: ^3.2.0
+
+  # App version / build metadata used by the IAP receipts and About screen
+  package_info_plus: ^8.0.2
+
+  # Opening App Store / Play subscription-management URLs from the paywall.
+  url_launcher: ^6.3.1
+
   # Cryptography (Curve25519 ECDH, HKDF-SHA-256, AES-256-GCM)
   cryptography: ^2.7.0
 

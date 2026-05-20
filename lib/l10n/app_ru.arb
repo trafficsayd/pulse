@@ -109,6 +109,23 @@
   },
   "subscriptionTrialExpired": "Триал закончился",
   "subscriptionConnectionLimitReached": "Достигнут лимит связей для текущего тарифа.",
+  "subscriptionRestoring": "Восстановление…",
+  "subscriptionRestoreNothing": "Ничего не найдено",
+  "subscriptionRestoreSuccess": "Подписка восстановлена",
+  "subscriptionPurchaseError": "Не удалось оформить подписку",
+  "subscriptionPurchasePending": "Платёж обрабатывается",
+  "subscriptionActiveUntil": "Подписка активна до {date}",
+  "@subscriptionActiveUntil": {
+    "placeholders": {
+      "date": {"type": "String"}
+    }
+  },
+  "subscriptionManage": "Управление подпиской",
+  "subscriptionErrorPaymentInvalid": "Способ оплаты не поддерживается",
+  "subscriptionErrorPaymentNotAllowed": "Покупки запрещены в настройках",
+  "subscriptionErrorBillingUnavailable": "Магазин временно недоступен",
+  "subscriptionErrorItemUnavailable": "Подписка пока недоступна",
+  "subscriptionErrorGeneric": "Произошла ошибка. Попробуйте ещё раз",
 
   "modesCatalogTitle": "Режимы",
   "modesCatalogTrialSection": "Доступно в триале ({available}/{total})",

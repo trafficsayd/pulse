@@ -19,10 +19,20 @@ class Entitlements {
   const Entitlements({
     required this.tier,
     required this.trialStartedAt,
+    this.expiresAt,
   });
 
   final SubscriptionTier tier;
   final DateTime trialStartedAt;
+
+  /// Local approximation of the subscription expiry, in UTC.
+  ///
+  /// On Android this is derived from the receipt's `purchaseTime` plus the
+  /// monthly billing window so the client can lock features back down
+  /// without a network call. On iOS we leave this null until server-side
+  /// receipt validation lands — Apple does not expose an expiry date on
+  /// the local PKCS#7 receipt.
+  final DateTime? expiresAt;
 
   static const trialDuration = Duration(days: 7);
 
@@ -47,10 +57,20 @@ class Entitlements {
   /// Re-evaluate the tier based on elapsed time. Call this on app start and
   /// whenever the trial banner is shown.
   Entitlements rolledForward({DateTime? now}) {
-    if (tier == SubscriptionTier.trial && trialDaysRemaining(now: now) <= 0) {
+    final at = now ?? DateTime.now();
+    if (tier == SubscriptionTier.subscribed &&
+        expiresAt != null &&
+        !at.isBefore(expiresAt!)) {
       return Entitlements(
         tier: SubscriptionTier.expired,
         trialStartedAt: trialStartedAt,
+      );
+    }
+    if (tier == SubscriptionTier.trial && trialDaysRemaining(now: at) <= 0) {
+      return Entitlements(
+        tier: SubscriptionTier.expired,
+        trialStartedAt: trialStartedAt,
+        expiresAt: expiresAt,
       );
     }
     return this;
@@ -72,20 +92,31 @@ class Entitlements {
   Map<String, Object?> toJson() => {
         'tier': tier.name,
         'trialStartedAt': trialStartedAt.toIso8601String(),
+        if (expiresAt != null) 'expiresAt': expiresAt!.toIso8601String(),
       };
 
-  factory Entitlements.fromJson(Map<String, Object?> json) => Entitlements(
-        tier: SubscriptionTier.values.firstWhere(
-          (t) => t.name == json['tier'],
-          orElse: () => SubscriptionTier.trial,
-        ),
-        trialStartedAt: DateTime.parse(json['trialStartedAt']! as String),
-      );
+  factory Entitlements.fromJson(Map<String, Object?> json) {
+    final expiresRaw = json['expiresAt'];
+    return Entitlements(
+      tier: SubscriptionTier.values.firstWhere(
+        (t) => t.name == json['tier'],
+        orElse: () => SubscriptionTier.trial,
+      ),
+      trialStartedAt: DateTime.parse(json['trialStartedAt']! as String),
+      expiresAt: expiresRaw is String ? DateTime.parse(expiresRaw) : null,
+    );
+  }
 
-  Entitlements copyWith({SubscriptionTier? tier, DateTime? trialStartedAt}) =>
+  Entitlements copyWith({
+    SubscriptionTier? tier,
+    DateTime? trialStartedAt,
+    DateTime? expiresAt,
+    bool clearExpiry = false,
+  }) =>
       Entitlements(
         tier: tier ?? this.tier,
         trialStartedAt: trialStartedAt ?? this.trialStartedAt,
+        expiresAt: clearExpiry ? null : (expiresAt ?? this.expiresAt),
       );
 
   @override
@@ -93,8 +124,9 @@ class Entitlements {
       identical(this, other) ||
       (other is Entitlements &&
           tier == other.tier &&
-          trialStartedAt == other.trialStartedAt);
+          trialStartedAt == other.trialStartedAt &&
+          expiresAt == other.expiresAt);
 
   @override
-  int get hashCode => Object.hash(tier, trialStartedAt);
+  int get hashCode => Object.hash(tier, trialStartedAt, expiresAt);
 }

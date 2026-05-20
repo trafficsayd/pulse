@@ -303,6 +303,49 @@ class AppLocalizationsEn extends AppLocalizations {
       'You\'ve reached the connection limit for your tier.';
 
   @override
+  String get subscriptionRestoring => 'Restoring…';
+
+  @override
+  String get subscriptionRestoreNothing => 'Nothing to restore';
+
+  @override
+  String get subscriptionRestoreSuccess => 'Subscription restored';
+
+  @override
+  String get subscriptionPurchaseError => 'Could not complete the purchase';
+
+  @override
+  String get subscriptionPurchasePending => 'Payment is processing';
+
+  @override
+  String subscriptionActiveUntil(String date) {
+    return 'Subscription active until $date';
+  }
+
+  @override
+  String get subscriptionManage => 'Manage subscription';
+
+  @override
+  String get subscriptionErrorPaymentInvalid =>
+      'Payment method is not supported';
+
+  @override
+  String get subscriptionErrorPaymentNotAllowed =>
+      'Purchases are disabled in settings';
+
+  @override
+  String get subscriptionErrorBillingUnavailable =>
+      'Store is temporarily unavailable';
+
+  @override
+  String get subscriptionErrorItemUnavailable =>
+      'Subscription is not available yet';
+
+  @override
+  String get subscriptionErrorGeneric =>
+      'Something went wrong, please try again';
+
+  @override
   String get modesCatalogTitle => 'Modes';
 
   @override

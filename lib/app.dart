@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
-import 'l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/locale/locale_controller.dart';
 import 'core/routing/app_router.dart';
 import 'core/theme/app_colors.dart';
 import 'core/theme/app_theme.dart';
+import 'features/subscription/application/subscription_controller.dart';
+import 'l10n/app_localizations.dart';
 
 /// Root [MaterialApp.router] for Pulse.
 ///
@@ -22,6 +23,16 @@ class PulseApp extends ConsumerStatefulWidget {
 
 class _PulseAppState extends ConsumerState<PulseApp> {
   late final _router = buildRouter();
+
+  @override
+  void initState() {
+    super.initState();
+    // Eagerly initialise the subscription controller so the IAP service
+    // is subscribed to `purchaseStream` for the whole app lifetime — a
+    // redelivery that arrives before the paywall is opened must not be
+    // dropped on the floor.
+    ref.read(subscriptionControllerProvider.notifier);
+  }
 
   @override
   Widget build(BuildContext context) {

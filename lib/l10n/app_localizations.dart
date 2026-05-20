@@ -626,6 +626,78 @@ abstract class AppLocalizations {
   /// **'You\'ve reached the connection limit for your tier.'**
   String get subscriptionConnectionLimitReached;
 
+  /// No description provided for @subscriptionRestoring.
+  ///
+  /// In en, this message translates to:
+  /// **'Restoring…'**
+  String get subscriptionRestoring;
+
+  /// No description provided for @subscriptionRestoreNothing.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing to restore'**
+  String get subscriptionRestoreNothing;
+
+  /// No description provided for @subscriptionRestoreSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Subscription restored'**
+  String get subscriptionRestoreSuccess;
+
+  /// No description provided for @subscriptionPurchaseError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not complete the purchase'**
+  String get subscriptionPurchaseError;
+
+  /// No description provided for @subscriptionPurchasePending.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment is processing'**
+  String get subscriptionPurchasePending;
+
+  /// No description provided for @subscriptionActiveUntil.
+  ///
+  /// In en, this message translates to:
+  /// **'Subscription active until {date}'**
+  String subscriptionActiveUntil(String date);
+
+  /// No description provided for @subscriptionManage.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage subscription'**
+  String get subscriptionManage;
+
+  /// No description provided for @subscriptionErrorPaymentInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment method is not supported'**
+  String get subscriptionErrorPaymentInvalid;
+
+  /// No description provided for @subscriptionErrorPaymentNotAllowed.
+  ///
+  /// In en, this message translates to:
+  /// **'Purchases are disabled in settings'**
+  String get subscriptionErrorPaymentNotAllowed;
+
+  /// No description provided for @subscriptionErrorBillingUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Store is temporarily unavailable'**
+  String get subscriptionErrorBillingUnavailable;
+
+  /// No description provided for @subscriptionErrorItemUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Subscription is not available yet'**
+  String get subscriptionErrorItemUnavailable;
+
+  /// No description provided for @subscriptionErrorGeneric.
+  ///
+  /// In en, this message translates to:
+  /// **'Something went wrong, please try again'**
+  String get subscriptionErrorGeneric;
+
   /// No description provided for @modesCatalogTitle.
   ///
   /// In en, this message translates to:

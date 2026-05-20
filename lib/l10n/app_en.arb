@@ -275,6 +275,22 @@
   "@halfHeartHint": {},
   "sketchHint": "Draw live or send a finished card",
   "@sketchHint": {},
+  "whisperHint": "Whisper into the mic — the spokes follow your breath",
+  "@whisperHint": {},
+  "bellHint": "Shake to ring the bell",
+  "@bellHint": {},
+  "bellIntensity": "Shake intensity",
+  "@bellIntensity": {},
+  "constellationHint": "Tap stars — wait to draw the lines",
+  "@constellationHint": {},
+  "modesUnsupportedTitle": "This mode can't run here",
+  "@modesUnsupportedTitle": {},
+  "modesUnsupportedNeeds": "Needs: {what}",
+  "@modesUnsupportedNeeds": {
+    "placeholders": {
+      "what": {"type": "String"}
+    }
+  },
   "sketchLive": "LIVE",
   "@sketchLive": {},
   "sketchCard": "Card",

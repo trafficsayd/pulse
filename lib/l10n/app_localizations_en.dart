@@ -411,6 +411,27 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sketchHint => 'Draw live or send a finished card';
 
   @override
+  String get whisperHint =>
+      'Whisper into the mic — the spokes follow your breath';
+
+  @override
+  String get bellHint => 'Shake to ring the bell';
+
+  @override
+  String get bellIntensity => 'Shake intensity';
+
+  @override
+  String get constellationHint => 'Tap stars — wait to draw the lines';
+
+  @override
+  String get modesUnsupportedTitle => 'This mode can\'t run here';
+
+  @override
+  String modesUnsupportedNeeds(String what) {
+    return 'Needs: $what';
+  }
+
+  @override
   String get sketchLive => 'LIVE';
 
   @override

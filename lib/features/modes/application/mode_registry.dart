@@ -4,10 +4,13 @@ import '../../../core/theme/app_colors.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../capabilities/domain/device_capability.dart';
 import '../domain/pulse_mode.dart';
+import '../presentation/modes/bell_mode_screen.dart';
+import '../presentation/modes/constellation_mode_screen.dart';
 import '../presentation/modes/half_heart_mode_screen.dart';
 import '../presentation/modes/placeholder_mode_screen.dart';
 import '../presentation/modes/ray_sketch_mode_screen.dart';
 import '../presentation/modes/tap_tap_mode_screen.dart';
+import '../presentation/modes/whisper_mode_screen.dart';
 
 /// Tints used for mode tiles. Each starter mode owns a distinct hue so the
 /// carousel/grid reads as a colored chord rather than a wall of violet.
@@ -59,7 +62,7 @@ final List<PulseModeDescriptor> kAllModes = [
       DeviceCapability.microphone,
       DeviceCapability.vibration,
     },
-    builder: (context) => const PlaceholderModeScreen(titleKey: 'modeWhisper'),
+    builder: (context) => const WhisperModeScreen(),
   ),
   PulseModeDescriptor(
     id: PulseModeId.bell,
@@ -69,7 +72,7 @@ final List<PulseModeDescriptor> kAllModes = [
     tint: _bellYellow,
     glyph: '🔔',
     requiredCapabilities: const {DeviceCapability.accelerometer},
-    builder: (context) => const PlaceholderModeScreen(titleKey: 'modeBell'),
+    builder: (context) => const BellModeScreen(),
   ),
   PulseModeDescriptor(
     id: PulseModeId.ray,
@@ -87,8 +90,7 @@ final List<PulseModeDescriptor> kAllModes = [
     isStarter: true,
     tint: _constellationLavender,
     glyph: '⭐',
-    builder: (context) =>
-        const PlaceholderModeScreen(titleKey: 'modeConstellation'),
+    builder: (context) => const ConstellationModeScreen(),
   ),
   // Subscription-only modes — placeholders for now, but they appear in the
   // catalog grid and the locked Hub tile so the design lands fully.

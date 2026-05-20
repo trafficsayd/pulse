@@ -212,6 +212,33 @@ void main() {
       expect(device.disconnectCount, greaterThanOrEqualTo(1));
     });
 
+    test('GATT connect failure cleans up resources and resets to idle',
+        () async {
+      final failDevice = FakeBleDevice(
+        remoteId: 'FF:EE:DD:CC:BB:AA',
+        services: [],
+        failConnect: true,
+      );
+      addTearDown(failDevice.dispose);
+
+      final adv = BleAdvertisement(
+        device: failDevice,
+        rssi: -50,
+        serviceUuids: [pulseServiceUuid],
+      );
+      final connectFuture = client.connect(
+        scanTimeout: const Duration(seconds: 5),
+      );
+      await Future<void>.delayed(Duration.zero);
+      scanner.emit([adv]);
+
+      await expectLater(
+        connectFuture,
+        throwsA(isA<BleTransportException>()),
+      );
+      expect(client.currentState, BleClientState.idle);
+    });
+
     test('state stream reflects scanning → connecting → connected', () async {
       final states = <BleClientState>[];
       final sub = client.state.listen(states.add);

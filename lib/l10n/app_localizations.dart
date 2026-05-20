@@ -950,6 +950,150 @@ abstract class AppLocalizations {
   /// **'Send anonymously'**
   String get settingsCrashReportsHint;
 
+  /// No description provided for @settingsCrashReportsSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Crash reports'**
+  String get settingsCrashReportsSection;
+
+  /// No description provided for @settingsPermissionBluetooth.
+  ///
+  /// In en, this message translates to:
+  /// **'Bluetooth'**
+  String get settingsPermissionBluetooth;
+
+  /// No description provided for @settingsPermissionWifi.
+  ///
+  /// In en, this message translates to:
+  /// **'Wi-Fi'**
+  String get settingsPermissionWifi;
+
+  /// No description provided for @settingsPermissionMicrophone.
+  ///
+  /// In en, this message translates to:
+  /// **'Microphone'**
+  String get settingsPermissionMicrophone;
+
+  /// No description provided for @settingsPermissionGranted.
+  ///
+  /// In en, this message translates to:
+  /// **'OK'**
+  String get settingsPermissionGranted;
+
+  /// No description provided for @settingsSupportEmail.
+  ///
+  /// In en, this message translates to:
+  /// **'support@pulse.app'**
+  String get settingsSupportEmail;
+
+  /// No description provided for @settingsDiagnostics.
+  ///
+  /// In en, this message translates to:
+  /// **'Device diagnostics'**
+  String get settingsDiagnostics;
+
+  /// No description provided for @settingsDiagnosticsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'What works on this phone'**
+  String get settingsDiagnosticsHint;
+
+  /// No description provided for @diagnosticsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Diagnostics'**
+  String get diagnosticsTitle;
+
+  /// No description provided for @diagnosticsHardwareSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Hardware'**
+  String get diagnosticsHardwareSection;
+
+  /// No description provided for @diagnosticsModesSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Modes'**
+  String get diagnosticsModesSection;
+
+  /// No description provided for @diagnosticsCapabilityMicrophone.
+  ///
+  /// In en, this message translates to:
+  /// **'Microphone'**
+  String get diagnosticsCapabilityMicrophone;
+
+  /// No description provided for @diagnosticsCapabilityAccelerometer.
+  ///
+  /// In en, this message translates to:
+  /// **'Accelerometer'**
+  String get diagnosticsCapabilityAccelerometer;
+
+  /// No description provided for @diagnosticsCapabilityVibration.
+  ///
+  /// In en, this message translates to:
+  /// **'Vibration'**
+  String get diagnosticsCapabilityVibration;
+
+  /// No description provided for @diagnosticsCapabilityVibrationAmplitude.
+  ///
+  /// In en, this message translates to:
+  /// **'Variable vibration'**
+  String get diagnosticsCapabilityVibrationAmplitude;
+
+  /// No description provided for @diagnosticsCapabilityFlashlight.
+  ///
+  /// In en, this message translates to:
+  /// **'Flashlight'**
+  String get diagnosticsCapabilityFlashlight;
+
+  /// No description provided for @diagnosticsCapabilityCamera.
+  ///
+  /// In en, this message translates to:
+  /// **'Camera'**
+  String get diagnosticsCapabilityCamera;
+
+  /// No description provided for @diagnosticsCapabilityBluetoothLe.
+  ///
+  /// In en, this message translates to:
+  /// **'Bluetooth LE'**
+  String get diagnosticsCapabilityBluetoothLe;
+
+  /// No description provided for @diagnosticsCapabilityLocalNetwork.
+  ///
+  /// In en, this message translates to:
+  /// **'Local network'**
+  String get diagnosticsCapabilityLocalNetwork;
+
+  /// No description provided for @diagnosticsStatusOk.
+  ///
+  /// In en, this message translates to:
+  /// **'Available'**
+  String get diagnosticsStatusOk;
+
+  /// No description provided for @diagnosticsStatusMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'Unavailable'**
+  String get diagnosticsStatusMissing;
+
+  /// No description provided for @diagnosticsStatusProbing.
+  ///
+  /// In en, this message translates to:
+  /// **'Probing…'**
+  String get diagnosticsStatusProbing;
+
+  /// No description provided for @diagnosticsModeAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Ready'**
+  String get diagnosticsModeAvailable;
+
+  /// No description provided for @diagnosticsModeMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'Missing: {what}'**
+  String diagnosticsModeMissing(String what);
+
   /// No description provided for @connectionStatusTitle.
   ///
   /// In en, this message translates to:

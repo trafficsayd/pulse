@@ -413,6 +413,26 @@ class AppLocalizationsRu extends AppLocalizations {
   String get sketchHint => 'Рисуй вживую или отправь готовую открытку';
 
   @override
+  String get whisperHint => 'Шёпот в микрофон — лучи дышат вместе с тобой';
+
+  @override
+  String get bellHint => 'Потряси телефон, чтобы зазвонить';
+
+  @override
+  String get bellIntensity => 'Сила тряски';
+
+  @override
+  String get constellationHint => 'Касайся точек — подожди, чтобы соединить';
+
+  @override
+  String get modesUnsupportedTitle => 'Здесь этот режим не работает';
+
+  @override
+  String modesUnsupportedNeeds(String what) {
+    return 'Нужно: $what';
+  }
+
+  @override
   String get sketchLive => 'LIVE';
 
   @override

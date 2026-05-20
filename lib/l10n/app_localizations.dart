@@ -824,6 +824,42 @@ abstract class AppLocalizations {
   /// **'Draw live or send a finished card'**
   String get sketchHint;
 
+  /// No description provided for @whisperHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Whisper into the mic — the spokes follow your breath'**
+  String get whisperHint;
+
+  /// No description provided for @bellHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Shake to ring the bell'**
+  String get bellHint;
+
+  /// No description provided for @bellIntensity.
+  ///
+  /// In en, this message translates to:
+  /// **'Shake intensity'**
+  String get bellIntensity;
+
+  /// No description provided for @constellationHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap stars — wait to draw the lines'**
+  String get constellationHint;
+
+  /// No description provided for @modesUnsupportedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'This mode can\'t run here'**
+  String get modesUnsupportedTitle;
+
+  /// No description provided for @modesUnsupportedNeeds.
+  ///
+  /// In en, this message translates to:
+  /// **'Needs: {what}'**
+  String modesUnsupportedNeeds(String what);
+
   /// No description provided for @sketchLive.
   ///
   /// In en, this message translates to:

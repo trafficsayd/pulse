@@ -156,6 +156,17 @@
   "tapTapHint": "Коснитесь, чтобы постучать",
   "halfHeartHint": "Удерживай свою половину",
   "sketchHint": "Рисуй вживую или отправь готовую открытку",
+  "whisperHint": "Шёпот в микрофон — лучи дышат вместе с тобой",
+  "bellHint": "Потряси телефон, чтобы зазвонить",
+  "bellIntensity": "Сила тряски",
+  "constellationHint": "Касайся точек — подожди, чтобы соединить",
+  "modesUnsupportedTitle": "Здесь этот режим не работает",
+  "modesUnsupportedNeeds": "Нужно: {what}",
+  "@modesUnsupportedNeeds": {
+    "placeholders": {
+      "what": {"type": "String"}
+    }
+  },
   "sketchLive": "LIVE",
   "sketchCard": "Открытка",
   "sketchClear": "Очистить",

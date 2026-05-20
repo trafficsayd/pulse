@@ -107,11 +107,11 @@ class RealBleClient implements BleClient {
       try {
         adv = await found.future.timeout(scanTimeout);
       } on TimeoutException {
-        await _stopScanQuiet();
-        _setState(BleClientState.idle);
         throw BleTransportException.scanTimeout(scanTimeout);
       }
       await _stopScanQuiet();
+      await _safeCancel(_scanSub);
+      _scanSub = null;
 
       _device = adv.device;
       _setState(BleClientState.connecting);
@@ -160,6 +160,9 @@ class RealBleClient implements BleClient {
       _rx = rx;
 
       _setState(BleClientState.connected);
+    } catch (e) {
+      await disconnect();
+      rethrow;
     } finally {
       _connecting = false;
     }

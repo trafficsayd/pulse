@@ -43,6 +43,10 @@ dependencies:
   # Cryptography (Curve25519 ECDH, HKDF-SHA-256, AES-256-GCM)
   cryptography: ^2.7.0
 
+  # HTTP client used by the signaling client that brokers WebRTC SDP / ICE
+  # between two peers via the Cloudflare Worker in `signaling/`.
+  http: ^1.2.2
+
   # Utilities
   collection: ^1.18.0
   uuid: ^4.5.1

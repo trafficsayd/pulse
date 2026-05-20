@@ -1,5 +1,5 @@
+// ignore: unused_import
 import 'package:intl/intl.dart' as intl;
-
 import 'app_localizations.dart';
 
 // ignore_for_file: type=lint
@@ -496,6 +496,13 @@ class AppLocalizationsRu extends AppLocalizations {
   String get settingsSupportEmail => 'support@pulse.app';
 
   @override
+  String get connectionStatusTitle => 'Подключение';
+
+  @override
+  String get connectionStatusOfflineNotice =>
+      'Приложение работает без интернета и не собирает данные';
+
+  @override
   String get settingsDiagnostics => 'Диагностика устройства';
 
   @override
@@ -553,11 +560,12 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
-  String get connectionStatusTitle => 'Подключение';
+  String get modesUnavailableCaption => 'Недоступно на этом устройстве';
 
   @override
-  String get connectionStatusOfflineNotice =>
-      'Приложение работает без интернета и не собирает данные';
+  String modesUnavailableReason(String what) {
+    return 'Этому режиму нужен $what, которого нет на устройстве.';
+  }
 
   @override
   String get errorGeneric => 'Что-то пошло не так';

@@ -18,7 +18,7 @@ import 'app_localizations_ru.dart';
 /// `supportedLocales` list. For example:
 ///
 /// ```dart
-/// import 'gen_l10n/app_localizations.dart';
+/// import 'l10n/app_localizations.dart';
 ///
 /// return MaterialApp(
 ///   localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -986,6 +986,18 @@ abstract class AppLocalizations {
   /// **'support@pulse.app'**
   String get settingsSupportEmail;
 
+  /// No description provided for @connectionStatusTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection'**
+  String get connectionStatusTitle;
+
+  /// No description provided for @connectionStatusOfflineNotice.
+  ///
+  /// In en, this message translates to:
+  /// **'The app works offline and collects no data'**
+  String get connectionStatusOfflineNotice;
+
   /// No description provided for @settingsDiagnostics.
   ///
   /// In en, this message translates to:
@@ -1094,17 +1106,17 @@ abstract class AppLocalizations {
   /// **'Missing: {what}'**
   String diagnosticsModeMissing(String what);
 
-  /// No description provided for @connectionStatusTitle.
+  /// No description provided for @modesUnavailableCaption.
   ///
   /// In en, this message translates to:
-  /// **'Connection'**
-  String get connectionStatusTitle;
+  /// **'Unavailable on this device'**
+  String get modesUnavailableCaption;
 
-  /// No description provided for @connectionStatusOfflineNotice.
+  /// No description provided for @modesUnavailableReason.
   ///
   /// In en, this message translates to:
-  /// **'The app works offline and collects no data'**
-  String get connectionStatusOfflineNotice;
+  /// **'This mode needs {what}, which isn\'t available on this device.'**
+  String modesUnavailableReason(String what);
 
   /// No description provided for @errorGeneric.
   ///

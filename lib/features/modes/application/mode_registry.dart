@@ -4,12 +4,15 @@ import '../../../core/theme/app_colors.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../capabilities/domain/device_capability.dart';
 import '../domain/pulse_mode.dart';
+import '../presentation/modes/balance_mode_screen.dart';
 import '../presentation/modes/bell_mode_screen.dart';
 import '../presentation/modes/constellation_mode_screen.dart';
+import '../presentation/modes/goosebumps_mode_screen.dart';
 import '../presentation/modes/half_heart_mode_screen.dart';
 import '../presentation/modes/placeholder_mode_screen.dart';
 import '../presentation/modes/ray_sketch_mode_screen.dart';
 import '../presentation/modes/tap_tap_mode_screen.dart';
+import '../presentation/modes/thunder_mode_screen.dart';
 import '../presentation/modes/whisper_mode_screen.dart';
 
 /// Tints used for mode tiles. Each starter mode owns a distinct hue so the
@@ -103,10 +106,8 @@ final List<PulseModeDescriptor> kAllModes = [
     glyph: '💫',
     requiredCapabilities: const {
       DeviceCapability.vibration,
-      DeviceCapability.vibrationAmplitude,
     },
-    builder: (context) =>
-        const PlaceholderModeScreen(titleKey: 'modeGoosebumps'),
+    builder: (context) => const GoosebumpsModeScreen(),
   ),
   PulseModeDescriptor(
     id: PulseModeId.thread,
@@ -128,7 +129,7 @@ final List<PulseModeDescriptor> kAllModes = [
       DeviceCapability.microphone,
       DeviceCapability.flashlight,
     },
-    builder: (context) => const PlaceholderModeScreen(titleKey: 'modeThunder'),
+    builder: (context) => const ThunderModeScreen(),
   ),
   PulseModeDescriptor(
     id: PulseModeId.fireworks,
@@ -148,7 +149,7 @@ final List<PulseModeDescriptor> kAllModes = [
     tint: AppColors.textSecondary,
     glyph: '⚖️',
     requiredCapabilities: const {DeviceCapability.accelerometer},
-    builder: (context) => const PlaceholderModeScreen(titleKey: 'modeBalance'),
+    builder: (context) => const BalanceModeScreen(),
   ),
   PulseModeDescriptor(
     id: PulseModeId.sandbox,

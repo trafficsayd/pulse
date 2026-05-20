@@ -848,6 +848,24 @@ abstract class AppLocalizations {
   /// **'Tap stars — wait to draw the lines'**
   String get constellationHint;
 
+  /// No description provided for @modeThunderHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Clap loud — torch and bolt fire on every thunder'**
+  String get modeThunderHint;
+
+  /// No description provided for @modeGoosebumpsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Drag your finger — speed sets the buzz'**
+  String get modeGoosebumpsHint;
+
+  /// No description provided for @modeBalanceHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Tilt to roll the ball — feel the rim'**
+  String get modeBalanceHint;
+
   /// No description provided for @modesUnsupportedTitle.
   ///
   /// In en, this message translates to:

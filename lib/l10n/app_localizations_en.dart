@@ -424,6 +424,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get constellationHint => 'Tap stars — wait to draw the lines';
 
   @override
+  String get modeThunderHint =>
+      'Clap loud — torch and bolt fire on every thunder';
+
+  @override
+  String get modeGoosebumpsHint => 'Drag your finger — speed sets the buzz';
+
+  @override
+  String get modeBalanceHint => 'Tilt to roll the ball — feel the rim';
+
+  @override
   String get modesUnsupportedTitle => 'This mode can\'t run here';
 
   @override

@@ -425,6 +425,17 @@ class AppLocalizationsRu extends AppLocalizations {
   String get constellationHint => 'Касайся точек — подожди, чтобы соединить';
 
   @override
+  String get modeThunderHint =>
+      'Хлопни громко — вспышка и молния от каждого грома';
+
+  @override
+  String get modeGoosebumpsHint =>
+      'Веди пальцем — скорость задаёт силу вибрации';
+
+  @override
+  String get modeBalanceHint => 'Наклоняй, чтобы катить шар — почувствуй край';
+
+  @override
   String get modesUnsupportedTitle => 'Здесь этот режим не работает';
 
   @override

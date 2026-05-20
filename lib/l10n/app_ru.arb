@@ -160,6 +160,9 @@
   "bellHint": "Потряси телефон, чтобы зазвонить",
   "bellIntensity": "Сила тряски",
   "constellationHint": "Касайся точек — подожди, чтобы соединить",
+  "modeThunderHint": "Хлопни громко — вспышка и молния от каждого грома",
+  "modeGoosebumpsHint": "Веди пальцем — скорость задаёт силу вибрации",
+  "modeBalanceHint": "Наклоняй, чтобы катить шар — почувствуй край",
   "modesUnsupportedTitle": "Здесь этот режим не работает",
   "modesUnsupportedNeeds": "Нужно: {what}",
   "@modesUnsupportedNeeds": {

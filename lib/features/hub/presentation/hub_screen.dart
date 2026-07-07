@@ -15,6 +15,7 @@ import '../../connections/application/connections_controller.dart';
 import '../../connections/domain/connection.dart';
 import '../../modes/application/mode_registry.dart';
 import '../../modes/domain/pulse_mode.dart';
+import '../../session/application/session_provider.dart';
 import '../../subscription/application/subscription_controller.dart';
 import '../../transport/transport.dart';
 
@@ -26,11 +27,10 @@ class HubScreen extends ConsumerWidget {
     final t = AppLocalizations.of(context)!;
     final connections = ref.watch(connectionsControllerProvider);
     final activeConnection = connections.active;
-    final transportKind = activeConnection != null
-        ? TransportKind.direct
-        : TransportKind.searching;
-    final transportLabel =
-        activeConnection != null ? t.transportDirectBle : t.transportSearching;
+    final sessionAsync = ref.watch(sessionProvider);
+    final transportKind = sessionAsync.valueOrNull?.currentTransport ??
+        TransportKind.searching;
+    final transportLabel = _transportLabel(transportKind, t);
 
     return BottomNavShell(
       current: BottomNavTab.pulse,
@@ -501,3 +501,11 @@ class _CenterDisc extends StatelessWidget {
     );
   }
 }
+
+/// Maps a [TransportKind] to its localized display label.
+String _transportLabel(TransportKind kind, AppLocalizations t) => switch (kind) {
+      TransportKind.direct => t.transportDirectBle,
+      TransportKind.localNetwork => t.transportLocalWifi,
+      TransportKind.relay => t.transportRelayWebrtc,
+      TransportKind.searching => t.transportSearching,
+    };

@@ -425,6 +425,12 @@ class AppLocalizationsRu extends AppLocalizations {
   String get constellationHint => 'Касайся точек — подожди, чтобы соединить';
 
   @override
+  String get candleTouchHint => 'Коснись, чтобы зажечь свечу';
+
+  @override
+  String get candleBlowHint => 'Подуй, чтобы погасить';
+
+  @override
   String get modesUnsupportedTitle => 'Здесь этот режим не работает';
 
   @override

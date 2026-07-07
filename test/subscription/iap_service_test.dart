@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:pulse/features/subscription/data/iap_diagnostics.dart';
@@ -119,6 +120,15 @@ Future<void> _flush() async {
 
 void main() {
   group('IapService', () {
+    test(
+      'default adapter stays unavailable instead of throwing on web',
+      () async {
+        final adapter = DefaultInAppPurchaseAdapter();
+        expect(await adapter.isAvailable(), isFalse);
+      },
+      skip: !kIsWeb,
+    );
+
     test('isAvailable returns the underlying availability', () async {
       final available = IapService(adapter: _FakeAdapter(available: true));
       final unavailable = IapService(adapter: _FakeAdapter(available: false));

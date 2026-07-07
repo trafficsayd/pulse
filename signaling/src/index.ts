@@ -2,11 +2,13 @@ import { extractBearerToken, signToken, verifyToken } from './auth';
 import { checkAndIncrementRateLimit } from './rate_limit';
 import {
   appendIce,
+  appendMessage,
   createSession,
   getAnswer,
   getOffer,
   getSession,
   readIceSince,
+  readMessagesSince,
   storeAnswer,
   storeOffer,
 } from './session';
@@ -18,6 +20,8 @@ import type {
   IceCandidate,
   IcePayload,
   OfferPayload,
+  RelayMessage,
+  RelayMessagePayload,
 } from './types';
 
 /**
@@ -114,6 +118,16 @@ function asIceCandidateList(value: unknown): IceCandidate[] | null {
     out.push(candidate);
   }
   return out;
+}
+
+function asBase64(value: unknown): string | null {
+  if (typeof value !== 'string' || value.length === 0 || value.length > 87_384) {
+    return null;
+  }
+  if (!/^[A-Za-z0-9+/]+={0,2}$/.test(value)) {
+    return null;
+  }
+  return value;
 }
 
 async function requireAuth(
@@ -345,14 +359,86 @@ async function handleGetIce(ctx: RouteContext, sessionId: string): Promise<Respo
   return json(payload, { status: 200 });
 }
 
+async function handlePostMessage(ctx: RouteContext, sessionId: string): Promise<Response> {
+  const authFailure = await requireAuth(ctx.env, ctx.request, sessionId, ctx.nowMs);
+  if (authFailure) {
+    return authFailure;
+  }
+  const session = await getSession(ctx.env, sessionId);
+  if (!session) {
+    return errorJson(404, 'session_not_found', 'session does not exist or has expired');
+  }
+
+  let body: unknown;
+  try {
+    body = await readJsonBody(ctx.request);
+  } catch {
+    return errorJson(400, 'bad_body', 'expected JSON body with `senderId`, `kind`, `payload`');
+  }
+  if (typeof body !== 'object' || body === null) {
+    return errorJson(400, 'bad_body', 'expected JSON object');
+  }
+
+  const { senderId, kind, payload } = body as {
+    senderId?: unknown;
+    kind?: unknown;
+    payload?: unknown;
+  };
+  if (!isString(senderId) || senderId.length === 0 || senderId.length > 64) {
+    return errorJson(400, 'bad_sender_id', '`senderId` must be a 1..64 char string');
+  }
+  if (!isString(kind) || kind.length === 0 || kind.length > 64) {
+    return errorJson(400, 'bad_kind', '`kind` must be a 1..64 char string');
+  }
+  const encodedPayload = asBase64(payload);
+  if (!encodedPayload) {
+    return errorJson(400, 'bad_payload', '`payload` must be non-empty base64 text');
+  }
+
+  const message: RelayMessage = {
+    senderId,
+    kind,
+    payload: encodedPayload,
+    storedAt: ctx.nowMs,
+  };
+  const cursor = await appendMessage(ctx.env, sessionId, message);
+  return json({ ok: true, cursor }, { status: 200 });
+}
+
+async function handleGetMessages(ctx: RouteContext, sessionId: string): Promise<Response> {
+  const authFailure = await requireAuth(ctx.env, ctx.request, sessionId, ctx.nowMs);
+  if (authFailure) {
+    return authFailure;
+  }
+  const session = await getSession(ctx.env, sessionId);
+  if (!session) {
+    return errorJson(404, 'session_not_found', 'session does not exist or has expired');
+  }
+
+  const since = intQuery(ctx.url, 'since', 0);
+  const timeoutMs = parseLongPollTimeoutMs(ctx.env);
+  const intervalMs = parseLongPollIntervalMs(ctx.env);
+  const deadline = ctx.nowMs + timeoutMs;
+
+  let payload: RelayMessagePayload = await readMessagesSince(ctx.env, sessionId, since);
+  while (payload.messages.length === 0 && Date.now() < deadline) {
+    await poll(intervalMs);
+    payload = await readMessagesSince(ctx.env, sessionId, since);
+  }
+  if (payload.messages.length === 0) {
+    return new Response(null, { status: 204 });
+  }
+  return json(payload, { status: 200 });
+}
+
 interface RouteMatch {
   handler: (ctx: RouteContext, sessionId: string) => Promise<Response>;
   sessionId: string;
 }
 
 function matchSessionRoute(method: string, pathname: string): RouteMatch | null {
-  // /session/:id/(offer|answer|ice)
-  const match = /^\/session\/([0-9a-fA-F]{6,64})\/(offer|answer|ice)$/.exec(pathname);
+  // /session/:id/(offer|answer|ice|messages)
+  const match = /^\/session\/([0-9a-fA-F]{6,64})\/(offer|answer|ice|messages)$/.exec(pathname);
   if (!match) {
     return null;
   }
@@ -375,6 +461,12 @@ function matchSessionRoute(method: string, pathname: string): RouteMatch | null 
   }
   if (sub === 'ice' && method === 'GET') {
     return { handler: handleGetIce, sessionId };
+  }
+  if (sub === 'messages' && method === 'POST') {
+    return { handler: handlePostMessage, sessionId };
+  }
+  if (sub === 'messages' && method === 'GET') {
+    return { handler: handleGetMessages, sessionId };
   }
   return null;
 }

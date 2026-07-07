@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 import 'package:meta/meta.dart';
@@ -117,6 +118,47 @@ class SignalingIceCandidate {
         if (sdpMid != null) 'sdpMid': sdpMid,
         if (sdpMLineIndex != null) 'sdpMLineIndex': sdpMLineIndex,
         if (usernameFragment != null) 'usernameFragment': usernameFragment,
+      };
+}
+
+/// End-to-end encrypted application packet carried by the signaling relay.
+@immutable
+class SignalingRelayMessage {
+  const SignalingRelayMessage({
+    required this.senderId,
+    required this.kind,
+    required this.payload,
+    required this.storedAt,
+  });
+
+  factory SignalingRelayMessage.fromJson(Map<String, Object?> json) {
+    final Object? senderId = json['senderId'];
+    final Object? kind = json['kind'];
+    final Object? payload = json['payload'];
+    final Object? storedAt = json['storedAt'];
+    if (senderId is! String ||
+        kind is! String ||
+        payload is! String ||
+        storedAt is! num) {
+      throw const FormatException('malformed relay message');
+    }
+    return SignalingRelayMessage(
+      senderId: senderId,
+      kind: kind,
+      payload: Uint8List.fromList(base64Decode(payload)),
+      storedAt: DateTime.fromMillisecondsSinceEpoch(storedAt.toInt()),
+    );
+  }
+
+  final String senderId;
+  final String kind;
+  final Uint8List payload;
+  final DateTime storedAt;
+
+  Map<String, Object?> toJson() => <String, Object?>{
+        'senderId': senderId,
+        'kind': kind,
+        'payload': base64Encode(payload),
       };
 }
 
@@ -351,6 +393,48 @@ class SignalingClient {
     return controller.stream;
   }
 
+  /// `POST /session/:id/messages` — append one encrypted app packet.
+  Future<void> postMessage({
+    required String sessionId,
+    required String token,
+    required SignalingRelayMessage message,
+  }) async {
+    final Uri uri = _resolve('/session/$sessionId/messages');
+    final http.Response res = await _http
+        .post(uri,
+            headers: _authHeaders(token), body: jsonEncode(message.toJson()))
+        .timeout(_postTimeout);
+    if (res.statusCode != 200) {
+      throw SignalingException(
+        'postMessage failed: ${res.body}',
+        statusCode: res.statusCode,
+      );
+    }
+  }
+
+  /// Long-poll encrypted application packets from the signaling relay.
+  Stream<SignalingRelayMessage> messages({
+    required String sessionId,
+    required String token,
+  }) {
+    // ignore: close_sinks
+    final StreamController<SignalingRelayMessage> controller =
+        StreamController<SignalingRelayMessage>();
+    bool stopped = false;
+    controller.onCancel = () async {
+      stopped = true;
+    };
+    controller.onListen = () {
+      unawaited(_runMessagePoll(
+        controller: controller,
+        sessionId: sessionId,
+        token: token,
+        isStopped: () => stopped,
+      ));
+    };
+    return controller.stream;
+  }
+
   Future<void> _runIcePoll({
     required StreamController<SignalingIceCandidate> controller,
     required String sessionId,
@@ -404,6 +488,66 @@ class SignalingClient {
         for (final Object? c in candidates) {
           if (c is Map<String, Object?>) {
             controller.add(SignalingIceCandidate.fromJson(c));
+          }
+        }
+        cursor = next.toInt();
+      }
+    } finally {
+      if (!controller.isClosed) {
+        await controller.close();
+      }
+    }
+  }
+
+  Future<void> _runMessagePoll({
+    required StreamController<SignalingRelayMessage> controller,
+    required String sessionId,
+    required String token,
+    required bool Function() isStopped,
+  }) async {
+    int cursor = 0;
+    try {
+      while (!isStopped()) {
+        final Uri uri = _resolve(
+          '/session/$sessionId/messages',
+          query: <String, String>{'since': cursor.toString()},
+        );
+        late http.Response res;
+        try {
+          res = await _http
+              .get(uri, headers: _authHeaders(token))
+              .timeout(_longPollTimeout);
+        } on TimeoutException {
+          continue;
+        }
+        if (isStopped()) {
+          return;
+        }
+        if (res.statusCode == 204) {
+          continue;
+        }
+        if (res.statusCode != 200) {
+          controller.addError(
+            SignalingException(
+              'messages failed: ${res.body}',
+              statusCode: res.statusCode,
+            ),
+          );
+          return;
+        }
+        final Map<String, Object?> payload =
+            jsonDecode(res.body) as Map<String, Object?>;
+        final Object? messages = payload['messages'];
+        final Object? next = payload['cursor'];
+        if (messages is! List || next is! num) {
+          controller.addError(
+            const SignalingException('malformed message long-poll payload'),
+          );
+          return;
+        }
+        for (final Object? m in messages) {
+          if (m is Map<String, Object?>) {
+            controller.add(SignalingRelayMessage.fromJson(m));
           }
         }
         cursor = next.toInt();

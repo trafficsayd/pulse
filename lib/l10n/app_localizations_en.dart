@@ -424,6 +424,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get constellationHint => 'Tap stars — wait to draw the lines';
 
   @override
+  String get candleTouchHint => 'Touch to light the candle';
+
+  @override
+  String get candleBlowHint => 'Blow to extinguish';
+
+  @override
   String get modesUnsupportedTitle => 'This mode can\'t run here';
 
   @override

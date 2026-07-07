@@ -1,6 +1,6 @@
 import { SELF } from 'cloudflare:test';
 import { describe, expect, it } from 'vitest';
-import type { AnswerPayload, IcePayload, OfferPayload } from '../src/types';
+import type { AnswerPayload, IcePayload, OfferPayload, RelayMessagePayload } from '../src/types';
 import { authHeaders, callCreateSession, defaultHeaders, fakeIce, TEST_IP } from './helpers';
 
 describe('POST /session', () => {
@@ -11,6 +11,13 @@ describe('POST /session', () => {
     expect(typeof body.token).toBe('string');
     expect(body.token.split('.')).toHaveLength(3);
     expect(body.expiresAt).toBeGreaterThan(Date.now());
+  });
+
+  it('reuses the rendezvous session for the same pairingCode', async () => {
+    const first = await callCreateSession('same-code');
+    const second = await callCreateSession('same-code');
+    expect(second.status).toBe(201);
+    expect(second.body.sessionId).toBe(first.body.sessionId);
   });
 
   it('rejects a missing pairingCode', async () => {
@@ -193,6 +200,78 @@ describe('ICE candidates', () => {
       headers: authHeaders(created.token),
       body: JSON.stringify({ sdpMid: '0' }),
     });
+    expect(postRes.status).toBe(400);
+  });
+});
+
+describe('relay messages', () => {
+  it('appends encrypted packets and returns them with a cursor', async () => {
+    const { body: created } = await callCreateSession('1234');
+
+    const postRes = await SELF.fetch(
+      `https://signaling.test/session/${created.sessionId}/messages`,
+      {
+        method: 'POST',
+        headers: authHeaders(created.token),
+        body: JSON.stringify({
+          senderId: 'client-a',
+          kind: 'sealed',
+          payload: 'AQID',
+        }),
+      },
+    );
+    expect(postRes.status).toBe(200);
+
+    const getRes = await SELF.fetch(
+      `https://signaling.test/session/${created.sessionId}/messages?since=0`,
+      { headers: authHeaders(created.token) },
+    );
+    expect(getRes.status).toBe(200);
+    const payload = (await getRes.json()) as RelayMessagePayload;
+    expect(payload.messages).toHaveLength(1);
+    expect(payload.messages[0]?.senderId).toBe('client-a');
+    expect(payload.messages[0]?.kind).toBe('sealed');
+    expect(payload.messages[0]?.payload).toBe('AQID');
+    expect(payload.cursor).toBe(1);
+  });
+
+  it('returns only relay messages after `since`', async () => {
+    const { body: created } = await callCreateSession('1234');
+    for (const payload of ['AQID', 'BAUG', 'BwgJ']) {
+      await SELF.fetch(`https://signaling.test/session/${created.sessionId}/messages`, {
+        method: 'POST',
+        headers: authHeaders(created.token),
+        body: JSON.stringify({
+          senderId: 'client-a',
+          kind: 'sealed',
+          payload,
+        }),
+      });
+    }
+    const getRes = await SELF.fetch(
+      `https://signaling.test/session/${created.sessionId}/messages?since=1`,
+      { headers: authHeaders(created.token) },
+    );
+    expect(getRes.status).toBe(200);
+    const payload = (await getRes.json()) as RelayMessagePayload;
+    expect(payload.messages.map((message) => message.payload)).toEqual(['BAUG', 'BwgJ']);
+    expect(payload.cursor).toBe(3);
+  });
+
+  it('rejects malformed relay payloads', async () => {
+    const { body: created } = await callCreateSession('1234');
+    const postRes = await SELF.fetch(
+      `https://signaling.test/session/${created.sessionId}/messages`,
+      {
+        method: 'POST',
+        headers: authHeaders(created.token),
+        body: JSON.stringify({
+          senderId: 'client-a',
+          kind: 'sealed',
+          payload: 'not base64!',
+        }),
+      },
+    );
     expect(postRes.status).toBe(400);
   });
 });

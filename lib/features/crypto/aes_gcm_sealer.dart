@@ -103,10 +103,12 @@ class AesGcmSealer {
       );
     }
     final out = Uint8List(nonceLength);
-    final bd = ByteData.view(out.buffer);
     // High 32 bits reserved (left as zero).
-    bd.setUint32(0, 0, Endian.big);
-    bd.setUint64(4, counter, Endian.big);
+    var value = counter;
+    for (var i = nonceLength - 1; i >= 4; i--) {
+      out[i] = value % 256;
+      value = value ~/ 256;
+    }
     return out;
   }
 

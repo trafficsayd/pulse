@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pulse App Preview</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #1a1a2e; color: #fff; font-family: -apple-system, 'Segoe UI', sans-serif; display: flex; flex-wrap: wrap; justify-content: center; gap: 40px; padding: 30px; min-height: 100vh; }
+  h1 { width: 100%; text-align: center; font-size: 28px; color: #c4b5fd; margin-bottom: 10px; }
+  .subtitle { width: 100%; text-align: center; color: #888; font-size: 14px; margin-bottom: 20px; }
+  .phone { width: 340px; height: 700px; background: #0D0B1A; border-radius: 40px; border: 3px solid #333; overflow: hidden; position: relative; box-shadow: 0 20px 60px rgba(0,0,0,0.5); }
+  .phone-label { text-align: center; margin-top: 12px; color: #a78bfa; font-weight: 700; font-size: 15px; }
+  .status-bar { height: 44px; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #666; }
+  
+  /* Hub Screen */
+  .hub-content { padding: 10px 18px; height: calc(100% - 44px); display: flex; flex-direction: column; }
+  .hub-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  .transport-badge { background: rgba(255,255,255,0.06); border: 1px solid rgba(74,222,128,0.46); border-radius: 22px; padding: 6px 14px; display: flex; align-items: center; gap: 8px; }
+  .transport-dot { width: 8px; height: 8px; border-radius: 50%; background: #4ade80; box-shadow: 0 0 10px #4ade80; }
+  .transport-text { color: #4ade80; font-size: 11px; font-weight: 700; }
+  .settings-btn { width: 36px; height: 36px; border-radius: 50%; background: rgba(255,255,255,0.06); display: flex; align-items: center; justify-content: center; color: #888; font-size: 18px; }
+  .avatar { width: 40px; height: 40px; border-radius: 50%; background: linear-gradient(135deg, #818cf8, #e879f9); display: flex; align-items: center; justify-content: center; font-size: 20px; }
+  
+  .circular-layout { flex: 1; display: flex; align-items: center; justify-content: center; position: relative; }
+  .center-disc { width: 90px; height: 90px; border-radius: 50%; background: radial-gradient(circle, #e879f9 8%, #818cf8 100%); box-shadow: 0 0 44px rgba(129,140,248,0.6), 0 0 32px rgba(232,121,249,0.26); display: flex; align-items: center; justify-content: center; font-size: 36px; position: absolute; z-index: 2; }
+  .mode-ring { position: absolute; width: 280px; height: 280px; }
+  .mode-bubble { position: absolute; width: 62px; display: flex; flex-direction: column; align-items: center; gap: 5px; transform: translate(-50%, -50%); }
+  .mode-circle { width: 52px; height: 52px; border-radius: 50%; background: rgba(255,255,255,0.06); border: 1.5px solid rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: center; font-size: 22px; }
+  .mode-name { font-size: 9px; font-weight: 700; color: #94a3b8; text-align: center; white-space: nowrap; }
+  
+  .hub-footer { text-align: center; padding: 12px 0; }
+  .hub-footer-text { color: #64748b; font-size: 11px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 6px; }
+  
+  /* Candle Screen */
+  .candle-screen { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; background: #0D0B1A; }
+  .candle-hint { position: absolute; top: 54px; color: #555; font-size: 12px; font-weight: 600; }
+  .candle-close { position: absolute; top: 10px; right: 14px; color: #666; font-size: 22px; cursor: pointer; }
+  .candle-body { width: 38px; height: 140px; background: linear-gradient(to bottom, #F5E6D3, #E8D5B7); border-radius: 4px; position: relative; }
+  .candle-wick { width: 2px; height: 16px; background: #3D3D3D; position: absolute; top: -16px; left: 50%; transform: translateX(-50%); border-radius: 1px; }
+  .flame-container { position: absolute; top: -68px; left: 50%; transform: translateX(-50%); }
+  .flame-outer { width: 28px; height: 44px; background: linear-gradient(to bottom, #FFD86A, #FFB05C, #FF6B35); border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%; animation: flicker 1.5s ease-in-out infinite; filter: blur(0.5px); }
+  .flame-inner { width: 12px; height: 22px; background: rgba(255,248,225,0.9); border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%; position: absolute; top: 12px; left: 50%; transform: translateX(-50%); animation: flicker2 1.5s ease-in-out infinite; }
+  .flame-glow { position: absolute; top: -40px; left: 50%; transform: translateX(-50%); width: 160px; height: 160px; background: radial-gradient(circle, rgba(255,176,92,0.35) 0%, transparent 70%); border-radius: 50%; }
+  @keyframes flicker { 0%,100% { transform: scaleX(1) scaleY(1); } 25% { transform: scaleX(0.92) scaleY(1.04); } 50% { transform: scaleX(1.05) scaleY(0.96); } 75% { transform: scaleX(0.95) scaleY(1.02); } }
+  @keyframes flicker2 { 0%,100% { transform: translateX(-50%) scaleX(1); } 33% { transform: translateX(-50%) scaleX(0.9); } 66% { transform: translateX(-50%) scaleX(1.1); } }
+  
+  /* Connection Status */
+  .conn-screen { padding: 10px 20px; height: calc(100% - 44px); display: flex; flex-direction: column; }
+  .conn-header { font-size: 18px; font-weight: 700; margin-bottom: 18px; color: #e2e8f0; }
+  .transport-section { background: rgba(255,255,255,0.04); border-radius: 24px; padding: 14px; }
+  .transport-label { color: #94a3b8; font-size: 11px; font-weight: 800; letter-spacing: 0.8px; padding-left: 4px; margin-bottom: 10px; text-transform: uppercase; }
+  .channel-tile { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 18px; margin-bottom: 6px; border: 1px solid transparent; }
+  .channel-tile.active { border-color: rgba(74,222,128,0.45); box-shadow: 0 0 20px rgba(74,222,128,0.12); background: rgba(74,222,128,0.04); }
+  .channel-tile.inactive { border-color: rgba(255,255,255,0.06); }
+  .channel-icon { width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px; }
+  .channel-icon.ble { background: rgba(74,222,128,0.14); color: #4ade80; }
+  .channel-icon.wifi { background: rgba(96,165,250,0.14); color: #60a5fa; }
+  .channel-icon.relay { background: rgba(148,163,184,0.14); color: #94a3b8; }
+  .channel-title { flex: 1; font-size: 13px; font-weight: 700; color: #e2e8f0; }
+  .signal-bars { display: flex; align-items: flex-end; gap: 2px; height: 16px; }
+  .signal-bar { width: 4px; border-radius: 2px; }
+  .signal-bar.on { background: #4ade80; }
+  .signal-bar.off { background: #334155; }
+  .offline-banner { margin-top: auto; background: rgba(129,140,248,0.08); border: 1px solid rgba(129,140,248,0.3); border-radius: 20px; padding: 14px; display: flex; align-items: center; gap: 10px; }
+  .offline-banner .icon { color: #818cf8; font-size: 20px; }
+  .offline-banner .text { color: #94a3b8; font-size: 12px; font-weight: 600; line-height: 1.3; }
+  
+  /* Nav tabs */
+  .bottom-nav { height: 56px; border-top: 1px solid rgba(255,255,255,0.06); display: flex; align-items: center; justify-content: space-around; padding: 0 20px; }
+  .nav-item { display: flex; flex-direction: column; align-items: center; gap: 2px; color: #555; font-size: 10px; font-weight: 600; }
+  .nav-item.active { color: #818cf8; }
+  .nav-icon { font-size: 20px; }
+</style>
+</head>
+<body>
+  <h1>💜 Pulse App — Preview</h1>
+  <p class="subtitle">Визуализация ключевых экранов приложения (как будет выглядеть на устройстве)</p>
+
+  <!-- Hub Screen -->
+  <div>
+    <div class="phone">
+      <div class="status-bar">9:41</div>
+      <div class="hub-content">
+        <div class="hub-header">
+          <div class="settings-btn">⚙</div>
+          <div class="transport-badge">
+            <div class="transport-dot"></div>
+            <span class="transport-text">Прямое (BLE)</span>
+          </div>
+          <div class="avatar">💜</div>
+        </div>
+        <div class="circular-layout">
+          <div class="mode-ring" id="modeRing"></div>
+          <div class="center-disc">💜</div>
+        </div>
+        <div class="hub-footer">
+          <span class="hub-footer-text">👆 Долгое нажатие — запустить</span>
+        </div>
+      </div>
+      <div class="bottom-nav">
+        <div class="nav-item"><span class="nav-icon">👥</span>Мои люди</div>
+        <div class="nav-item active"><span class="nav-icon">💜</span>Pulse</div>
+        <div class="nav-item"><span class="nav-icon">🤫</span>Подкрасться</div>
+      </div>
+    </div>
+    <div class="phone-label">Хаб (главный экран)</div>
+  </div>
+
+  <!-- Candle Mode -->
+  <div>
+    <div class="phone">
+      <div class="candle-screen">
+        <div class="candle-hint">Коснись, чтобы зажечь свечу</div>
+        <div class="candle-close">✕</div>
+        <div class="candle-body">
+          <div class="candle-wick"></div>
+          <div class="flame-container">
+            <div class="flame-glow"></div>
+            <div class="flame-outer"></div>
+            <div class="flame-inner"></div>
+          </div>
+        </div>
+      </div>
+      <div class="bottom-nav">
+        <div class="nav-item"><span class="nav-icon">👥</span>Мои люди</div>
+        <div class="nav-item active"><span class="nav-icon">💜</span>Pulse</div>
+        <div class="nav-item"><span class="nav-icon">🤫</span>Подкрасться</div>
+      </div>
+    </div>
+    <div class="phone-label">Режим «Свечка» 🔥</div>
+  </div>
+
+  <!-- Connection Status -->
+  <div>
+    <div class="phone">
+      <div class="status-bar">9:41</div>
+      <div class="conn-screen">
+        <div class="conn-header">Подключение</div>
+        <div class="transport-section">
+          <div class="transport-label">Transport</div>
+          <div class="channel-tile active">
+            <div class="channel-icon ble">📶</div>
+            <div class="channel-title">Прямое (BLE)</div>
+            <div class="signal-bars">
+              <div class="signal-bar on" style="height:4px"></div>
+              <div class="signal-bar on" style="height:7px"></div>
+              <div class="signal-bar on" style="height:11px"></div>
+              <div class="signal-bar on" style="height:16px"></div>
+            </div>
+          </div>
+          <div class="channel-tile inactive">
+            <div class="channel-icon wifi">📡</div>
+            <div class="channel-title" style="color:#64748b">Локальная сеть (Wi-Fi)</div>
+            <div class="signal-bars">
+              <div class="signal-bar off" style="height:4px"></div>
+              <div class="signal-bar off" style="height:7px"></div>
+              <div class="signal-bar off" style="height:11px"></div>
+              <div class="signal-bar off" style="height:16px"></div>
+            </div>
+          </div>
+          <div class="channel-tile inactive">
+            <div class="channel-icon relay">☁️</div>
+            <div class="channel-title" style="color:#64748b">Интернет-реле (WebRTC)</div>
+            <div class="signal-bars">
+              <div class="signal-bar off" style="height:4px"></div>
+              <div class="signal-bar off" style="height:7px"></div>
+              <div class="signal-bar off" style="height:11px"></div>
+              <div class="signal-bar off" style="height:16px"></div>
+            </div>
+          </div>
+        </div>
+        <div class="offline-banner">
+          <span class="icon">🛡️</span>
+          <span class="text">Приложение работает без интернета и не собирает данные</span>
+        </div>
+      </div>
+      <div class="bottom-nav">
+        <div class="nav-item"><span class="nav-icon">👥</span>Мои люди</div>
+        <div class="nav-item active"><span class="nav-icon">💜</span>Pulse</div>
+        <div class="nav-item"><span class="nav-icon">🤫</span>Подкрасться</div>
+      </div>
+    </div>
+    <div class="phone-label">Статус подключения</div>
+  </div>
+
+<script>
+  // Position mode bubbles in a circle
+  const modes = [
+    { emoji: '👆', name: 'Тук-Тук', color: '#818cf8' },
+    { emoji: '❤️', name: 'Половина', color: '#f472b6' },
+    { emoji: '🕯️', name: 'Свечка', color: '#FFB05C' },
+    { emoji: '🌬️', name: 'Шёпот', color: '#6BD3FF' },
+    { emoji: '🔔', name: 'Колокольчик', color: '#FFD86A' },
+    { emoji: '✨', name: 'Лучик', color: '#7CE0A1' },
+    { emoji: '⭐', name: 'Созвездие', color: '#B39CFF' },
+    { emoji: '•••', name: 'Ещё', color: '#64748b' },
+  ];
+  const ring = document.getElementById('modeRing');
+  const total = modes.length;
+  const radius = 118;
+  modes.forEach((m, i) => {
+    const angle = (i / total) * 2 * Math.PI - Math.PI / 2;
+    const x = 50 + (radius / 140) * 50 * Math.cos(angle);
+    const y = 50 + (radius / 140) * 50 * Math.sin(angle);
+    const bubble = document.createElement('div');
+    bubble.className = 'mode-bubble';
+    bubble.style.left = x + '%';
+    bubble.style.top = y + '%';
+    bubble.innerHTML = `
+      <div class="mode-circle" style="border-color: ${m.color}33; box-shadow: 0 0 18px ${m.color}22">${m.emoji}</div>
+      <div class="mode-name" style="color: ${m.color}">${m.name}</div>
+    `;
+    ring.appendChild(bubble);
+  });
+</script>
+</body>
+</html>

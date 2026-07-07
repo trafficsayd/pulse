@@ -5,6 +5,7 @@ import '../../../l10n/app_localizations.dart';
 import '../../capabilities/domain/device_capability.dart';
 import '../domain/pulse_mode.dart';
 import '../presentation/modes/bell_mode_screen.dart';
+import '../presentation/modes/candle_mode_screen.dart';
 import '../presentation/modes/constellation_mode_screen.dart';
 import '../presentation/modes/half_heart_mode_screen.dart';
 import '../presentation/modes/placeholder_mode_screen.dart';
@@ -49,7 +50,8 @@ final List<PulseModeDescriptor> kAllModes = [
     isStarter: true,
     tint: _candleOrange,
     glyph: '🕯️',
-    builder: (context) => const PlaceholderModeScreen(titleKey: 'modeCandle'),
+    requiredCapabilities: const {DeviceCapability.microphone},
+    builder: (context) => const CandleModeScreen(),
   ),
   PulseModeDescriptor(
     id: PulseModeId.whisper,

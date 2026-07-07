@@ -5,6 +5,7 @@ import 'core/locale/locale_controller.dart';
 import 'core/routing/app_router.dart';
 import 'core/theme/app_colors.dart';
 import 'core/theme/app_theme.dart';
+import 'core/widgets/session_error_banner.dart';
 import 'features/subscription/application/subscription_controller.dart';
 import 'l10n/app_localizations.dart';
 
@@ -48,12 +49,14 @@ class _PulseAppState extends ConsumerState<PulseApp> {
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       builder: (context, child) {
-        return ColoredBox(
-          color: AppColors.background,
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 430),
-              child: child ?? const SizedBox.shrink(),
+        return SessionErrorBanner(
+          child: ColoredBox(
+            color: AppColors.background,
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 430),
+                child: child ?? const SizedBox.shrink(),
+              ),
             ),
           ),
         );

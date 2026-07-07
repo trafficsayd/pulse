@@ -31,11 +31,13 @@ class ConnectionsState {
 /// active session" rule from the spec.
 class ConnectionsController extends Notifier<ConnectionsState> {
   late final ConnectionsRepository _repo;
+  late final Uuid _uuid;
 
   @override
   ConnectionsState build() {
     final store = ref.read(secureKeyStoreProvider);
-    _repo = ConnectionsRepository(keyStore: store);
+    _uuid = ref.read(uuidProvider);
+    _repo = ConnectionsRepository(keyStore: store, uuid: _uuid);
     _bootstrap();
     return const ConnectionsState();
   }
@@ -110,6 +112,54 @@ class ConnectionsController extends Notifier<ConnectionsState> {
     final next = [...state.connections, c];
     state = state.copyWith(connections: next);
     return c;
+  }
+
+  /// Create the saved connection that belongs to a completed pairing.
+  ///
+  /// [connectionId] must match the id used by [PairKeys.persist], otherwise
+  /// [SessionNotifier] will not be able to load the encrypted channel keys
+  /// for the active person.
+  Future<Connection> createPairedConnection({
+    required String connectionId,
+    String nickname = 'Pulse',
+    String? bleAddressToken,
+    String? signalingToken,
+  }) async {
+    final existing = state.connections.firstWhereOrNull(
+      (c) => c.id == connectionId,
+    );
+    if (existing != null) {
+      await makeActive(existing.id);
+      return existing.copyWith(status: ConnectionStatus.active);
+    }
+
+    const palette = [0, 1, 2, 3, 4, 5, 6, 7];
+    const emojis = ['🌞', '🌙', '✨', '☄️', '🪐', '🌟', '🌈', '🔮'];
+    final colorIndex = palette[state.connections.length % palette.length];
+    final emoji = emojis[state.connections.length % emojis.length];
+    final created = await _repo.create(
+      id: connectionId,
+      nickname: nickname,
+      emoji: emoji,
+      colorIndex: colorIndex,
+      status: ConnectionStatus.active,
+      bleAddressToken: bleAddressToken ?? signalingToken ?? _uuid.v4(),
+      signalingToken: signalingToken ?? connectionId,
+    );
+
+    final next = <Connection>[];
+    for (final c in state.connections) {
+      if (c.status == ConnectionStatus.active) {
+        final paused = c.copyWith(status: ConnectionStatus.paused);
+        await _repo.update(paused);
+        next.add(paused);
+      } else {
+        next.add(c);
+      }
+    }
+    next.add(created);
+    state = state.copyWith(connections: next, isLoading: false);
+    return created;
   }
 
   Future<void> makeActive(String id) async {

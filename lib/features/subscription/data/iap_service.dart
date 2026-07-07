@@ -1,7 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 
+import 'package:flutter/foundation.dart'
+    show kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:meta/meta.dart';
 
@@ -31,35 +32,57 @@ abstract class InAppPurchaseAdapter {
 
 /// Default adapter that forwards every call to `InAppPurchase.instance`. Kept
 /// dead simple so the production path is essentially a pass-through.
+///
+/// On platforms where the billing plugin is not registered (e.g. web),
+/// [_inner] will be `null` and every method will behave as if the store is
+/// unavailable.
 class DefaultInAppPurchaseAdapter implements InAppPurchaseAdapter {
   DefaultInAppPurchaseAdapter([InAppPurchase? inner])
-      : _inner = inner ?? InAppPurchase.instance;
+      : _inner = _resolve(inner);
 
-  final InAppPurchase _inner;
+  static InAppPurchase? _resolve(InAppPurchase? explicit) {
+    if (explicit != null) return explicit;
+    if (kIsWeb) return null;
+    try {
+      return InAppPurchase.instance;
+    } on Object {
+      return null;
+    }
+  }
+
+  final InAppPurchase? _inner;
 
   @override
-  Future<bool> isAvailable() => _inner.isAvailable();
+  Future<bool> isAvailable() => _inner?.isAvailable() ?? Future.value(false);
 
   @override
   Future<ProductDetailsResponse> queryProductDetails(
     Set<String> identifiers,
   ) =>
-      _inner.queryProductDetails(identifiers);
+      _inner?.queryProductDetails(identifiers) ??
+      Future.value(ProductDetailsResponse(
+        productDetails: const [],
+        notFoundIDs: identifiers.toList(),
+        error: null,
+      ));
 
   @override
   Future<bool> buyNonConsumable({required PurchaseParam purchaseParam}) =>
-      _inner.buyNonConsumable(purchaseParam: purchaseParam);
+      _inner?.buyNonConsumable(purchaseParam: purchaseParam) ??
+      Future.value(false);
 
   @override
   Future<void> restorePurchases({String? applicationUserName}) =>
-      _inner.restorePurchases(applicationUserName: applicationUserName);
+      _inner?.restorePurchases(applicationUserName: applicationUserName) ??
+      Future.value();
 
   @override
   Future<void> completePurchase(PurchaseDetails purchase) =>
-      _inner.completePurchase(purchase);
+      _inner?.completePurchase(purchase) ?? Future.value();
 
   @override
-  Stream<List<PurchaseDetails>> get purchaseStream => _inner.purchaseStream;
+  Stream<List<PurchaseDetails>> get purchaseStream =>
+      _inner?.purchaseStream ?? const Stream.empty();
 }
 
 /// Outcome of a single purchase / restore round trip surfaced to the
@@ -163,7 +186,12 @@ class IapService {
   /// this to gate features client-side between refreshes.
   static const Duration monthlyBillingWindow = Duration(days: 31);
 
-  bool get _isIOS => _overrideIsIOS ?? Platform.isIOS;
+  bool get _isIOS {
+    if (_overrideIsIOS != null) return _overrideIsIOS;
+    if (kIsWeb) return false;
+    // ignore: avoid_dynamic_calls
+    return defaultTargetPlatform == TargetPlatform.iOS;
+  }
 
   /// Registers (or replaces) the persistor invoked before
   /// [InAppPurchaseAdapter.completePurchase] runs on every successful

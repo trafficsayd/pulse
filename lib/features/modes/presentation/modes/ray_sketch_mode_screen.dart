@@ -1,24 +1,30 @@
+import 'dart:async';
 import 'dart:ui' show BlurStyle, ImageFilter, MaskFilter;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/routing/routes.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/pulse_mockup.dart';
 import '../../../../l10n/app_localizations.dart';
+import '../../../session/application/mode_event.dart';
+import '../../../session/application/mode_event_bus.dart';
 
 enum _BrushEffect { clean, neon, glow, watercolor, sparkles }
 
-class RaySketchModeScreen extends StatefulWidget {
+class RaySketchModeScreen extends ConsumerStatefulWidget {
   const RaySketchModeScreen({super.key});
 
   @override
-  State<RaySketchModeScreen> createState() => _RaySketchModeScreenState();
+  ConsumerState<RaySketchModeScreen> createState() =>
+      _RaySketchModeScreenState();
 }
 
-class _RaySketchModeScreenState extends State<RaySketchModeScreen> {
+class _RaySketchModeScreenState extends ConsumerState<RaySketchModeScreen> {
+  StreamSubscription<ModeEvent>? _partnerSub;
   static const List<Color> _palette = [
     Color(0xFFFFFFFF),
     Color(0xFF9747FF),
@@ -44,6 +50,28 @@ class _RaySketchModeScreenState extends State<RaySketchModeScreen> {
   _BrushEffect _selectedEffect = _BrushEffect.neon;
   bool _liveMode = true;
   int _revision = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _partnerSub = ref.read(modeEventBusProvider).incoming
+        .where((e) => e.type == 'ray_point' || e.type == 'ray_end')
+        .listen(_onPartnerEvent);
+  }
+
+  void _onPartnerEvent(ModeEvent event) {
+    if (!mounted) return;
+    if (event.type == 'ray_point') {
+      // Partner's drawing points could be rendered as a separate overlay.
+      // For now we acknowledge but don't render to keep the sketch clean.
+    }
+  }
+
+  @override
+  void dispose() {
+    _partnerSub?.cancel();
+    super.dispose();
+  }
 
   void _startStroke(DragStartDetails details) {
     final stroke = _Stroke(
@@ -74,12 +102,24 @@ class _RaySketchModeScreenState extends State<RaySketchModeScreen> {
       ];
       _revision++;
     });
+    // Send drawing point to partner.
+    final size = context.size;
+    if (size != null) {
+      ref.read(modeEventBusProvider).send(ModeEvent(
+            type: 'ray_point',
+            data: {
+              'x': details.localPosition.dx / size.width,
+              'y': details.localPosition.dy / size.height,
+            },
+          ));
+    }
   }
 
   void _endStroke() {
     if (_activeStroke == null) return;
     setState(() => _activeStroke = null);
     HapticFeedback.lightImpact();
+    ref.read(modeEventBusProvider).send(const ModeEvent(type: 'ray_end'));
   }
 
   void _clear() {

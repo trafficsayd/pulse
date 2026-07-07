@@ -2,9 +2,12 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../l10n/app_localizations.dart';
+import '../../../session/application/mode_event.dart';
+import '../../../session/application/mode_event_bus.dart';
 import '../../primitives/painting_canvas.dart';
 
 /// "Constellation" — tap to place stars, idle to draw the lines.
@@ -12,20 +15,18 @@ import '../../primitives/painting_canvas.dart';
 /// Backed by [PaintingCanvas] (Track C). Every `onTapDown` places a
 /// star (a single-point [PaintStroke]) at the touch point, and after
 /// [idleBeforeConnect] of no taps the screen animates Bezier curves
-/// connecting every star in tap order. The remote partner is simulated:
-/// each local tap also pushes a single faint star at a random position
-/// via [PaintingCanvasState.pushRemoteStroke], so a single user can
-/// see how the constellation reads with two participants.
+/// connecting every star in tap order. Partner stars arrive via the
+/// event bus — each local tap sends a `star` event, and incoming
+/// `star` events render as faint remote stars.
 ///
-/// Disposal: cancels the idle timer and the connector animation
-/// controller before [super.dispose].
-class ConstellationModeScreen extends StatefulWidget {
+/// Disposal: cancels the idle timer, partner subscription and the
+/// connector animation controller before [super.dispose].
+class ConstellationModeScreen extends ConsumerStatefulWidget {
   const ConstellationModeScreen({
     super.key,
     this.canvasKey,
     this.random,
     this.idleBeforeConnect = const Duration(seconds: 3),
-    this.simulatePartner = true,
   });
 
   /// Lets tests inject a [GlobalKey] so they can assert against the
@@ -38,20 +39,17 @@ class ConstellationModeScreen extends StatefulWidget {
   /// Idle duration with no taps before Bezier lines animate in.
   final Duration idleBeforeConnect;
 
-  /// When true (production default), each local tap pushes a faint
-  /// remote star so a solo user sees both channels.
-  final bool simulatePartner;
-
   @override
-  State<ConstellationModeScreen> createState() =>
+  ConsumerState<ConstellationModeScreen> createState() =>
       _ConstellationModeScreenState();
 }
 
-class _ConstellationModeScreenState extends State<ConstellationModeScreen>
+class _ConstellationModeScreenState
+    extends ConsumerState<ConstellationModeScreen>
     with SingleTickerProviderStateMixin {
   late final GlobalKey<PaintingCanvasState> _canvasKey;
   late final AnimationController _connector;
-  late final math.Random _rng;
+  StreamSubscription<ModeEvent>? _partnerSub;
   Timer? _idleTimer;
 
   final List<Offset> _localStars = [];
@@ -66,15 +64,31 @@ class _ConstellationModeScreenState extends State<ConstellationModeScreen>
   void initState() {
     super.initState();
     _canvasKey = widget.canvasKey ?? GlobalKey<PaintingCanvasState>();
-    _rng = widget.random ?? math.Random();
     _connector = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 900),
+    );
+    _partnerSub = ref.read(modeEventBusProvider).incoming
+        .where((e) => e.type == 'star')
+        .listen(_onPartnerStar);
+  }
+
+  void _onPartnerStar(ModeEvent event) {
+    if (!mounted || _canvasSize == Size.zero) return;
+    final x = (event.data['x'] as num?)?.toDouble() ?? 0.5;
+    final y = (event.data['y'] as num?)?.toDouble() ?? 0.5;
+    _canvasKey.currentState?.pushRemoteStroke(
+      PaintStroke(
+        color: _remoteStarColor.withValues(alpha: 0.45),
+        strokeWidth: 10,
+        points: [PaintPoint(Offset(x * _canvasSize.width, y * _canvasSize.height))],
+      ),
     );
   }
 
   @override
   void dispose() {
+    _partnerSub?.cancel();
     _idleTimer?.cancel();
     _connector.dispose();
     super.dispose();
@@ -96,18 +110,15 @@ class _ConstellationModeScreenState extends State<ConstellationModeScreen>
         points: [PaintPoint(position)],
       ),
     );
-    if (widget.simulatePartner && _canvasSize != Size.zero) {
-      final partner = Offset(
-        _rng.nextDouble() * _canvasSize.width,
-        _rng.nextDouble() * _canvasSize.height,
-      );
-      _canvasKey.currentState?.pushRemoteStroke(
-        PaintStroke(
-          color: _remoteStarColor.withValues(alpha: 0.45),
-          strokeWidth: 10,
-          points: [PaintPoint(partner)],
-        ),
-      );
+    // Send star event to partner.
+    if (_canvasSize != Size.zero) {
+      ref.read(modeEventBusProvider).send(ModeEvent(
+            type: 'star',
+            data: {
+              'x': position.dx / _canvasSize.width,
+              'y': position.dy / _canvasSize.height,
+            },
+          ));
     }
     _resetIdleTimer();
   }

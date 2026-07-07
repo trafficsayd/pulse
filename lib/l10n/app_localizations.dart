@@ -848,6 +848,18 @@ abstract class AppLocalizations {
   /// **'Tap stars — wait to draw the lines'**
   String get constellationHint;
 
+  /// No description provided for @candleTouchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Touch to light the candle'**
+  String get candleTouchHint;
+
+  /// No description provided for @candleBlowHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Blow to extinguish'**
+  String get candleBlowHint;
+
   /// No description provided for @modesUnsupportedTitle.
   ///
   /// In en, this message translates to:

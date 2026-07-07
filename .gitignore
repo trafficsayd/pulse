@@ -32,6 +32,13 @@ migrate_working_dir/
 .pub-cache/
 .pub/
 /build/
+coverage/
+
+# Local machine / Flutter-generated platform files
+android/local.properties
+ios/Flutter/Generated.xcconfig
+ios/Flutter/flutter_export_environment.sh
+ios/Flutter/ephemeral/
 
 # Symbolication related
 app.*.symbols

@@ -98,6 +98,33 @@ export interface IcePayload {
 }
 
 /**
+ * End-to-end encrypted application packet relayed through the Worker.
+ *
+ * The Worker treats `payload` as opaque base64 text. Decryption and replay
+ * protection happen on-device in PairChannel, so this relay does not need to
+ * understand mode events or user data.
+ */
+export interface RelayMessage {
+  /** Random per-client id so a peer can ignore its own reflected packets. */
+  senderId: string;
+  /** Opaque packet kind carried by the Dart transport layer. */
+  kind: string;
+  /** Base64-encoded encrypted bytes. */
+  payload: string;
+  /** Millisecond epoch at which the packet was stored. */
+  storedAt: number;
+}
+
+/**
+ * Long-poll payload for `GET /session/:id/messages`.
+ */
+export interface RelayMessagePayload {
+  messages: RelayMessage[];
+  /** Cursor the client should send back as `?since=` on the next long-poll. */
+  cursor: number;
+}
+
+/**
  * Payload returned by `POST /session`.
  */
 export interface CreateSessionResponse {

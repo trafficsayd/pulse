@@ -12,6 +12,9 @@ import '../../primitives/haptic_pattern_player.dart';
 import '../../primitives/mic_level_stream.dart';
 import 'unsupported_mode_screen.dart';
 
+import '../../../session/application/mode_event.dart';
+import '../../../session/application/mode_event_bus.dart';
+
 /// "Whisper" — radial waveform driven by [MicLevelStream.levels].
 ///
 /// Subscribes to a [MicLevelStream] (Track C) and renders an animated
@@ -83,7 +86,7 @@ class WhisperModeScreen extends ConsumerWidget {
   }
 }
 
-class _WhisperModeView extends StatefulWidget {
+class _WhisperModeView extends ConsumerStatefulWidget {
   const _WhisperModeView({
     required this.micLevelStream,
     required this.hapticEngine,
@@ -97,10 +100,10 @@ class _WhisperModeView extends StatefulWidget {
   final int requiredConsecutive;
 
   @override
-  State<_WhisperModeView> createState() => _WhisperModeViewState();
+  ConsumerState<_WhisperModeView> createState() => _WhisperModeViewState();
 }
 
-class _WhisperModeViewState extends State<_WhisperModeView>
+class _WhisperModeViewState extends ConsumerState<_WhisperModeView>
     with SingleTickerProviderStateMixin {
   late final MicLevelStream _mic;
   late final HapticEngine _engine;
@@ -109,6 +112,7 @@ class _WhisperModeViewState extends State<_WhisperModeView>
   late final AnimationController _ambient;
 
   double _level = 0.0;
+  StreamSubscription<ModeEvent>? _partnerSub;
   int _ticksOverThreshold = 0;
   bool _ownsMic = false;
   bool _ownsEngine = false;
@@ -134,11 +138,22 @@ class _WhisperModeViewState extends State<_WhisperModeView>
       duration: const Duration(seconds: 3),
     )..repeat();
     _sub = _mic.levels.listen(_onLevel);
+    _partnerSub = ref.read(modeEventBusProvider).incoming
+        .where((e) => e.type == 'whisper_level')
+        .listen((e) {
+      if (mounted) {
+        setState(() {});
+      }
+    });
   }
 
   void _onLevel(MicLevel sample) {
     if (!mounted) return;
     setState(() => _level = sample.level01);
+    // Send mic level to partner.
+    ref.read(modeEventBusProvider).send(
+          ModeEvent(type: 'whisper_level', data: {'level': sample.level01}),
+        );
     if (sample.level01 > widget.threshold) {
       _ticksOverThreshold++;
       if (_ticksOverThreshold == widget.requiredConsecutive) {
@@ -154,6 +169,7 @@ class _WhisperModeViewState extends State<_WhisperModeView>
   @override
   void dispose() {
     _sub?.cancel();
+    _partnerSub?.cancel();
     _ambient.dispose();
     unawaited(_player.stop());
     if (_ownsMic) {

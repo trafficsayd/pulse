@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -206,6 +207,81 @@ void main() {
       });
       final SignalingIceCandidate emitted = await first.future;
       expect(emitted.candidate, contains('candidate:'));
+      await sub.cancel();
+    });
+
+    test('postMessage sends an encrypted relay packet', () async {
+      late http.Request received;
+      final MockClient mock = MockClient((http.Request req) async {
+        received = req;
+        return http.Response(jsonEncode(<String, Object?>{'ok': true}), 200);
+      });
+      final SignalingClient client = SignalingClient(
+        httpClient: mock,
+        baseUrl: 'https://example.test',
+      );
+      await client.postMessage(
+        sessionId: 'sid',
+        token: 'tok',
+        message: SignalingRelayMessage(
+          senderId: 'client-a',
+          kind: 'sealed',
+          payload: Uint8List.fromList(<int>[1, 2, 3]),
+          storedAt: DateTime.fromMillisecondsSinceEpoch(0),
+        ),
+      );
+
+      expect(received.url.path, '/session/sid/messages');
+      expect(received.headers['authorization'], 'Bearer tok');
+      final Map<String, Object?> body =
+          jsonDecode(received.body) as Map<String, Object?>;
+      expect(body['senderId'], 'client-a');
+      expect(body['kind'], 'sealed');
+      expect(body['payload'], base64Encode(<int>[1, 2, 3]));
+    });
+
+    test('messages emits relay packets from a long-poll response', () async {
+      int call = 0;
+      final MockClient mock = MockClient((http.Request _) async {
+        call++;
+        if (call == 1) {
+          return http.Response(
+            jsonEncode(<String, Object?>{
+              'messages': <Map<String, Object?>>[
+                <String, Object?>{
+                  'senderId': 'client-b',
+                  'kind': 'sealed',
+                  'payload': base64Encode(<int>[9, 8, 7]),
+                  'storedAt': 1_700_000_000_000,
+                },
+              ],
+              'cursor': 1,
+            }),
+            200,
+            headers: <String, String>{'content-type': 'application/json'},
+          );
+        }
+        return http.Response('', 204);
+      });
+      final SignalingClient client = SignalingClient(
+        httpClient: mock,
+        baseUrl: 'https://example.test',
+      );
+
+      final Completer<SignalingRelayMessage> first =
+          Completer<SignalingRelayMessage>();
+      late StreamSubscription<SignalingRelayMessage> sub;
+      sub = client
+          .messages(sessionId: 'sid', token: 'tok')
+          .listen((SignalingRelayMessage message) {
+        if (!first.isCompleted) {
+          first.complete(message);
+        }
+      });
+      final SignalingRelayMessage emitted = await first.future;
+      expect(emitted.senderId, 'client-b');
+      expect(emitted.kind, 'sealed');
+      expect(emitted.payload, <int>[9, 8, 7]);
       await sub.cancel();
     });
 

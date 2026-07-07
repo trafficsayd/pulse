@@ -11,6 +11,8 @@ import '../../../capabilities/application/capability_providers.dart';
 import '../../../capabilities/domain/device_capability.dart';
 import '../../primitives/accelerometer_3d_stream.dart';
 import '../../primitives/haptic_pattern_player.dart';
+import '../../../session/application/mode_event.dart';
+import '../../../session/application/mode_event_bus.dart';
 import 'unsupported_mode_screen.dart';
 
 /// "Bell" — shake-to-ring mode driven by [Accelerometer3DStream].
@@ -77,7 +79,7 @@ class BellModeScreen extends ConsumerWidget {
   }
 }
 
-class _BellModeView extends StatefulWidget {
+class _BellModeView extends ConsumerStatefulWidget {
   const _BellModeView({
     required this.accelerometerStream,
     required this.hapticEngine,
@@ -91,16 +93,17 @@ class _BellModeView extends StatefulWidget {
   final Duration shakeWindow;
 
   @override
-  State<_BellModeView> createState() => _BellModeViewState();
+  ConsumerState<_BellModeView> createState() => _BellModeViewState();
 }
 
-class _BellModeViewState extends State<_BellModeView>
+class _BellModeViewState extends ConsumerState<_BellModeView>
     with SingleTickerProviderStateMixin {
   late final Accelerometer3DStream _accel;
   late final HapticEngine _engine;
   late final HapticPatternPlayer _player;
   late final AnimationController _swing;
   StreamSubscription<Accel3>? _sub;
+  StreamSubscription<ModeEvent>? _partnerSub;
   Timer? _cooldownTimer;
 
   bool _ownsAccel = false;
@@ -141,6 +144,19 @@ class _BellModeViewState extends State<_BellModeView>
       value: 0.0,
     );
     _sub = _accel.events.listen(_onAccel);
+    _partnerSub = ref.read(modeEventBusProvider).incoming
+        .where((e) => e.type == 'bell_ring')
+        .listen((e) {
+      if (mounted) _firePartnerRing();
+    });
+  }
+
+  void _firePartnerRing() {
+    _swing
+      ..value = 0.0
+      ..forward();
+    unawaited(SystemSound.play(SystemSoundType.alert));
+    unawaited(_player.play(HapticPatterns.triple));
   }
 
   void _onAccel(Accel3 sample) {
@@ -172,6 +188,10 @@ class _BellModeViewState extends State<_BellModeView>
       ..forward();
     unawaited(SystemSound.play(SystemSoundType.alert));
     unawaited(_player.play(HapticPatterns.triple));
+    // Send bell ring event to partner.
+    ref.read(modeEventBusProvider).send(
+          ModeEvent(type: 'bell_ring', data: {'intensity': _intensity}),
+        );
     _cooldownTimer?.cancel();
     _cooldownTimer = Timer(_cooldown, () {
       if (!mounted) return;
@@ -183,6 +203,7 @@ class _BellModeViewState extends State<_BellModeView>
   @override
   void dispose() {
     _sub?.cancel();
+    _partnerSub?.cancel();
     _cooldownTimer?.cancel();
     _swing.dispose();
     unawaited(_player.stop());

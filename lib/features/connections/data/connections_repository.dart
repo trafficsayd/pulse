@@ -42,16 +42,22 @@ class ConnectionsRepository {
     required String nickname,
     required int colorIndex,
     required String emoji,
+    String? id,
+    ConnectionStatus status = ConnectionStatus.paused,
     PermissionFlags permissions = const PermissionFlags(),
+    String? bleAddressToken,
+    String? signalingToken,
   }) async {
     final connection = Connection(
-      id: _uuid.v4(),
+      id: id ?? _uuid.v4(),
       nickname: nickname,
       colorIndex: colorIndex,
       emoji: emoji,
-      status: ConnectionStatus.paused,
+      status: status,
       permissions: permissions,
       createdAt: DateTime.now(),
+      bleAddressToken: bleAddressToken,
+      signalingToken: signalingToken,
     );
     await _writeEntry(connection);
     await _appendIndex(connection.id);

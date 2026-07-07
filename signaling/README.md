@@ -1,22 +1,24 @@
 # Pulse signaling Worker
 
 A small Cloudflare Worker that acts as a rendezvous broker between two
-Pulse peers behind separate NATs. The Worker only relays opaque SDP and
-ICE messages — payload bytes are end-to-end encrypted by the app on top
-of DTLS-SRTP, so this server cannot see anything sensitive.
+Pulse peers behind separate NATs. The Worker relays opaque SDP/ICE metadata
+and encrypted app packets. Packet payload bytes are sealed on-device before
+they reach the Worker, so this server cannot see mode events or user data.
 
 ## Routes
 
-| Method | Path                       | Auth   | Purpose                                                                                                      |
-| ------ | -------------------------- | ------ | ------------------------------------------------------------------------------------------------------------ |
-| `POST` | `/session`                 | none   | Create a new signaling session. Body: `{ "pairingCode": "..." }`. Returns `{ sessionId, token, expiresAt }`. |
-| `POST` | `/session/:id/offer`       | bearer | Store the SDP offer (and optional initial ICE candidates).                                                   |
-| `GET`  | `/session/:id/offer`       | bearer | Read the stored offer. `204` if not yet posted.                                                              |
-| `POST` | `/session/:id/answer`      | bearer | Store the SDP answer.                                                                                        |
-| `GET`  | `/session/:id/answer`      | bearer | Read the stored answer. `204` if not yet posted.                                                             |
-| `POST` | `/session/:id/ice`         | bearer | Append one trickle-ICE candidate.                                                                            |
-| `GET`  | `/session/:id/ice?since=N` | bearer | Long-poll (up to 25 s) for ICE candidates after cursor `N`. Returns `204` on timeout.                        |
-| `GET`  | `/health`                  | none   | Liveness probe.                                                                                              |
+| Method | Path                            | Auth   | Purpose                                                                                                      |
+| ------ | ------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------ |
+| `POST` | `/session`                      | none   | Create a new signaling session. Body: `{ "pairingCode": "..." }`. Returns `{ sessionId, token, expiresAt }`. |
+| `POST` | `/session/:id/offer`            | bearer | Store the SDP offer (and optional initial ICE candidates).                                                   |
+| `GET`  | `/session/:id/offer`            | bearer | Read the stored offer. `204` if not yet posted.                                                              |
+| `POST` | `/session/:id/answer`           | bearer | Store the SDP answer.                                                                                        |
+| `GET`  | `/session/:id/answer`           | bearer | Read the stored answer. `204` if not yet posted.                                                             |
+| `POST` | `/session/:id/ice`              | bearer | Append one trickle-ICE candidate.                                                                            |
+| `GET`  | `/session/:id/ice?since=N`      | bearer | Long-poll (up to 25 s) for ICE candidates after cursor `N`. Returns `204` on timeout.                        |
+| `POST` | `/session/:id/messages`         | bearer | Append one encrypted app packet. Body: `{ senderId, kind, payload }`, where `payload` is base64.             |
+| `GET`  | `/session/:id/messages?since=N` | bearer | Long-poll for encrypted app packets after cursor `N`. Returns `204` on timeout.                              |
+| `GET`  | `/health`                       | none   | Liveness probe.                                                                                              |
 
 ### Auth model
 
@@ -87,8 +89,8 @@ npm test
 Tests run against [`@cloudflare/vitest-pool-workers`](https://www.npmjs.com/package/@cloudflare/vitest-pool-workers),
 which boots a Miniflare worker for each test file with an isolated KV
 namespace. They cover happy-path session creation, offer/answer storage,
-auth rejection, rate limiting and TTL expiry. 34 specs at the time of
-writing.
+ICE, encrypted message relay, auth rejection, rate limiting and TTL expiry.
+38 specs at the time of writing.
 
 ## Lint / format
 

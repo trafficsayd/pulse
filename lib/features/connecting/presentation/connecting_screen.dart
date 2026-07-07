@@ -8,6 +8,7 @@ import '../../../core/routing/routes.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/pulse_mockup.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../connections/application/connections_controller.dart';
 import '../../pairing/application/pairing_controller.dart';
 
 /// "Establishing connection..." — animated handshake screen shown right
@@ -55,6 +56,14 @@ class _ConnectingScreenState extends ConsumerState<ConnectingScreen>
       context.go(Routes.pairing);
       return;
     }
+    final pairingState = ref.read(pairingControllerProvider);
+    await ref
+        .read(connectionsControllerProvider.notifier)
+        .createPairedConnection(
+          connectionId: result.connectionId,
+          nickname: AppLocalizations.of(context)?.appTitle ?? 'Pulse',
+          signalingToken: pairingState.signalingToken ?? result.connectionId,
+        );
     // Give the orbit animation a beat to feel intentional, then hub.
     await Future<void>.delayed(const Duration(milliseconds: 700));
     if (!mounted || _routed) return;

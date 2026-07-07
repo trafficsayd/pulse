@@ -1,29 +1,32 @@
-import 'dart:math' as math;
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../l10n/app_localizations.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/pulse_mockup.dart';
+import '../../../session/application/mode_event.dart';
+import '../../../session/application/mode_event_bus.dart';
 
 /// "Tap-Tap" — concentric pulse rings on a near-black canvas.
 ///
 /// Each tap drops a soft ring at the touch point that expands and fades
 /// out. A continuous central pair of rings keeps the screen alive even
 /// when nobody is tapping, mirroring the "Тук-Тук" tile on the design.
-class TapTapModeScreen extends StatefulWidget {
+class TapTapModeScreen extends ConsumerStatefulWidget {
   const TapTapModeScreen({super.key});
 
   @override
-  State<TapTapModeScreen> createState() => _TapTapModeScreenState();
+  ConsumerState<TapTapModeScreen> createState() => _TapTapModeScreenState();
 }
 
-class _TapTapModeScreenState extends State<TapTapModeScreen>
+class _TapTapModeScreenState extends ConsumerState<TapTapModeScreen>
     with TickerProviderStateMixin {
   late final AnimationController _ambient;
   final List<_Ring> _rings = [];
-  final _rng = math.Random();
+  StreamSubscription<ModeEvent>? _partnerSub;
 
   @override
   void initState() {
@@ -32,6 +35,23 @@ class _TapTapModeScreenState extends State<TapTapModeScreen>
       vsync: this,
       duration: const Duration(seconds: 3),
     )..repeat();
+    // Listen for partner tap events.
+    _partnerSub = ref.read(modeEventBusProvider).incoming
+        .where((e) => e.type == 'tap')
+        .listen(_onPartnerTap);
+  }
+
+  void _onPartnerTap(ModeEvent event) {
+    if (!mounted) return;
+    final size = context.size;
+    if (size == null) return;
+    final x = (event.data['x'] as num?)?.toDouble() ?? 0.5;
+    final y = (event.data['y'] as num?)?.toDouble() ?? 0.5;
+    _addRing(
+      Offset(x * size.width, y * size.height),
+      isLocal: false,
+    );
+    HapticFeedback.selectionClick();
   }
 
   void _addRing(Offset position, {required bool isLocal}) {
@@ -56,21 +76,17 @@ class _TapTapModeScreenState extends State<TapTapModeScreen>
     _addRing(details.localPosition, isLocal: true);
     HapticFeedback.lightImpact();
 
-    Future.delayed(const Duration(milliseconds: 320), () {
-      if (!mounted) return;
-      _addRing(
-        Offset(
-          _rng.nextDouble() * size.width,
-          _rng.nextDouble() * size.height,
-        ),
-        isLocal: false,
-      );
-      HapticFeedback.selectionClick();
-    });
+    // Send tap event to partner.
+    final bus = ref.read(modeEventBusProvider);
+    await bus.send(ModeEvent(type: 'tap', data: {
+      'x': details.localPosition.dx / size.width,
+      'y': details.localPosition.dy / size.height,
+    }));
   }
 
   @override
   void dispose() {
+    _partnerSub?.cancel();
     _ambient.dispose();
     for (final r in _rings) {
       r.controller.dispose();

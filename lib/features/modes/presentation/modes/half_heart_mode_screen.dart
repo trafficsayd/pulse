@@ -1,24 +1,30 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../l10n/app_localizations.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../../../session/application/mode_event.dart';
+import '../../../session/application/mode_event_bus.dart';
 
 /// "Half-Heart" — each side touches their half. While both halves are held,
-/// they pulse together as one heart. The remote partner state is simulated
-/// here for the foundation PR; the real runner will subscribe to inbound
-/// touch events and reflect the partner's hold state in [_partnerHeld].
-class HalfHeartModeScreen extends StatefulWidget {
+/// they pulse together as one heart. Partner state is driven by the event
+/// bus: local hold events are sent, partner hold events are received.
+class HalfHeartModeScreen extends ConsumerStatefulWidget {
   const HalfHeartModeScreen({super.key});
 
   @override
-  State<HalfHeartModeScreen> createState() => _HalfHeartModeScreenState();
+  ConsumerState<HalfHeartModeScreen> createState() =>
+      _HalfHeartModeScreenState();
 }
 
-class _HalfHeartModeScreenState extends State<HalfHeartModeScreen>
+class _HalfHeartModeScreenState extends ConsumerState<HalfHeartModeScreen>
     with SingleTickerProviderStateMixin {
   bool _localHeld = false;
-  bool _partnerHeld = false; // simulated: stays in lock-step with local touch
+  bool _partnerHeld = false;
+  StreamSubscription<ModeEvent>? _partnerSub;
 
   late final AnimationController _pulse;
 
@@ -29,21 +35,32 @@ class _HalfHeartModeScreenState extends State<HalfHeartModeScreen>
       vsync: this,
       duration: const Duration(milliseconds: 900),
     )..repeat(reverse: true);
+    _partnerSub = ref.read(modeEventBusProvider).incoming
+        .where((e) => e.type == 'hold_start' || e.type == 'hold_end')
+        .listen(_onPartnerHold);
+  }
+
+  void _onPartnerHold(ModeEvent event) {
+    if (!mounted) return;
+    setState(() {
+      _partnerHeld = event.type == 'hold_start';
+    });
   }
 
   @override
   void dispose() {
+    _partnerSub?.cancel();
     _pulse.dispose();
     super.dispose();
   }
 
   void _setLocal(bool held) {
     if (held == _localHeld) return;
-    setState(() {
-      _localHeld = held;
-      _partnerHeld = held; // local-only simulation for the foundation PR
-    });
+    setState(() => _localHeld = held);
     if (held) HapticFeedback.lightImpact();
+    // Send hold event to partner.
+    final bus = ref.read(modeEventBusProvider);
+    bus.send(ModeEvent(type: held ? 'hold_start' : 'hold_end'));
   }
 
   @override

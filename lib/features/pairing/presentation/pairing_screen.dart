@@ -42,19 +42,20 @@ class _PairingScreenState extends ConsumerState<PairingScreen> {
 
   String _qrPayload(PairingState pairing) {
     final pub = pairing.localPublicKeyBase64;
+    final code = pairing.pairingCode;
     if (pub == null) {
       // Generation in flight — fall back to a placeholder URI so the QR
       // widget doesn't crash on an empty string.
       return 'pulse://pair?pending=1';
     }
-    return 'pulse://pair?v=1&pk=$pub';
+    return 'pulse://pair?v=1&code=${code ?? ''}&pk=$pub';
   }
 
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context)!;
     final pairing = ref.watch(pairingControllerProvider);
-    final displayCode = pairing.sasCode ?? '······';
+    final displayCode = pairing.sasCode ?? pairing.pairingCode ?? '······';
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -156,8 +157,10 @@ class _PairingScreenState extends ConsumerState<PairingScreen> {
                               const SizedBox(height: 10),
                               Text(
                                 pairing.hasShortCode
-                                    ? t.pairingEnterCode
-                                    : t.pairingDerivingCode,
+                                    ? t.connectingSecuredLink
+                                    : pairing.hasPairingCode
+                                        ? t.pairingEnterCode
+                                        : t.pairingDerivingCode,
                                 style: const TextStyle(
                                   color: AppColors.textMuted,
                                   fontSize: 12,
@@ -295,15 +298,28 @@ class _LangPill extends StatelessWidget {
   }
 }
 
-class _JoinByCodeSheet extends StatefulWidget {
+class _JoinByCodeSheet extends ConsumerStatefulWidget {
   const _JoinByCodeSheet();
 
   @override
-  State<_JoinByCodeSheet> createState() => _JoinByCodeSheetState();
+  ConsumerState<_JoinByCodeSheet> createState() => _JoinByCodeSheetState();
 }
 
-class _JoinByCodeSheetState extends State<_JoinByCodeSheet> {
+class _JoinByCodeSheetState extends ConsumerState<_JoinByCodeSheet> {
   final _controller = TextEditingController();
+  bool _joining = false;
+  String _code = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _controller.addListener(() {
+      final next = _controller.text.replaceAll(RegExp(r'\D'), '');
+      if (next != _code) {
+        setState(() => _code = next);
+      }
+    });
+  }
 
   @override
   void dispose() {
@@ -367,11 +383,23 @@ class _JoinByCodeSheetState extends State<_JoinByCodeSheet> {
           SizedBox(
             width: double.infinity,
             child: GradientButton(
-              label: t.pairingJoin,
-              onPressed: () {
-                Navigator.of(context).pop();
-                context.go(Routes.connecting);
-              },
+              label: _joining ? t.connectingTitle : t.pairingJoin,
+              onPressed: _code.length == 6 && !_joining
+                  ? () async {
+                      setState(() => _joining = true);
+                      await ref
+                          .read(pairingControllerProvider.notifier)
+                          .joinHandshake(_code);
+                      if (!context.mounted) return;
+                      final state = ref.read(pairingControllerProvider);
+                      if (!state.isReadyToConfirm) {
+                        setState(() => _joining = false);
+                        return;
+                      }
+                      Navigator.of(context).pop();
+                      context.go(Routes.connecting);
+                    }
+                  : null,
             ),
           ),
           const SizedBox(height: 8),

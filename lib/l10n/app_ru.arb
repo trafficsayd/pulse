@@ -160,6 +160,8 @@
   "bellHint": "Потряси телефон, чтобы зазвонить",
   "bellIntensity": "Сила тряски",
   "constellationHint": "Касайся точек — подожди, чтобы соединить",
+  "candleTouchHint": "Коснись, чтобы зажечь свечу",
+  "candleBlowHint": "Подуй, чтобы погасить",
   "modesUnsupportedTitle": "Здесь этот режим не работает",
   "modesUnsupportedNeeds": "Нужно: {what}",
   "@modesUnsupportedNeeds": {

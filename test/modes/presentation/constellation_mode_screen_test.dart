@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulse/features/modes/presentation/modes/constellation_mode_screen.dart';
 import 'package:pulse/features/modes/primitives/painting_canvas.dart';
@@ -9,7 +10,7 @@ import 'package:pulse/l10n/app_localizations.dart';
 
 void main() {
   testWidgets(
-    'tapping places a local star and (when partner simulation is on) a remote one',
+    'tapping places a local star on the canvas',
     (tester) async {
       final key = GlobalKey<PaintingCanvasState>();
 
@@ -26,9 +27,8 @@ void main() {
       await tester.pump();
 
       final strokes = key.currentState!.strokes;
-      // One local star + one simulated partner star.
-      expect(strokes.length, 2,
-          reason: 'tap must record both local and simulated remote stars');
+      // One local star recorded.
+      expect(strokes.length, 1, reason: 'tap must record a local star');
       expect(strokes.first.points.length, 1);
       // Local star colour is the canonical lavender used by the screen.
       expect(strokes.first.color, const Color(0xFFB39CFF));
@@ -46,7 +46,6 @@ void main() {
           canvasKey: key,
           random: math.Random(7),
           idleBeforeConnect: const Duration(seconds: 3),
-          simulatePartner: false,
         ),
       );
 
@@ -67,36 +66,21 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
-
-  testWidgets(
-    'partner simulation disabled: only the local star is recorded',
-    (tester) async {
-      final key = GlobalKey<PaintingCanvasState>();
-      await _pump(
-        tester,
-        ConstellationModeScreen(
-          canvasKey: key,
-          simulatePartner: false,
-        ),
-      );
-      await tester.tapAt(const Offset(100, 100));
-      await tester.pump();
-      expect(key.currentState!.strokes.length, 1);
-    },
-  );
 }
 
 Future<void> _pump(WidgetTester tester, Widget child) async {
   await tester.pumpWidget(
-    MaterialApp(
-      localizationsDelegates: const [
-        AppLocalizations.delegate,
-        GlobalMaterialLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
-      ],
-      supportedLocales: AppLocalizations.supportedLocales,
-      home: child,
+    ProviderScope(
+      child: MaterialApp(
+        localizationsDelegates: const [
+          AppLocalizations.delegate,
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: child,
+      ),
     ),
   );
   await tester.pump();

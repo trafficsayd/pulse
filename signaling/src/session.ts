@@ -4,6 +4,8 @@ import type {
   IceCandidate,
   IcePayload,
   OfferPayload,
+  RelayMessage,
+  RelayMessagePayload,
   SignalingSession,
 } from './types';
 
@@ -13,10 +15,14 @@ import type {
  */
 const KEY = {
   session: (id: string): string => `session:${id}`,
+  pairing: (hash: string): string => `pairing:${hash}`,
   offer: (id: string): string => `offer:${id}`,
   answer: (id: string): string => `answer:${id}`,
   ice: (id: string): string => `ice:${id}`,
+  messages: (id: string): string => `messages:${id}`,
 };
+
+const encoder = new TextEncoder();
 
 function ttlSeconds(env: Env): number {
   const raw = env.SESSION_TTL_SECONDS;
@@ -40,12 +46,26 @@ export function newSessionId(): string {
   return out;
 }
 
+async function sha256Hex(value: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', encoder.encode(value));
+  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
 export async function createSession(
   env: Env,
   pairingCode: string,
   nowMs: number = Date.now(),
 ): Promise<SignalingSession> {
   const ttl = ttlSeconds(env);
+  const pairingKey = KEY.pairing(await sha256Hex(pairingCode));
+  const existingId = await env.SIGNALING_SESSIONS.get(pairingKey);
+  if (existingId) {
+    const existing = await getSession(env, existingId);
+    if (existing) {
+      return existing;
+    }
+  }
+
   const session: SignalingSession = {
     sessionId: newSessionId(),
     pairingCode,
@@ -53,6 +73,9 @@ export async function createSession(
     expiresAt: nowMs + ttl * 1000,
   };
   await env.SIGNALING_SESSIONS.put(KEY.session(session.sessionId), JSON.stringify(session), {
+    expirationTtl: ttl,
+  });
+  await env.SIGNALING_SESSIONS.put(pairingKey, session.sessionId, {
     expirationTtl: ttl,
   });
   return session;
@@ -171,4 +194,60 @@ export async function readIceSince(
     return { candidates: [], cursor };
   }
   return { candidates: all.slice(safeSince), cursor };
+}
+
+/**
+ * Read the full relay message list. Empty list when nothing has been stored
+ * yet. These are encrypted app packets, not SDP/ICE metadata.
+ */
+export async function readMessages(env: Env, sessionId: string): Promise<RelayMessage[]> {
+  const raw = await env.SIGNALING_SESSIONS.get(KEY.messages(sessionId));
+  if (!raw) {
+    return [];
+  }
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+    return parsed as RelayMessage[];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Append one encrypted application packet to the session relay stream.
+ *
+ * KV is last-write-wins, so this remains best-effort under simultaneous
+ * writes. Pulse mode events are already ephemeral; missed beats are allowed.
+ */
+export async function appendMessage(
+  env: Env,
+  sessionId: string,
+  message: RelayMessage,
+): Promise<number> {
+  const current = await readMessages(env, sessionId);
+  current.push(message);
+  await env.SIGNALING_SESSIONS.put(KEY.messages(sessionId), JSON.stringify(current), {
+    expirationTtl: ttlSeconds(env),
+  });
+  return current.length;
+}
+
+/**
+ * Return relay messages added strictly after `since`.
+ */
+export async function readMessagesSince(
+  env: Env,
+  sessionId: string,
+  since: number,
+): Promise<RelayMessagePayload> {
+  const all = await readMessages(env, sessionId);
+  const safeSince = Number.isFinite(since) && since >= 0 ? Math.floor(since) : 0;
+  const cursor = all.length;
+  if (safeSince >= cursor) {
+    return { messages: [], cursor };
+  }
+  return { messages: all.slice(safeSince), cursor };
 }

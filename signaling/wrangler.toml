@@ -1,0 +1,39 @@
+name = "pulse-signaling"
+main = "src/index.ts"
+compatibility_date = "2026-05-20"
+compatibility_flags = ["nodejs_compat"]
+
+# Replace this with the real Cloudflare account_id before the first deploy.
+# `wrangler whoami` will print it once you have logged in via `wrangler login`.
+account_id = "REPLACE_ME_ACCOUNT_ID"
+
+# Workers Logs (free tier) — keeps stdout/stderr visible in the dashboard.
+[observability]
+enabled = true
+
+# KV namespace that stores signaling sessions, offers, answers, ICE candidates
+# and per-IP rate-limit counters. Create it with:
+#
+#   wrangler kv:namespace create SIGNALING_SESSIONS
+#   wrangler kv:namespace create SIGNALING_SESSIONS --preview
+#
+# then paste the returned ids below.
+[[kv_namespaces]]
+binding = "SIGNALING_SESSIONS"
+id = "REPLACE_ME_KV_NAMESPACE_ID"
+preview_id = "REPLACE_ME_KV_NAMESPACE_PREVIEW_ID"
+
+# WORKER_SECRET is the HMAC key used to sign per-session bearer tokens.
+# Set it for real deployments with:
+#
+#   wrangler secret put WORKER_SECRET
+#
+# For local `wrangler dev` runs put a value into `.dev.vars` (gitignored) or
+# export WORKER_SECRET in the shell.
+[vars]
+# Default values used during `wrangler dev` only. Real environments override
+# these via `wrangler secret put`.
+ICE_LONG_POLL_TIMEOUT_MS = "25000"
+ICE_LONG_POLL_INTERVAL_MS = "500"
+RATE_LIMIT_PER_MINUTE = "30"
+SESSION_TTL_SECONDS = "600"

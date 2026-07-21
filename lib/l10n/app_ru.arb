@@ -1,0 +1,243 @@
+{
+  "@@locale": "ru",
+  "appTitle": "Pulse",
+
+  "languageRu": "Русский",
+  "languageEn": "English",
+
+  "pairingTitle": "Создать пару",
+  "pairingShareCode": "Попросите партнёра ввести код или сканировать QR",
+  "pairingCreate": "Создать пару",
+  "pairingJoin": "Присоединиться",
+  "pairingEnterCode": "Введите шестизначный код",
+  "pairingDerivingCode": "Вычисляем безопасный код…",
+  "pairingError": "Не удалось подключиться к серверу. Проверьте интернет и повторите.",
+  "pairingRetry": "Повторить",
+  "pairingCancel": "Отмена",
+  "pairingNicknameHint": "Псевдоним (видно только тебе)",
+
+  "connectingTitle": "Устанавливаем связь...",
+  "connectingKeyExchange": "Обмен ключами",
+  "connectingChannelEncrypted": "Шифрование канала",
+  "connectingSecuredLink": "Создание защищённой связи",
+
+  "hubModesTitle": "Режимы",
+  "hubLongPressToStart": "Долгое нажатие — запустить",
+  "hubNoActiveConnection": "Нет активной связи",
+  "hubChooseSomeone": "Выбери человека в «Моих людях», чтобы начать сессию.",
+  "hubExit": "Выйти в хаб",
+  "hubSubscriptionLockedHint": "подписка",
+  "hubMore": "Ещё",
+
+  "transportDirect": "Прямое",
+  "transportLocal": "Локальная сеть",
+  "transportRelay": "Реле",
+  "transportSearching": "Поиск",
+  "transportDirectBle": "Прямое (BLE)",
+  "transportLocalWifi": "Локальная сеть (Wi-Fi Direct)",
+  "transportRelayWebrtc": "Интернет-реле (WebRTC)",
+
+  "peopleTitle": "Мои люди",
+  "peopleEmpty": "Пока нет сохранённых связей.",
+  "peopleAdd": "Добавить",
+  "peopleLongPressHint": "Долгое нажатие — меню действий",
+  "peopleMakeActive": "Сделать активной",
+  "peopleSneakIn": "Подкрасться",
+  "peoplePermissions": "Разрешения",
+  "peopleArchive": "Архивировать",
+  "peopleDelete": "Удалить связь",
+  "peopleStatusActive": "Активна",
+  "peopleStatusActiveWithYou": "Активна с вами",
+  "peopleStatusPaused": "Пауза",
+  "peopleStatusPausedSneakIn": "Пауза • Sneak In ✓",
+  "peopleStatusArchived": "Архив",
+
+  "navPeople": "Мои люди",
+  "navPulse": "Pulse",
+  "navSneakIn": "Подкрасться",
+
+  "permissionsTitle": "Разрешения",
+  "permissionsAllowSessions": "Разрешить полные сессии",
+  "permissionsAllowSneakIn": "Разрешить Sneak In",
+  "permissionsConfirmFirst": "Требовать подтверждение при первом вмешательстве",
+  "permissionsBlocked": "Заблокировано",
+
+  "connectionSettingsTitle": "Настройки связи",
+  "connectionStatusSection": "Статус",
+
+  "sneakInTitle": "Подкрасться",
+  "sneakInChooseSound": "Выберите звук",
+  "sneakInSwipeUp": "Свайп вверх для отправки",
+  "sneakInLimitReached": "Дневной лимит на этого человека исчерпан.",
+  "sneakInRemaining": "{count, plural, =0{Сегодня больше нельзя} =1{Осталось 1 на сегодня} few{Осталось {count} на сегодня} many{Осталось {count} на сегодня} other{Осталось {count} на сегодня}}",
+  "@sneakInRemaining": {
+    "placeholders": {
+      "count": {"type": "int", "format": "decimalPattern"}
+    }
+  },
+  "sneakInIncomingTitle": "Sneak In!",
+  "sneakInIncomingSubtitle": "отправил(а) вам сигнал",
+  "sneakInPullDownToReply": "Потянуть вниз чтобы ответить",
+  "sneakInIgnore": "Игнорировать",
+  "sneakSignalHiccup": "Икота",
+  "sneakSignalToot": "Пук",
+  "sneakSignalBell": "Колокольчик",
+  "sneakSignalKnock": "Стук",
+  "sneakSignalWhisper": "Шёпот",
+  "sneakSignalClap": "Хлопок",
+  "sneakSignalBoom": "Бум",
+  "sneakSignalSqueak": "Писк",
+
+  "subscriptionTitle": "Подписка",
+  "subscriptionTagline": "Откройте все режимы и возможности",
+  "subscriptionFeatureAllModes": "Все режимы",
+  "subscriptionFeatureUnlimitedSneak": "Безлимитный Sneak In",
+  "subscriptionFeatureUpToTen": "До 10 сохранённых связей",
+  "subscriptionFeaturePriority": "Приоритет новых функций",
+  "subscriptionPrice": "150 ₽ / месяц",
+  "subscriptionFreeTrial7Days": "7 дней бесплатно",
+  "subscriptionTryFree": "Попробовать бесплатно",
+  "subscriptionContinueTrial": "Продолжить триал",
+  "subscriptionSubscribe": "Оформить подписку",
+  "subscriptionRestore": "Восстановить покупки",
+  "subscriptionTermsOfUse": "Условия использования",
+  "subscriptionPrivacyPolicy": "Политика конфиденциальности",
+  "subscriptionLockedMode": "Этот режим недоступен.",
+  "subscriptionTrialDaysLeft": "{days, plural, =0{Триал заканчивается сегодня} =1{Остался 1 день триала} few{Осталось {days} дня триала} many{Осталось {days} дней триала} other{Осталось {days} дней триала}}",
+  "@subscriptionTrialDaysLeft": {
+    "placeholders": {
+      "days": {"type": "int", "format": "decimalPattern"}
+    }
+  },
+  "subscriptionTrialExpired": "Триал закончился",
+  "subscriptionConnectionLimitReached": "Достигнут лимит связей для текущего тарифа.",
+  "subscriptionRestoring": "Восстановление…",
+  "subscriptionRestoreNothing": "Ничего не найдено",
+  "subscriptionRestoreSuccess": "Подписка восстановлена",
+  "subscriptionPurchaseError": "Не удалось оформить подписку",
+  "subscriptionPurchasePending": "Платёж обрабатывается",
+  "subscriptionActiveUntil": "Подписка активна до {date}",
+  "@subscriptionActiveUntil": {
+    "placeholders": {
+      "date": {"type": "String"}
+    }
+  },
+  "subscriptionManage": "Управление подпиской",
+  "subscriptionErrorPaymentInvalid": "Способ оплаты не поддерживается",
+  "subscriptionErrorPaymentNotAllowed": "Покупки запрещены в настройках",
+  "subscriptionErrorBillingUnavailable": "Магазин временно недоступен",
+  "subscriptionErrorItemUnavailable": "Подписка пока недоступна",
+  "subscriptionErrorGeneric": "Произошла ошибка. Попробуйте ещё раз",
+
+  "modesCatalogTitle": "Режимы",
+  "modesCatalogTrialSection": "Доступно в триале ({available}/{total})",
+  "@modesCatalogTrialSection": {
+    "placeholders": {
+      "available": {"type": "int"},
+      "total": {"type": "int"}
+    }
+  },
+  "modesCatalogPaidSection": "Доступно по подписке",
+
+  "modeTapTap": "Тук-Тук",
+  "modeHalfHeart": "Половина сердца",
+  "modeCandle": "Свечка",
+  "modeWhisper": "Шёпот",
+  "modeBell": "Колокольчик",
+  "modeRay": "Лучик",
+  "modeConstellation": "Созвездие",
+  "modeGoosebumps": "Мурашки",
+  "modeThread": "Ниточка",
+  "modeThunder": "Гром",
+  "modeFireworks": "Фейерверк",
+  "modeBalance": "Баланс",
+  "modeSandbox": "Песочница",
+  "modeBreath": "Дыхание",
+  "modeSync": "Синхро",
+
+  "tapTapHint": "Коснитесь, чтобы постучать",
+  "halfHeartHint": "Удерживай свою половину",
+  "sketchHint": "Рисуй вживую или отправь готовую открытку",
+  "whisperHint": "Шёпот в микрофон — лучи дышат вместе с тобой",
+  "bellHint": "Потряси телефон, чтобы зазвонить",
+  "bellIntensity": "Сила тряски",
+  "constellationHint": "Касайся точек — подожди, чтобы соединить",
+  "candleTouchHint": "Коснись, чтобы зажечь свечу",
+  "candleBlowHint": "Подуй, чтобы погасить",
+  "modesUnsupportedTitle": "Здесь этот режим не работает",
+  "modesUnsupportedNeeds": "Нужно: {what}",
+  "@modesUnsupportedNeeds": {
+    "placeholders": {
+      "what": {"type": "String"}
+    }
+  },
+  "sketchLive": "LIVE",
+  "sketchCard": "Открытка",
+  "sketchClear": "Очистить",
+  "sketchSend": "Отправить",
+  "sketchSendReady": "Рисунок готов к отправке",
+  "sketchEffectClean": "Обычная кисть",
+  "sketchEffectNeon": "Неон",
+  "sketchEffectGlow": "Свечение",
+  "sketchEffectWatercolor": "Акварель",
+  "sketchEffectSparkles": "Блёстки",
+
+  "settingsTitle": "Настройки",
+  "settingsLanguage": "Язык",
+  "settingsLanguageSection": "Язык / Language",
+  "settingsLanguageSystem": "Системный",
+  "settingsNotifications": "Уведомления",
+  "settingsPermissions": "Разрешения",
+  "settingsAbout": "О приложении",
+  "settingsSupport": "Служба поддержки",
+  "settingsVersion": "Версия {version}",
+  "@settingsVersion": {
+    "placeholders": {
+      "version": {"type": "String"}
+    }
+  },
+  "settingsCrashReports": "Отчёты о сбоях",
+  "settingsCrashReportsHint": "Отправлять анонимно",
+  "settingsCrashReportsSection": "Отчёты о сбоях",
+  "settingsPermissionBluetooth": "Bluetooth",
+  "settingsPermissionWifi": "Wi-Fi",
+  "settingsPermissionMicrophone": "Микрофон",
+  "settingsPermissionGranted": "Разрешено",
+  "settingsSupportEmail": "support@pulse.app",
+
+  "connectionStatusTitle": "Подключение",
+  "connectionStatusOfflineNotice": "Приложение работает без интернета и не собирает данные",
+
+  "settingsDiagnostics": "Диагностика устройства",
+  "settingsDiagnosticsHint": "Какие функции доступны на твоём телефоне",
+  "diagnosticsTitle": "Диагностика",
+  "diagnosticsHardwareSection": "Оборудование",
+  "diagnosticsModesSection": "Режимы",
+  "diagnosticsCapabilityMicrophone": "Микрофон",
+  "diagnosticsCapabilityAccelerometer": "Акселерометр",
+  "diagnosticsCapabilityVibration": "Вибрация",
+  "diagnosticsCapabilityVibrationAmplitude": "Тонкая вибрация",
+  "diagnosticsCapabilityFlashlight": "Вспышка",
+  "diagnosticsCapabilityCamera": "Камера",
+  "diagnosticsCapabilityBluetoothLe": "Bluetooth LE",
+  "diagnosticsCapabilityLocalNetwork": "Локальная сеть",
+  "diagnosticsStatusOk": "Доступно",
+  "diagnosticsStatusMissing": "Недоступно",
+  "diagnosticsStatusProbing": "Проверка...",
+  "diagnosticsModeAvailable": "Готово",
+  "diagnosticsModeMissing": "Не хватает: {what}",
+  "@diagnosticsModeMissing": {
+    "placeholders": {
+      "what": {"type": "String"}
+    }
+  },
+  "modesUnavailableCaption": "Недоступно на этом устройстве",
+  "modesUnavailableReason": "Этому режиму нужен {what}, которого нет на устройстве.",
+  "@modesUnavailableReason": {
+    "placeholders": {
+      "what": {"type": "String"}
+    }
+  },
+
+  "errorGeneric": "Что-то пошло не так"
+}

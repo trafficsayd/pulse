@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pulse — Privacy Policy</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 680px; margin: 40px auto; padding: 0 20px; color: #333; line-height: 1.6; }
+        h1 { color: #9747FF; }
+        h2 { color: #555; margin-top: 32px; }
+        code { background: #f4f4f4; padding: 2px 6px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <h1>Pulse — Privacy Policy</h1>
+    <p><strong>Effective date:</strong> July 11, 2026</p>
+
+    <p>Pulse is a non-verbal sensory communication app. This privacy policy describes how we handle your data.</p>
+
+    <h2>1. No Accounts, No Data Collection</h2>
+    <p>Pulse does not require an account. We do not collect, store, or transmit any personal data. There are no servers that receive your name, email, phone number, contacts, or location.</p>
+
+    <h2>2. Local Storage Only</h2>
+    <p>All your connections, pairing keys, and preferences are stored locally on your device using the operating system's secure storage (iOS Keychain / Android EncryptedSharedPreferences). This data never leaves your device.</p>
+
+    <h2>3. Bluetooth & Local Network</h2>
+    <p>Pulse uses Bluetooth Low Energy (BLE) and local Wi-Fi to connect directly with another Pulse user nearby. These connections are peer-to-peer and end-to-end encrypted with AES-256-GCM. The app does not read your contacts, GPS location, or gallery.</p>
+
+    <h2>4. Internet Relay (Signaling)</h2>
+    <p>When a direct connection isn't possible, Pulse uses a Cloudflare Worker to relay encrypted packets between two devices. The relay only sees opaque random tokens — never your identity, messages, or connection metadata. The signaling server cannot decrypt your traffic.</p>
+
+    <h2>5. Cryptography</h2>
+    <p>All communication is end-to-end encrypted using Curve25519 ECDH key exchange and AES-256-GCM. Keys are generated locally and never shared with any server.</p>
+
+    <h2>6. Microphone, Camera & Sensors</h2>
+    <p>The microphone is used only in active mode sessions (e.g., Whisper, Breath, Candle blow detection). Audio is processed locally in real-time and never recorded or transmitted. The camera flash (torch) is used in Thunder mode. The accelerometer is used in Bell and Balance modes. No sensor data leaves your device.</p>
+
+    <h2>7. In-App Purchases</h2>
+    <p>Pulse Premium subscription is processed by Apple App Store and Google Play. We do not see or store your payment information. Purchase validation is handled by the platform stores.</p>
+
+    <h2>8. Crash Reports</h2>
+    <p>Crash reports are opt-in only. If you enable them in Settings, anonymous crash data may be sent to help us fix bugs. This data never contains personal information or session content.</p>
+
+    <h2>9. Data Deletion</h2>
+    <p>Deleting a connection in the app immediately destroys all associated cryptographic keys and data. There is no cloud backup to restore from.</p>
+
+    <h2>10. Children's Privacy</h2>
+    <p>Pulse is rated for users 13+. We do not knowingly collect data from children under 13. Since we collect no data from anyone, this policy applies equally to all ages.</p>
+
+    <h2>11. Contact</h2>
+    <p>Questions about privacy? Email: support@pulse-app.app</p>
+</body>
+</html>

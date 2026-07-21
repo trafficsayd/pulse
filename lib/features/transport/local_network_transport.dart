@@ -193,7 +193,13 @@ class LocalNetworkTransport implements Transport {
       // Identity handshake line.
       if (json.containsKey('identity')) {
         final peerToken = json['identity'] as String;
-        debugPrint('[LAN] peer identity: $peerToken');
+        // SECURITY (§4/§14 zero-logging): never print the reconnection token
+        // value — it is sensitive pairing material. Log only that an
+        // identity line arrived, and only in debug builds.
+        assert(() {
+          debugPrint('[LAN] peer identity received');
+          return true;
+        }());
         final expected = _identityToken;
         if (expected != null && expected.isNotEmpty && peerToken != expected) {
           debugPrint('[LAN] peer identity mismatch — disconnecting');

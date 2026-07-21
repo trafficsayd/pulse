@@ -17,6 +17,34 @@ abstract final class AppColors {
   static const Color textSecondary = Color(0xFF8A8F9A);
   static const Color textMuted = Color(0xFF55585F);
 
+  // --- Apple (HIG) semantic aliases -------------------------------------
+  // These do not introduce new hues — they are named the way iOS/macOS
+  // names its dark-mode text and fill roles (labelPrimary/Secondary/
+  // Tertiary, separator, systemFill) so screens can express intent while
+  // still resolving to the exact tokens above. No existing hex changes.
+
+  /// Same value as [textPrimary] — Apple's `label` role.
+  static const Color labelPrimary = textPrimary;
+
+  /// Same value as [textSecondary] — Apple's `secondaryLabel` role.
+  static const Color labelSecondary = textSecondary;
+
+  /// New accessible token for small/tertiary *text* (captions, helper
+  /// copy, timestamps). Roughly ~4:1 contrast against [background] and
+  /// [surface] — legible at small sizes, unlike [textMuted] which stays
+  /// reserved for purely decorative elements (e.g. disabled icon tints)
+  /// rather than text a user needs to read.
+  static const Color labelTertiary = Color(0xFF6B6F79);
+
+  /// Apple's `separator` role — hairline dividers, list separators.
+  /// Same value as [outline].
+  static const Color separator = outline;
+
+  /// Apple's `systemFill`-style translucent fill, for subtle control
+  /// backgrounds (segmented controls, chip backgrounds) layered over a
+  /// surface color rather than replacing it.
+  static const Color fill = Color(0x14FFFFFF);
+
   /// Primary accent — violet glow used everywhere from the QR ring on the
   /// pairing screen to the active item in the bottom tab bar.
   static const Color pulse = Color(0xFF9747FF);

@@ -595,4 +595,17 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get errorGeneric => 'Что-то пошло не так';
+
+  @override
+  String get verifyCodeTitle => 'Убедитесь, что это точно они';
+
+  @override
+  String get verifyCodeBody =>
+      'Проверьте, что этот код в точности совпадает с кодом на экране вашего партнёра.';
+
+  @override
+  String get verifyCodeMatch => 'Коды совпадают';
+
+  @override
+  String get verifyCodeMismatch => 'Не совпадают';
 }

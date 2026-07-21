@@ -1171,6 +1171,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Something went wrong'**
   String get errorGeneric;
+
+  /// No description provided for @verifyCodeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Make sure it\'s really them'**
+  String get verifyCodeTitle;
+
+  /// No description provided for @verifyCodeBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Check that this code is identical to the one shown on your partner\'s screen.'**
+  String get verifyCodeBody;
+
+  /// No description provided for @verifyCodeMatch.
+  ///
+  /// In en, this message translates to:
+  /// **'The codes match'**
+  String get verifyCodeMatch;
+
+  /// No description provided for @verifyCodeMismatch.
+  ///
+  /// In en, this message translates to:
+  /// **'They don\'t match'**
+  String get verifyCodeMismatch;
 }
 
 class _AppLocalizationsDelegate

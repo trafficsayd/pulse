@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/storage/secure_key_store.dart';
+import '../../crypto/pair_keys.dart';
 import '../data/connections_repository.dart';
 import '../domain/connection.dart';
 import '../domain/connection_status.dart';
@@ -204,6 +205,13 @@ class ConnectionsController extends Notifier<ConnectionsState> {
 
   Future<void> delete(String id) async {
     await _repo.delete(id);
+    // SECURITY (§6 "паническое стирание"): removing a connection MUST
+    // destroy all of its cryptographic material — the symmetric AES key,
+    // the partner's public key and both nonce counters — not just the
+    // metadata entry. Otherwise the key survives in the Keychain /
+    // EncryptedSharedPreferences indefinitely and history stays recoverable.
+    final store = ref.read(secureKeyStoreProvider);
+    await PairKeys.wipe(store, id);
     state = state.copyWith(
       connections: [
         for (final c in state.connections)

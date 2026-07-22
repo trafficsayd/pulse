@@ -118,3 +118,11 @@ flutter_native_splash:
   android_12:
     color: "#06070C"
     image: assets/icon/splash.png
+
+# Build-time override: on Dart 3.6 the record 5.x family resolves an
+# incompatible pair (record_linux 0.7.2 vs record_platform_interface 1.6.0).
+# Pin the interface to the pre-recorderId signature record_linux expects.
+dependency_overrides:
+  # record 5.x caps record_linux at 0.7.2 (no startStream); force a newer
+  # desktop impl that implements the streaming interface we use.
+  record_linux: ^1.0.0

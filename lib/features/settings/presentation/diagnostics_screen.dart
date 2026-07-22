@@ -40,7 +40,7 @@ class DiagnosticsScreen extends ConsumerWidget {
                 child: caps.when(
                   loading: () =>
                       const Center(child: CircularProgressIndicator()),
-                  error: (_, __) => Center(child: Text(t.errorGeneric)),
+                  error: (_, _) => Center(child: Text(t.errorGeneric)),
                   data: (capabilities) => ListView(
                     padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
                     children: [

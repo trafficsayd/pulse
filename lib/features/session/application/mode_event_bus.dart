@@ -74,6 +74,6 @@ final modeEventBusProvider = Provider<ModeEventBus>((ref) {
     data: (session) =>
         session != null ? ModeEventBus.live(session) : ModeEventBus.inert(),
     loading: ModeEventBus.inert,
-    error: (_, __) => ModeEventBus.inert(),
+    error: (_, _) => ModeEventBus.inert(),
   );
 });

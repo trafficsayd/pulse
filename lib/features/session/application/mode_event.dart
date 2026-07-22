@@ -40,7 +40,7 @@ class ModeEvent {
       type: typeSneak,
       data: {
         sneakSignalKey: signalId,
-        if (senderId != null) sneakSenderKey: senderId,
+        sneakSenderKey: ?senderId,
       },
     );
   }

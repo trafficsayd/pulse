@@ -120,7 +120,7 @@ class PaintingCanvasState extends State<PaintingCanvas> {
         child: CustomPaint(
           painter: _PaintingPainter(
             background: widget.background,
-            strokes: [..._strokes, if (_active != null) _active!],
+            strokes: [..._strokes, ?_active],
           ),
           child: const SizedBox.expand(),
         ),

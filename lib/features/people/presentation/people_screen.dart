@@ -99,7 +99,7 @@ class PeopleScreen extends ConsumerWidget {
                           physics: const BouncingScrollPhysics(),
                           padding: const EdgeInsets.only(bottom: 24),
                           itemCount: state.connections.length,
-                          separatorBuilder: (_, __) =>
+                          separatorBuilder: (_, _) =>
                               const SizedBox(height: 10),
                           itemBuilder: (context, index) =>
                               _PersonRow(connection: state.connections[index]),

@@ -5,8 +5,12 @@ publish_to: 'none'
 version: 0.1.0+1
 
 environment:
-  sdk: ^3.6.0
-  flutter: ">=3.27.0"
+  # Baseline raised for the dependency migration (D3): the latest majors
+  # (flutter_lints 6, go_router 17, riverpod 3, …) require Dart >=3.8 /
+  # Flutter >=3.35. Moving the floor here is a deliberate part of that
+  # migration; the Android toolchain (AGP/Gradle) must move with it.
+  sdk: ^3.8.0
+  flutter: ">=3.35.0"
 
 dependencies:
   flutter:
@@ -26,7 +30,7 @@ dependencies:
   intl: any
 
   # Secure storage abstraction (iOS Keychain / Android EncryptedSharedPreferences)
-  flutter_secure_storage: ^9.2.2
+  flutter_secure_storage: ^10.0.0
 
   # QR rendering for the pairing screen
   qr_flutter: ^4.1.0
@@ -35,7 +39,7 @@ dependencies:
   in_app_purchase: ^3.2.0
 
   # App version / build metadata used by the IAP receipts and About screen
-  package_info_plus: ^8.0.2
+  package_info_plus: ^10.0.0
 
   # Opening App Store / Play subscription-management URLs from the paywall.
   url_launcher: ^6.3.1
@@ -55,9 +59,9 @@ dependencies:
   # Mode primitives (Track C).
   # NOTE: lock to exact minor versions, never `any`, so a transitive bump
   # cannot silently change microphone / sensor behaviour between releases.
-  sensors_plus: ^4.0.2
-  vibration: ^1.9.0
-  record: ^5.1.2
+  sensors_plus: ^7.0.0
+  vibration: ^3.0.0
+  record: ^7.0.0
   permission_handler: ^12.0.0
 
   # Track F1 — real Bluetooth Low Energy transport (central + Android
@@ -70,7 +74,7 @@ dependencies:
   # `signaling/`; once the data channel opens, sealed packets travel P2P
   # (DTLS-SRTP) and never touch the Worker. Falls back to the Worker relay
   # if the data channel cannot open (e.g. symmetric NAT without TURN).
-  flutter_webrtc: ^0.12.0
+  flutter_webrtc: ^1.0.0
 
 dev_dependencies:
   flutter_test:

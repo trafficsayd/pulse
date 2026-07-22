@@ -114,89 +114,90 @@ class _ConnectingScreenState extends ConsumerState<ConnectingScreen>
                     onMismatch: _abortMismatch,
                   )
                 : Column(
-              children: [
-                PulseHeader(title: t.connectingTitle),
-                const SizedBox(height: 34),
-                Text(
-                  t.connectingTitle,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    color: AppColors.textPrimary,
-                    fontSize: 28,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -0.35,
-                  ),
-                ),
-                const SizedBox(height: 34),
-                PulsePanel(
-                  radius: 34,
-                  padding: const EdgeInsets.all(18),
-                  child: SizedBox(
-                    width: 286,
-                    height: 286,
-                    child: AnimatedBuilder(
-                      animation: _orbit,
-                      builder: (context, _) {
-                        return CustomPaint(
-                          painter: _DottedRingPainter(progress: _orbit.value),
-                          child: const Stack(
-                            alignment: Alignment.center,
-                            children: [
-                              Align(
-                                alignment: Alignment.centerLeft,
-                                child: _PhoneGlyph(rotated: false),
-                              ),
-                              Align(
-                                alignment: Alignment.centerRight,
-                                child: _PhoneGlyph(rotated: true),
-                              ),
-                              PulseGlowCircle(
-                                size: 72,
-                                color: AppColors.pulse,
-                                fill: AppColors.surface,
-                                blur: 28,
-                                borderWidth: 1,
-                                child: Icon(
-                                  Icons.lock_rounded,
-                                  color: AppColors.pulse,
-                                  size: 28,
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ),
-                const Spacer(),
-                PulsePanel(
-                  radius: 28,
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
                     children: [
-                      _StepRow(
-                        done: step >= 1,
-                        inProgress: step == 0,
-                        label: t.connectingKeyExchange,
+                      PulseHeader(title: t.connectingTitle),
+                      const SizedBox(height: 34),
+                      Text(
+                        t.connectingTitle,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: AppColors.textPrimary,
+                          fontSize: 28,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.35,
+                        ),
                       ),
-                      const SizedBox(height: 14),
-                      _StepRow(
-                        done: step >= 2,
-                        inProgress: step == 1,
-                        label: t.connectingChannelEncrypted,
+                      const SizedBox(height: 34),
+                      PulsePanel(
+                        radius: 34,
+                        padding: const EdgeInsets.all(18),
+                        child: SizedBox(
+                          width: 286,
+                          height: 286,
+                          child: AnimatedBuilder(
+                            animation: _orbit,
+                            builder: (context, _) {
+                              return CustomPaint(
+                                painter:
+                                    _DottedRingPainter(progress: _orbit.value),
+                                child: const Stack(
+                                  alignment: Alignment.center,
+                                  children: [
+                                    Align(
+                                      alignment: Alignment.centerLeft,
+                                      child: _PhoneGlyph(rotated: false),
+                                    ),
+                                    Align(
+                                      alignment: Alignment.centerRight,
+                                      child: _PhoneGlyph(rotated: true),
+                                    ),
+                                    PulseGlowCircle(
+                                      size: 72,
+                                      color: AppColors.pulse,
+                                      fill: AppColors.surface,
+                                      blur: 28,
+                                      borderWidth: 1,
+                                      child: Icon(
+                                        Icons.lock_rounded,
+                                        color: AppColors.pulse,
+                                        size: 28,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
+                        ),
                       ),
-                      const SizedBox(height: 14),
-                      _StepRow(
-                        done: step >= 3,
-                        inProgress: step == 2,
-                        label: t.connectingSecuredLink,
+                      const Spacer(),
+                      PulsePanel(
+                        radius: 28,
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          children: [
+                            _StepRow(
+                              done: step >= 1,
+                              inProgress: step == 0,
+                              label: t.connectingKeyExchange,
+                            ),
+                            const SizedBox(height: 14),
+                            _StepRow(
+                              done: step >= 2,
+                              inProgress: step == 1,
+                              label: t.connectingChannelEncrypted,
+                            ),
+                            const SizedBox(height: 14),
+                            _StepRow(
+                              done: step >= 3,
+                              inProgress: step == 2,
+                              label: t.connectingSecuredLink,
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ),
-                ),
-              ],
-            ),
           ),
         ),
       ),

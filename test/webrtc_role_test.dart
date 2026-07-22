@@ -25,8 +25,7 @@ void main() {
 
   group('WebRtcTransport.parseRoleClaim', () {
     test('extracts the client id from a role-claim entry', () {
-      expect(WebRtcTransport.parseRoleClaim('pulse-role:deadbeef'),
-          'deadbeef');
+      expect(WebRtcTransport.parseRoleClaim('pulse-role:deadbeef'), 'deadbeef');
     });
 
     test('returns null for a real ICE candidate line', () {

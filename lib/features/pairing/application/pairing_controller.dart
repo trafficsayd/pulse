@@ -29,7 +29,8 @@ class SasNotConfirmedException implements Exception {
 class SasMismatchException implements Exception {
   const SasMismatchException();
   @override
-  String toString() => 'Pairing aborted: SAS codes did not match (possible MITM).';
+  String toString() =>
+      'Pairing aborted: SAS codes did not match (possible MITM).';
 }
 
 /// Discrete steps the pairing handshake walks through. Drives both the

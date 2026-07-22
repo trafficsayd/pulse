@@ -68,7 +68,9 @@ class _ConstellationModeScreenState
       vsync: this,
       duration: const Duration(milliseconds: 900),
     );
-    _partnerSub = ref.read(modeEventBusProvider).incoming
+    _partnerSub = ref
+        .read(modeEventBusProvider)
+        .incoming
         .where((e) => e.type == 'star')
         .listen(_onPartnerStar);
   }
@@ -81,7 +83,9 @@ class _ConstellationModeScreenState
       PaintStroke(
         color: _remoteStarColor.withValues(alpha: 0.45),
         strokeWidth: 10,
-        points: [PaintPoint(Offset(x * _canvasSize.width, y * _canvasSize.height))],
+        points: [
+          PaintPoint(Offset(x * _canvasSize.width, y * _canvasSize.height))
+        ],
       ),
     );
   }

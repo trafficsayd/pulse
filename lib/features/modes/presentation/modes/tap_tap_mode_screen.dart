@@ -36,7 +36,9 @@ class _TapTapModeScreenState extends ConsumerState<TapTapModeScreen>
       duration: const Duration(seconds: 3),
     )..repeat();
     // Listen for partner tap events.
-    _partnerSub = ref.read(modeEventBusProvider).incoming
+    _partnerSub = ref
+        .read(modeEventBusProvider)
+        .incoming
         .where((e) => e.type == 'tap')
         .listen(_onPartnerTap);
   }

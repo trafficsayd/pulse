@@ -117,7 +117,8 @@ void main() {
       expect(a, isNot(equals(b)));
     });
 
-    test('roundtrip with non-empty aad: seal then open with the same aad '
+    test(
+        'roundtrip with non-empty aad: seal then open with the same aad '
         'returns the original plaintext', () async {
       final plaintext = Uint8List.fromList(
         utf8Bytes('pulse mode_event: aad bound packet'),
@@ -144,7 +145,8 @@ void main() {
       expect(opened, equals(plaintext));
     });
 
-    test('open with a different aad than what was used to seal fails '
+    test(
+        'open with a different aad than what was used to seal fails '
         'authentication', () async {
       final plaintext = Uint8List.fromList(utf8Bytes('aad must match'));
       final sealAad = utf8Bytes('pulse:v1:aad:epoch-0');
@@ -168,7 +170,8 @@ void main() {
       );
     });
 
-    test('open with no aad fails authentication when seal used a '
+    test(
+        'open with no aad fails authentication when seal used a '
         'non-empty aad', () async {
       final plaintext = Uint8List.fromList(utf8Bytes('aad presence matters'));
       final aad = utf8Bytes('pulse:v1:aad:epoch-0');
@@ -188,7 +191,8 @@ void main() {
       );
     });
 
-    test('empty aad (explicit or defaulted) behaves identically — backward '
+    test(
+        'empty aad (explicit or defaulted) behaves identically — backward '
         'compatibility for every pre-existing call site', () async {
       final plaintext = Uint8List.fromList(utf8Bytes('no aad here'));
 

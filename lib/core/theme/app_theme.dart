@@ -1,3 +1,6 @@
+// CupertinoPageTransitionsBuilder lives in the cupertino library since
+// Flutter 3.4x (no longer re-exported through material).
+import 'package:flutter/cupertino.dart' show CupertinoPageTransitionsBuilder;
 import 'package:flutter/material.dart';
 
 import 'app_colors.dart';

@@ -7,8 +7,7 @@ import 'package:pulse/features/transport/transport_manager.dart';
 
 /// Fake transport whose connectivity and incoming can be controlled in tests.
 class _FakeTransport implements Transport {
-  _FakeTransport(this._kind, {bool connected = false})
-      : _connected = connected;
+  _FakeTransport(this._kind, {bool connected = false}) : _connected = connected;
 
   final TransportKind _kind;
   bool _connected;

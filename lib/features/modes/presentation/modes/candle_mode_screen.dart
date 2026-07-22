@@ -116,7 +116,9 @@ class _CandleModeViewState extends ConsumerState<_CandleModeView>
     )..repeat();
 
     _micSub = _mic.levels.listen(_onMicLevel);
-    _partnerSub = ref.read(modeEventBusProvider).incoming
+    _partnerSub = ref
+        .read(modeEventBusProvider)
+        .incoming
         .where((e) => e.type == 'candle_light' || e.type == 'candle_blow')
         .listen(_onPartnerEvent);
   }
@@ -163,7 +165,9 @@ class _CandleModeViewState extends ConsumerState<_CandleModeView>
   void _onTap() {
     if (!_isLit) {
       _lightCandle();
-      ref.read(modeEventBusProvider).send(const ModeEvent(type: 'candle_light'));
+      ref
+          .read(modeEventBusProvider)
+          .send(const ModeEvent(type: 'candle_light'));
     }
   }
 

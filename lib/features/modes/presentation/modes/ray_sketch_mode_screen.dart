@@ -54,7 +54,9 @@ class _RaySketchModeScreenState extends ConsumerState<RaySketchModeScreen> {
   @override
   void initState() {
     super.initState();
-    _partnerSub = ref.read(modeEventBusProvider).incoming
+    _partnerSub = ref
+        .read(modeEventBusProvider)
+        .incoming
         .where((e) => e.type == 'ray_point' || e.type == 'ray_end')
         .listen(_onPartnerEvent);
   }

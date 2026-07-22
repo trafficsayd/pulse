@@ -42,8 +42,7 @@ class SneakInIncomingScreen extends ConsumerStatefulWidget {
       _SneakInIncomingScreenState();
 }
 
-class _SneakInIncomingScreenState
-    extends ConsumerState<SneakInIncomingScreen> {
+class _SneakInIncomingScreenState extends ConsumerState<SneakInIncomingScreen> {
   late final HapticEngine _engine;
   late final HapticPatternPlayer _player;
   bool _ownsEngine = false;

@@ -60,6 +60,10 @@ dependencies:
   record: ^5.1.2
   permission_handler: ^11.3.1
 
+  # Sneak In signal sounds — short bundled SFX (v1.1). Assets are mono
+  # AAC (.m4a): raw .opus is not decodable by the iOS system players.
+  audioplayers: ^6.1.0
+
   # Track F1 — real Bluetooth Low Energy transport (central + Android
   # peripheral scaffolding). Pinned to a minor floor so a transitive bump
   # cannot silently change GATT behaviour between releases.
@@ -108,7 +112,7 @@ flutter_launcher_icons:
   min_sdk_android: 29
   background_color_ios: "#06070C"
   adaptive_icon_background: "#06070C"
-  adaptive_icon_foreground: "assets/icon/app_icon.png"
+  adaptive_icon_foreground: "assets/icon/app_icon_foreground.png"
 
 # ── Launch splash (flutter_native_splash) ───────────────────────────────────
 # Regenerate with `dart run flutter_native_splash:create`.

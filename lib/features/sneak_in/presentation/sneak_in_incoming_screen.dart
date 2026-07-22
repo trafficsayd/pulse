@@ -15,6 +15,7 @@ import '../../connections/domain/connection.dart';
 import '../../modes/primitives/haptic_pattern_player.dart';
 import '../../session/application/mode_event.dart';
 import '../../session/application/mode_event_bus.dart';
+import 'sneak_sound_player.dart';
 
 /// "Sneak In!" — full-screen overlay shown when an inbound short signal
 /// arrives. Pull down to reply, tap "Ignore" to dismiss.
@@ -88,10 +89,13 @@ class _SneakInIncomingScreenState extends ConsumerState<SneakInIncomingScreen> {
     // for a Sneak In. Fire-and-forget; disposal cancels any in-flight buzz.
     unawaited(_player.play(HapticPatterns.triple));
 
-    // TODO(audio): play the signal's sound asset once the audio pipeline and
-    // `assets/sounds/sneak/*.opus` bytes ship. Until then we intentionally
-    // limit inbound feedback to vibration + the visual bubble — no new
-    // dependency is added here.
+    // Sound layer: play the sender's chosen signal alongside the buzz.
+    // Mixes with any session audio and fails soft — vibration + the bubble
+    // remain the guaranteed feedback.
+    final signalId = event.sneakSignalId;
+    if (signalId != null) {
+      unawaited(ref.read(sneakSoundPlayerProvider).playSignal(signalId));
+    }
 
     _bubbleTimer?.cancel();
     _bubbleTimer = Timer(const Duration(seconds: 2), () {

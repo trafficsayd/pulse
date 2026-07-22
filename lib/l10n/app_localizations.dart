@@ -425,7 +425,7 @@ abstract class AppLocalizations {
   /// No description provided for @sneakInChooseSound.
   ///
   /// In en, this message translates to:
-  /// **'Pick a sound'**
+  /// **'Pick a signal'**
   String get sneakInChooseSound;
 
   /// No description provided for @sneakInSwipeUp.

@@ -40,7 +40,9 @@ Pulse — приложение для двоих (и самых близких),
 
 SNEAK IN — «ПОДКРАСТЬСЯ»
 Пошлите короткий внезапный сигнал человеку, даже когда он в сессии с
-кем-то другим: икота, пук, колокольчик — 8 звуков на колесе.
+кем-то другим: восемь озорных сигналов на колесе — от икоты до
+колокольчика. Получатель почувствует вибрацию и увидит вашу эмодзи
+на экране.
 
 PULSE PREMIUM
 7 дней бесплатно, затем 150 ₽/мес (цена может отличаться по регионам):
@@ -89,7 +91,8 @@ future mode.
 
 SNEAK IN
 Send a sudden little signal to someone even while they're in a session
-with somebody else: a hiccup, a toot, a bell — 8 sounds on the wheel.
+with somebody else: eight playful signals on the wheel, from a hiccup to
+a bell. Your person feels a buzz and sees your emoji flash on screen.
 
 PULSE PREMIUM
 7 days free, then $1.99/month (varies by region): all modes, unlimited

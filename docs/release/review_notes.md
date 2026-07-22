@@ -16,7 +16,7 @@
 4. «Свечка»: A зажигает, B задувает в микрофон.
 5. Paywall: открыть, показать цену, Restore purchases, тап по Terms и
    Privacy (открываются в браузере).
-6. Sneak In с колеса звуков.
+6. Sneak In с колеса сигналов.
 
 Залейте как unlisted на YouTube (или файлом в Play Console — там есть
 поле). Ссылку — в notes ниже.
@@ -43,8 +43,7 @@ free trial, unlocks all modes, unlimited "Sneak In" signals and up to 10
 saved connections. Free tier keeps Knock-Knock and Half-Heart modes.
 
 Background modes: bluetooth-central / bluetooth-peripheral keep the paired
-link alive to receive short "Sneak In" signals; audio continues an active
-session's sound when the app is backgrounded (core product behavior, see
+link alive to receive short "Sneak In" signals (core product behavior, see
 demo video).
 
 No account credentials are required for review.
@@ -55,7 +54,7 @@ No account credentials are required for review.
 ```
 No login required. Full functionality requires a second phone: users pair
 two devices with a 6-digit code and exchange encrypted sensory signals
-(vibration / light / sound). Demo video of the complete two-device flow:
+(vibration / light). Demo video of the complete two-device flow:
 <VIDEO_URL>. With a single device you can review pairing, the mode
 catalog, settings and the subscription paywall (price is loaded from
 Google Play; 7-day free trial offer; Restore purchases; Privacy Policy
@@ -66,9 +65,6 @@ link).
 
 - **«App doesn't work / stuck at pairing»** — вежливо указать на notes и
   видео; предложить созвон-демо (Apple иногда соглашается).
-- **«Background audio misuse»** — объяснить: активная сессия воспроизводит
-  звуковой канал пары (Whisper/Bell), это ядро продукта; при необходимости
-  приложить таймкод из видео.
 - **«Subscription terms unclear»** — на paywall есть цена из стора, срок
   триала, Restore, ссылки Terms/Privacy; в описании — абзац об
   автопродлении. Указать таймкод в видео.

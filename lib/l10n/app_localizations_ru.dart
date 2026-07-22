@@ -174,7 +174,7 @@ class AppLocalizationsRu extends AppLocalizations {
   String get sneakInTitle => 'Подкрасться';
 
   @override
-  String get sneakInChooseSound => 'Выберите звук';
+  String get sneakInChooseSound => 'Выберите сигнал';
 
   @override
   String get sneakInSwipeUp => 'Свайп вверх для отправки';

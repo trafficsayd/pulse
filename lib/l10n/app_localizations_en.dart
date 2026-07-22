@@ -173,7 +173,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sneakInTitle => 'Sneak in';
 
   @override
-  String get sneakInChooseSound => 'Pick a sound';
+  String get sneakInChooseSound => 'Pick a signal';
 
   @override
   String get sneakInSwipeUp => 'Swipe up to send';

@@ -64,7 +64,7 @@
   "connectionStatusSection": "Статус",
 
   "sneakInTitle": "Подкрасться",
-  "sneakInChooseSound": "Выберите звук",
+  "sneakInChooseSound": "Выберите сигнал",
   "sneakInSwipeUp": "Свайп вверх для отправки",
   "sneakInLimitReached": "Дневной лимит на этого человека исчерпан.",
   "sneakInRemaining": "{count, plural, =0{Сегодня больше нельзя} =1{Осталось 1 на сегодня} few{Осталось {count} на сегодня} many{Осталось {count} на сегодня} other{Осталось {count} на сегодня}}",

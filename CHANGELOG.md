@@ -38,6 +38,16 @@ First release candidate for App Store / Google Play.
 - Version bumped to `1.0.0+1`.
 - README refreshed to match the actual state of the code.
 
+### Changed (honest v1 scope)
+- Sneak In in v1 delivers vibration + an emoji flash (no custom sounds yet:
+  the audio pipeline and `.opus` assets are deferred to v1.1). Wheel copy
+  changed from "Pick a sound" to "Pick a signal" (RU: «Выберите сигнал»),
+  listings and review notes reworded accordingly.
+- **iOS:** removed the `audio` entry from `UIBackgroundModes` — the app has
+  no continuous audio playback, and an unjustified background-audio mode is
+  an App Review rejection risk (2.5.4). Restore together with the real
+  audio pipeline.
+
 ### Notes for testers
 - First release build with R8 enabled: run the full two-device smoke pass
   (pairing, all transports, purchase, restore) on the internal track before

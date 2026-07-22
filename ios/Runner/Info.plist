@@ -62,7 +62,6 @@
 		<array>
 			<string>bluetooth-central</string>
 			<string>bluetooth-peripheral</string>
-			<string>audio</string>
 		</array>
 		<!-- Pulse ships its own end-to-end encryption (Curve25519 ECDH +
 		     AES-256-GCM), which is NOT exempt under App Store export rules —

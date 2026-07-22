@@ -65,6 +65,13 @@ dependencies:
   # cannot silently change GATT behaviour between releases.
   flutter_blue_plus: ^1.32.0
 
+  # Track F3 — real WebRTC data-channel transport (P2P over the internet
+  # relay tier). SDP/ICE are brokered by the Cloudflare Worker in
+  # `signaling/`; once the data channel opens, sealed packets travel P2P
+  # (DTLS-SRTP) and never touch the Worker. Falls back to the Worker relay
+  # if the data channel cannot open (e.g. symmetric NAT without TURN).
+  flutter_webrtc: ^0.12.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

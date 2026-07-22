@@ -55,6 +55,11 @@ keytool -printcert -jarfile build/app/outputs/bundle/release/app-release.aab
 
 ## 3. Сборка в CI (workflow `release-android.yml`)
 
+> ⚠️ Файл workflow поставляется в `docs/release/workflows/release-android.yml`
+> — перенесите его в `.github/workflows/release-android.yml` (одноразово,
+> см. мастер-чеклист): у GitHub-интеграции, которой готовился релиз, нет
+> права записи в `.github/workflows/`.
+
 Секреты репозитория (Settings → Secrets and variables → Actions):
 
 | Секрет | Значение |

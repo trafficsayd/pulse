@@ -1,0 +1,97 @@
+name: Release (Android)
+
+# Builds a signed Android App Bundle ready for Play Console upload.
+#
+# Triggers:
+#   * every `v*` tag (e.g. v1.0.0)
+#   * manually via the Actions tab (workflow_dispatch)
+#
+# Required repository secrets (see docs/release/android_signing.md):
+#   ANDROID_KEYSTORE_BASE64   — upload keystore, base64-encoded
+#   ANDROID_KEYSTORE_PASSWORD — keystore password
+#   ANDROID_KEY_ALIAS         — key alias (e.g. "upload")
+#   ANDROID_KEY_PASSWORD      — key password
+#   SIGNALING_BASE_URL        — production signaling Worker URL
+# Optional secrets (TURN relay; see docs/release/turn.md):
+#   TURN_URL, TURN_USER, TURN_CRED
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+jobs:
+  build-aab:
+    name: Build signed AAB
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Restore packages
+        run: flutter pub get
+
+      - name: Generate localizations
+        run: flutter gen-l10n
+
+      - name: Fail fast if signing secrets are missing
+        run: |
+          if [ -z "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" ]; then
+            echo "::error::ANDROID_KEYSTORE_BASE64 secret is not configured — see docs/release/android_signing.md"
+            exit 1
+          fi
+          if [ -z "${{ secrets.SIGNALING_BASE_URL }}" ]; then
+            echo "::error::SIGNALING_BASE_URL secret is not configured — see docs/release/signaling_production.md"
+            exit 1
+          fi
+
+      - name: Materialize upload keystore
+        run: |
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android/upload-keystore.jks
+          cat > android/key.properties << EOF
+          storePassword=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}
+          keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}
+          storeFile=../upload-keystore.jks
+          EOF
+
+      - name: Build App Bundle
+        run: |
+          TURN_ARGS=""
+          if [ -n "${{ secrets.TURN_URL }}" ]; then
+            TURN_ARGS="--dart-define=TURN_URL=${{ secrets.TURN_URL }} --dart-define=TURN_USER=${{ secrets.TURN_USER }} --dart-define=TURN_CRED=${{ secrets.TURN_CRED }}"
+          fi
+          flutter build appbundle --release \
+            --dart-define=SIGNALING_BASE_URL=${{ secrets.SIGNALING_BASE_URL }} \
+            $TURN_ARGS
+
+      - name: Upload AAB artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pulse-release-aab
+          path: build/app/outputs/bundle/release/app-release.aab
+          if-no-files-found: error
+
+      - name: Upload R8 mapping (deobfuscation file for Play Console)
+        uses: actions/upload-artifact@v4
+        with:
+          name: pulse-release-mapping
+          path: build/app/outputs/mapping/release/mapping.txt
+          if-no-files-found: warn
+
+      - name: Cleanup signing material
+        if: always()
+        run: rm -f android/upload-keystore.jks android/key.properties

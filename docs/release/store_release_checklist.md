@@ -44,6 +44,12 @@
       FGS-пермиссии.
 - [ ] **[владелец]** Сгенерировать upload keystore и заполнить
       `android/key.properties` — **[документ]** `android_signing.md`.
+- [ ] **[владелец]** Переместить CI-workflow на боевое место: файл
+      лежит в `docs/release/workflows/release-android.yml` (у GitHub-
+      интеграции агента нет workflow-scope, чтобы класть его в
+      `.github/workflows/` напрямую). В веб-интерфейсе GitHub: Add file →
+      Create new file → путь `.github/workflows/release-android.yml` →
+      вставить содержимое; либо локально `git mv` + commit.
 - [ ] **[владелец]** Загрузить секреты в GitHub (Settings → Secrets →
       Actions): `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`,
       `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`, `SIGNALING_BASE_URL`

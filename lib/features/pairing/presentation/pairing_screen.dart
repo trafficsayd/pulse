@@ -12,6 +12,7 @@ import '../../../l10n/app_localizations.dart';
 import '../../connections/application/connections_controller.dart';
 import '../../subscription/application/subscription_controller.dart';
 import '../application/pairing_controller.dart';
+import 'pairing_error_text.dart';
 
 /// True when the saved-connections cap for the current tier has already
 /// been reached (spec §9). Shared by the host and join entry points so
@@ -182,12 +183,13 @@ class _PairingScreenState extends ConsumerState<PairingScreen> {
                               const SizedBox(height: 10),
                               Text(
                                 pairing.phase == PairingPhase.failed
-                                    ? t.errorGeneric
+                                    ? describePairingError(t, pairing.error)
                                     : pairing.hasShortCode
                                         ? t.connectingSecuredLink
                                         : pairing.hasPairingCode
                                             ? t.pairingEnterCode
                                             : t.pairingDerivingCode,
+                                textAlign: TextAlign.center,
                                 style: TextStyle(
                                   color: pairing.phase == PairingPhase.failed
                                       ? AppColors.heart
@@ -196,9 +198,38 @@ class _PairingScreenState extends ConsumerState<PairingScreen> {
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),
+                              if (pairing.phase == PairingPhase.failed &&
+                                  pairingErrorDetail(pairing.error)
+                                      .isNotEmpty) ...[
+                                const SizedBox(height: 6),
+                                Text(
+                                  pairingErrorDetail(pairing.error),
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                    color: AppColors.textMuted,
+                                    fontSize: 10,
+                                    height: 1.3,
+                                  ),
+                                ),
+                              ],
                             ],
                           ),
                         ),
+                        if (pairing.phase == PairingPhase.failed) ...[
+                          const SizedBox(height: 8),
+                          TextButton(
+                            onPressed: () => ref
+                                .read(pairingControllerProvider.notifier)
+                                .startHostHandshake(),
+                            child: Text(
+                              t.pairingRetry,
+                              style: const TextStyle(
+                                color: AppColors.pulse,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
                         const SizedBox(height: 24),
                       ],
                     ),
@@ -353,6 +384,8 @@ class _JoinByCodeSheetState extends ConsumerState<_JoinByCodeSheet> {
   final _controller = TextEditingController();
   bool _joining = false;
   String _code = '';
+  String? _error;
+  String? _errorDetail;
 
   @override
   void initState() {
@@ -360,7 +393,12 @@ class _JoinByCodeSheetState extends ConsumerState<_JoinByCodeSheet> {
     _controller.addListener(() {
       final next = _controller.text.replaceAll(RegExp(r'\D'), '');
       if (next != _code) {
-        setState(() => _code = next);
+        // A fresh code attempt clears the stale failure banner.
+        setState(() {
+          _code = next;
+          _error = null;
+          _errorDetail = null;
+        });
       }
     });
   }
@@ -440,14 +478,22 @@ class _JoinByCodeSheetState extends ConsumerState<_JoinByCodeSheet> {
                         context.go(Routes.subscription);
                         return;
                       }
-                      setState(() => _joining = true);
+                      setState(() {
+                        _joining = true;
+                        _error = null;
+                        _errorDetail = null;
+                      });
                       await ref
                           .read(pairingControllerProvider.notifier)
                           .joinHandshake(_code);
                       if (!context.mounted) return;
                       final state = ref.read(pairingControllerProvider);
                       if (!state.isReadyToConfirm) {
-                        setState(() => _joining = false);
+                        setState(() {
+                          _joining = false;
+                          _error = describePairingError(t, state.error);
+                          _errorDetail = pairingErrorDetail(state.error);
+                        });
                         return;
                       }
                       Navigator.of(context).pop();
@@ -456,6 +502,31 @@ class _JoinByCodeSheetState extends ConsumerState<_JoinByCodeSheet> {
                   : null,
             ),
           ),
+          if (_error != null) ...[
+            const SizedBox(height: 12),
+            Text(
+              _error!,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: AppColors.heart,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                height: 1.35,
+              ),
+            ),
+            if (_errorDetail != null && _errorDetail!.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(
+                _errorDetail!,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: AppColors.textMuted,
+                  fontSize: 10,
+                  height: 1.3,
+                ),
+              ),
+            ],
+          ],
           const SizedBox(height: 8),
           TextButton(
             onPressed: () => Navigator.of(context).pop(),

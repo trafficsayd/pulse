@@ -46,9 +46,11 @@ Background modes: bluetooth-central / bluetooth-peripheral keep the paired
 link alive to receive short "Sneak In" signals (core product behavior, see
 demo video).
 
-Note: the one-time pairing handshake requires internet connectivity (it is
-brokered by our signaling relay). Once two phones are paired, nearby modes
-run fully offline over BLE / local network.
+Note: the one-time pairing handshake normally goes through our signaling
+relay, but it also works fully offline: when the relay is unreachable the
+phones exchange public keys directly over BLE (the hosting device must be
+an Android phone in that case). After pairing, nearby modes always run
+fully offline over BLE / local network.
 
 No account credentials are required for review.
 ```

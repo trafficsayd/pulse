@@ -1201,6 +1201,54 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'They don\'t match'**
   String get verifyCodeMismatch;
+
+  /// No description provided for @pairingErrorCodeMismatch.
+  ///
+  /// In en, this message translates to:
+  /// **'The code didn\'t match — check the digits and try again'**
+  String get pairingErrorCodeMismatch;
+
+  /// No description provided for @pairingErrorRejected.
+  ///
+  /// In en, this message translates to:
+  /// **'The partner declined the pairing request'**
+  String get pairingErrorRejected;
+
+  /// No description provided for @pairingErrorPermission.
+  ///
+  /// In en, this message translates to:
+  /// **'Bluetooth permission is missing. Allow nearby-devices access in settings'**
+  String get pairingErrorPermission;
+
+  /// No description provided for @pairingErrorPartnerNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'No partner found nearby. Make sure their phone shows the “Create pair” screen and Bluetooth is on'**
+  String get pairingErrorPartnerNotFound;
+
+  /// No description provided for @pairingErrorLinkDropped.
+  ///
+  /// In en, this message translates to:
+  /// **'The link dropped. Please try again'**
+  String get pairingErrorLinkDropped;
+
+  /// No description provided for @pairingErrorBluetooth.
+  ///
+  /// In en, this message translates to:
+  /// **'Bluetooth is unavailable or turned off. Turn it on and retry'**
+  String get pairingErrorBluetooth;
+
+  /// No description provided for @pairingErrorTimeout.
+  ///
+  /// In en, this message translates to:
+  /// **'Timed out. Please try again'**
+  String get pairingErrorTimeout;
+
+  /// No description provided for @pairingRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Try again'**
+  String get pairingRetry;
 }
 
 class _AppLocalizationsDelegate

@@ -426,5 +426,21 @@
   "verifyCodeMatch": "The codes match",
   "@verifyCodeMatch": {},
   "verifyCodeMismatch": "They don't match",
-  "@verifyCodeMismatch": {}
+  "@verifyCodeMismatch": {},
+  "pairingErrorCodeMismatch": "The code didn't match — check the digits and try again",
+  "@pairingErrorCodeMismatch": {},
+  "pairingErrorRejected": "The partner declined the pairing request",
+  "@pairingErrorRejected": {},
+  "pairingErrorPermission": "Bluetooth permission is missing. Allow nearby-devices access in settings",
+  "@pairingErrorPermission": {},
+  "pairingErrorPartnerNotFound": "No partner found nearby. Make sure their phone shows the “Create pair” screen and Bluetooth is on",
+  "@pairingErrorPartnerNotFound": {},
+  "pairingErrorLinkDropped": "The link dropped. Please try again",
+  "@pairingErrorLinkDropped": {},
+  "pairingErrorBluetooth": "Bluetooth is unavailable or turned off. Turn it on and retry",
+  "@pairingErrorBluetooth": {},
+  "pairingErrorTimeout": "Timed out. Please try again",
+  "@pairingErrorTimeout": {},
+  "pairingRetry": "Try again",
+  "@pairingRetry": {}
 }

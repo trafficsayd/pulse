@@ -613,4 +613,32 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get verifyCodeMismatch => 'Не совпадают';
+
+  @override
+  String get pairingErrorCodeMismatch =>
+      'Код не совпал — проверьте цифры и попробуйте ещё раз';
+
+  @override
+  String get pairingErrorRejected => 'Партнёр отклонил запрос на сопряжение';
+
+  @override
+  String get pairingErrorPermission =>
+      'Нет разрешения на Bluetooth. Разрешите доступ к устройствам поблизости в настройках';
+
+  @override
+  String get pairingErrorPartnerNotFound =>
+      'Партнёр рядом не найден. Проверьте, что на его телефоне открыт экран «Создать пару» и включён Bluetooth';
+
+  @override
+  String get pairingErrorLinkDropped => 'Связь оборвалась. Попробуйте ещё раз';
+
+  @override
+  String get pairingErrorBluetooth =>
+      'Bluetooth недоступен или выключен. Включите его и повторите';
+
+  @override
+  String get pairingErrorTimeout => 'Время ожидания вышло. Попробуйте ещё раз';
+
+  @override
+  String get pairingRetry => 'Попробовать снова';
 }

@@ -76,6 +76,8 @@ jobs:
           fi
           flutter build appbundle --release \
             --dart-define=SIGNALING_BASE_URL=${{ secrets.SIGNALING_BASE_URL }} \
+            --dart-define=LEGAL_PRIVACY_URL=https://hyperagent.com/s/CA6vXgwUABvLwCb9yT3o7g \
+            --dart-define=LEGAL_TERMS_URL=https://hyperagent.com/s/naC5GsxsS4AU-Rz4U4Rwgg \
             $TURN_ARGS
 
       - name: Upload AAB artifact

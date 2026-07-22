@@ -21,8 +21,8 @@ flutter pub get
 
 flutter build ipa --release \
   --dart-define=SIGNALING_BASE_URL=https://<prod-worker>.workers.dev \
-  --dart-define=LEGAL_PRIVACY_URL=https://<ваш-хост>/legal/privacy.html \
-  --dart-define=LEGAL_TERMS_URL=https://<ваш-хост>/legal/terms.html
+  --dart-define=LEGAL_PRIVACY_URL=https://hyperagent.com/s/CA6vXgwUABvLwCb9yT3o7g \
+  --dart-define=LEGAL_TERMS_URL=https://hyperagent.com/s/naC5GsxsS4AU-Rz4U4Rwgg
   # + при наличии TURN: --dart-define=TURN_URL=... TURN_USER=... TURN_CRED=...
 ```
 

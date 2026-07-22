@@ -21,13 +21,15 @@
       указан `support@pulse.app` — если домена нет, заведите адрес и
       замените строку `settingsSupportEmail` в `lib/l10n/app_*.arb`
       (+ `flutter gen-l10n`).
-- [ ] **[владелец]** Опубликовать Privacy Policy и Terms по публичным URL —
-      готовые файлы лежат в `docs/legal/` (варианты хостинга — в
-      `docs/release/store_listings.md`, раздел «Хостинг юридических
-      страниц»). Затем передавать URL в сборки через
-      `--dart-define=LEGAL_PRIVACY_URL=… LEGAL_TERMS_URL=…`
-      (дефолты: privacy → GitHub Pages этого репо, terms → стандартная
-      EULA Apple).
+- [x] Privacy Policy и Terms опубликованы по публичным URL (хостинг
+      Hyperagent, без логина; проверено 22.07.2026):
+      Privacy: https://hyperagent.com/s/CA6vXgwUABvLwCb9yT3o7g
+      Terms: https://hyperagent.com/s/naC5GsxsS4AU-Rz4U4Rwgg
+      В release-сборки передавать:
+      `--dart-define=LEGAL_PRIVACY_URL=https://hyperagent.com/s/CA6vXgwUABvLwCb9yT3o7g`
+      `--dart-define=LEGAL_TERMS_URL=https://hyperagent.com/s/naC5GsxsS4AU-Rz4U4Rwgg`
+      (опционально позже переехать на собственный домен — источник
+      страниц в `docs/legal/`).
 - [ ] **[владелец]** Production-деплой signaling Worker — **[документ]**
       `signaling_production.md`. Результат: боевой
       `SIGNALING_BASE_URL`.

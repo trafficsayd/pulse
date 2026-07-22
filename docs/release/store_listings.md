@@ -134,7 +134,20 @@ EN: First release: 15 sensory modes, code pairing, offline operation
 ## Хостинг юридических страниц
 
 Готовые файлы: `docs/legal/privacy.html`, `docs/legal/terms.html`
-(двуязычные, самодостаточные). Варианты, любой займёт <15 минут:
+(двуязычные, самодостаточные).
+
+**Вариант 0 — уже опубликовано (работает прямо сейчас):**
+
+- Privacy Policy: https://hyperagent.com/s/CA6vXgwUABvLwCb9yT3o7g
+- Terms of Use: https://hyperagent.com/s/naC5GsxsS4AU-Rz4U4Rwgg
+
+Страницы захощены через платформу Hyperagent (публичны, без логина,
+проверено). Годятся для полей Privacy Policy URL в обеих консолях и для
+`--dart-define` в сборках. Когда появится собственный домен — просто
+замените URL в консолях и в командах сборки; сами страницы в
+`docs/legal/` остаются источником истины.
+
+Другие варианты (собственный хостинг), любой займёт <15 минут:
 
 1. **GitHub Pages этого репо** — Settings → Pages → Deploy from branch →
    дефолтная ветка / `docs/`. URL получатся

@@ -256,6 +256,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get subscriptionPrice => '150 ₽ / month';
 
   @override
+  String subscriptionPricePerMonth(String price) {
+    return '$price / month';
+  }
+
+  @override
   String get subscriptionFreeTrial7Days => '7 days free';
 
   @override

@@ -16,6 +16,22 @@ import '../data/iap_product_ids.dart';
 import '../data/iap_service.dart';
 import '../domain/entitlements.dart';
 
+/// Store-compliance links — Apple Guideline 3.1.2 requires every
+/// subscription paywall to expose working Terms of Use and Privacy Policy
+/// links. Overridable per build via --dart-define; the terms default is
+/// Apple's standard EULA, the privacy default is Pulse's hosted policy
+/// (sources in docs/legal/, hosting steps in docs/release/store_listings.md).
+const String _kTermsUrl = String.fromEnvironment(
+  'LEGAL_TERMS_URL',
+  defaultValue:
+      'https://www.apple.com/legal/internet-services/itunes/dev/stdeula/',
+);
+
+const String _kPrivacyUrl = String.fromEnvironment(
+  'LEGAL_PRIVACY_URL',
+  defaultValue: 'https://trafficsayd.github.io/pulse/legal/privacy.html',
+);
+
 /// Subscription paywall — minimal, in-app, dark.
 ///
 /// Layout: a soft violet halo around a key icon at the top, the title and
@@ -36,6 +52,9 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context)!;
     final entitlements = ref.watch(subscriptionControllerProvider);
+    // Store metadata for the Premium SKU; when it has loaded the paywall
+    // shows the store-localised price instead of the static fallback.
+    final premiumProduct = ref.watch(premiumProductProvider).valueOrNull;
 
     // Surface store-side events outside of an explicit buy/restore call.
     // The controller's own listener handles state updates; we're only
@@ -127,7 +146,9 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
                 child: Column(
                   children: [
                     Text(
-                      t.subscriptionPrice,
+                      premiumProduct == null
+                          ? t.subscriptionPrice
+                          : t.subscriptionPricePerMonth(premiumProduct.price),
                       style: const TextStyle(
                         color: AppColors.textPrimary,
                         fontSize: 28,
@@ -181,14 +202,20 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  _FootLink(label: t.subscriptionTermsOfUse, onTap: () {}),
+                  _FootLink(
+                    label: t.subscriptionTermsOfUse,
+                    onTap: () => _openLegalLink(_kTermsUrl),
+                  ),
                   const SizedBox(width: 16),
                   const Text(
                     '·',
                     style: TextStyle(color: AppColors.textMuted),
                   ),
                   const SizedBox(width: 16),
-                  _FootLink(label: t.subscriptionPrivacyPolicy, onTap: () {}),
+                  _FootLink(
+                    label: t.subscriptionPrivacyPolicy,
+                    onTap: () => _openLegalLink(_kPrivacyUrl),
+                  ),
                 ],
               ),
             ],
@@ -291,6 +318,10 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
         content: Text(message),
         duration: const Duration(minutes: 1),
       ));
+  }
+
+  Future<void> _openLegalLink(String url) async {
+    await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
   }
 
   Future<void> _openManageSubscription() async {

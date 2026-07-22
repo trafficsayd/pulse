@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:in_app_purchase/in_app_purchase.dart';
 
 import '../../../core/storage/secure_key_store.dart';
 import '../data/iap_repository.dart';
@@ -27,4 +28,13 @@ final iapRepositoryProvider = Provider<IapRepository>((ref) {
 /// Live `Stream<IapEvent>` of platform purchase events the UI subscribes to.
 final purchaseUpdatesProvider = StreamProvider<IapEvent>((ref) {
   return ref.watch(iapServiceProvider).events();
+});
+
+/// Store metadata for the Pulse Premium SKU.
+///
+/// Resolves to `null` when the store is unreachable or the product is not
+/// configured yet — the paywall then falls back to the static localised
+/// price string instead of showing nothing.
+final premiumProductProvider = FutureProvider<ProductDetails?>((ref) {
+  return ref.watch(iapServiceProvider).fetchPremiumProduct();
 });

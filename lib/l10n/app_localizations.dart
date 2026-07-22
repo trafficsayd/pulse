@@ -560,6 +560,12 @@ abstract class AppLocalizations {
   /// **'150 ₽ / month'**
   String get subscriptionPrice;
 
+  /// Price line when store metadata is available; price is the store-localised price string.
+  ///
+  /// In en, this message translates to:
+  /// **'{price} / month'**
+  String subscriptionPricePerMonth(String price);
+
   /// No description provided for @subscriptionFreeTrial7Days.
   ///
   /// In en, this message translates to:

@@ -27,7 +27,7 @@ Pulse — приложение для двоих (и самых близких),
 • Сквозное шифрование каждого сигнала (Curve25519 + AES-256-GCM).
 • Никакой аналитики и телеметрии. Совсем.
 
-РАБОТАЕТ ДАЖЕ БЕЗ ИНТЕРНЕТА
+РАБОТАЕТ ДАЖЕ БЕЗ ИНТЕРНЕТА (после первого сопряжения)
 • Рядом — по Bluetooth LE.
 • В одной Wi-Fi сети — напрямую по локальной сети.
 • На расстоянии — P2P-канал WebRTC со сквозным шифрованием.
@@ -78,7 +78,7 @@ NO ACCOUNTS, NO DATA COLLECTION
 • Every signal is end-to-end encrypted (Curve25519 + AES-256-GCM).
 • No analytics, no telemetry. None.
 
-WORKS EVEN WITHOUT INTERNET
+WORKS EVEN WITHOUT INTERNET (after the first pairing)
 • Nearby — over Bluetooth LE.
 • Same Wi-Fi — directly over the local network.
 • Far away — a peer-to-peer WebRTC channel, still end-to-end encrypted.

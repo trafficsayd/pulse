@@ -87,32 +87,42 @@ class PulseHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Row (not a Stack): the title gets the space BETWEEN leading and
+    // trailing and ellipsizes when it runs out. The old Stack centered the
+    // title across the full width, so long titles («Создать пару») rendered
+    // underneath a wide trailing widget (the RU/EN switcher on the pairing
+    // screen) and got visually chopped.
     return SizedBox(
       height: 52,
-      child: Stack(
-        alignment: Alignment.center,
+      child: Row(
         children: [
-          Positioned(
-            left: 0,
-            child: leading ??
-                PulseRoundButton(
-                  icon: Icons.arrow_back_rounded,
-                  onTap: onBack ?? () => Navigator.of(context).maybePop(),
-                  subtle: true,
+          leading ??
+              PulseRoundButton(
+                icon: Icons.arrow_back_rounded,
+                onTap: onBack ?? () => Navigator.of(context).maybePop(),
+                subtle: true,
+              ),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              child: Text(
+                title,
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: AppColors.textPrimary,
+                  fontSize: 18,
+                  height: 1,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: -0.2,
                 ),
-          ),
-          Text(
-            title,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: AppColors.textPrimary,
-              fontSize: 18,
-              height: 1,
-              fontWeight: FontWeight.w600,
-              letterSpacing: -0.2,
+              ),
             ),
           ),
-          if (trailing != null) Positioned(right: 0, child: trailing!),
+          // Reserve symmetric space when there is no trailing widget so the
+          // title stays visually centered next to the 40px round button.
+          trailing ?? const SizedBox(width: 40),
         ],
       ),
     );

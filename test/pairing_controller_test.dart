@@ -214,7 +214,8 @@ void main() {
     );
     await _waitFor(host, (s) => s.pairingCode != null);
     final code = host.read(pairingControllerProvider).pairingCode!;
-    await guestController.joinHandshake(code, timeout: const Duration(seconds: 5));
+    await guestController.joinHandshake(code,
+        timeout: const Duration(seconds: 5));
     await hostFuture;
 
     // User did NOT confirm the codes match — persisting must be refused and

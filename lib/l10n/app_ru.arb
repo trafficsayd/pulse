@@ -93,6 +93,12 @@
   "subscriptionFeatureUpToTen": "До 10 сохранённых связей",
   "subscriptionFeaturePriority": "Приоритет новых функций",
   "subscriptionPrice": "150 ₽ / месяц",
+  "subscriptionPricePerMonth": "{price} / месяц",
+  "@subscriptionPricePerMonth": {
+    "placeholders": {
+      "price": {"type": "String"}
+    }
+  },
   "subscriptionFreeTrial7Days": "7 дней бесплатно",
   "subscriptionTryFree": "Попробовать бесплатно",
   "subscriptionContinueTrial": "Продолжить триал",

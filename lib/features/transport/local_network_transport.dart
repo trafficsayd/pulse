@@ -67,7 +67,9 @@ class LocalNetworkTransport implements Transport {
       }
     } on SocketException {
       // Port already in use — another peer is already listening. Connect.
-      if (kDebugMode) debugPrint('[LAN] port $port in use — connecting as client');
+      if (kDebugMode) {
+        debugPrint('[LAN] port $port in use — connecting as client');
+      }
       await _tryConnect(port, host: reconnectTokens['localNetworkHost']);
     }
   }

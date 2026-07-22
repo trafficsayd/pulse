@@ -171,6 +171,13 @@
   "@subscriptionFeaturePriority": {},
   "subscriptionPrice": "150 ₽ / month",
   "@subscriptionPrice": {},
+  "subscriptionPricePerMonth": "{price} / month",
+  "@subscriptionPricePerMonth": {
+    "description": "Price line when store metadata is available; price is the store-localised price string.",
+    "placeholders": {
+      "price": {"type": "String"}
+    }
+  },
   "subscriptionFreeTrial7Days": "7 days free",
   "@subscriptionFreeTrial7Days": {},
   "subscriptionTryFree": "Try for free",

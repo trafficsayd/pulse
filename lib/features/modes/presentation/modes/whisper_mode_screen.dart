@@ -138,7 +138,9 @@ class _WhisperModeViewState extends ConsumerState<_WhisperModeView>
       duration: const Duration(seconds: 3),
     )..repeat();
     _sub = _mic.levels.listen(_onLevel);
-    _partnerSub = ref.read(modeEventBusProvider).incoming
+    _partnerSub = ref
+        .read(modeEventBusProvider)
+        .incoming
         .where((e) => e.type == 'whisper_level')
         .listen((e) {
       if (mounted) {

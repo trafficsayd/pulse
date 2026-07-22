@@ -35,7 +35,9 @@ class _HalfHeartModeScreenState extends ConsumerState<HalfHeartModeScreen>
       vsync: this,
       duration: const Duration(milliseconds: 900),
     )..repeat(reverse: true);
-    _partnerSub = ref.read(modeEventBusProvider).incoming
+    _partnerSub = ref
+        .read(modeEventBusProvider)
+        .incoming
         .where((e) => e.type == 'hold_start' || e.type == 'hold_end')
         .listen(_onPartnerHold);
   }

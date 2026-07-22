@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pulse — Privacy Policy / Политика конфиденциальности</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #06070C; color: #E8E9F0;
+         font: 16px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  .wrap { max-width: 720px; margin: 0 auto; padding: 48px 24px 96px; }
+  h1 { font-size: 28px; letter-spacing: -0.3px; margin: 48px 0 6px; }
+  h1:first-child { margin-top: 0; }
+  h2 { font-size: 19px; margin: 32px 0 10px; color: #C9B8FF; }
+  p, li { color: #B9BCCB; }
+  strong { color: #E8E9F0; }
+  em { color: #8b8fa3; font-style: normal; font-size: 14px; }
+  code { background: #14161f; border-radius: 6px; padding: 1px 6px; font-size: 14px; color: #C9B8FF; }
+  a { color: #9F86FF; }
+  .lang { position: sticky; top: 0; background: rgba(6,7,12,.92); backdrop-filter: blur(8px);
+          padding: 14px 0; margin-bottom: 8px; display: flex; gap: 14px; font-size: 14px; }
+  .lang a { text-decoration: none; border: 1px solid #2a2d3d; border-radius: 999px; padding: 5px 14px; color: #B9BCCB; }
+  .pulse-dot { width: 10px; height: 10px; border-radius: 50%; background: #9F86FF;
+               box-shadow: 0 0 18px #9F86FF; display: inline-block; margin-right: 8px; }
+  hr.split { border: 0; border-top: 1px solid #1c1f2c; margin: 64px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <nav class="lang"><span><span class="pulse-dot"></span><strong>Pulse</strong></span>
+    <a href="#en">English</a><a href="#ru">Русский</a></nav>
+  <section id="en">
+<h1>Pulse — Privacy Policy</h1>
+<p><em>Effective date: July 22, 2026</em></p>
+<p>Pulse is built on a simple principle: <strong>we collect no data about you.</strong> No accounts, no analytics, no telemetry, no advertising identifiers.</p>
+<h2>What stays on your devices</h2>
+<ul>
+<li><strong>Pairing keys and connections.</strong> When you pair with a trusted person, cryptographic keys are generated and stored only in your device's secure storage (iOS Keychain / Android encrypted storage). We have no copy and no way to obtain one.</li>
+<li><strong>Signals.</strong> Touches, vibrations, sounds and light patterns travel directly between the paired devices, end-to-end encrypted (Curve25519 key agreement, AES-256-GCM). Nobody in between — including us — can read them.</li>
+<li><strong>Permissions</strong> (Bluetooth, local network, microphone, camera, motion sensors) are used solely to power the modes on your device. Audio and camera frames are processed locally and never leave your phone. Bluetooth permissions on Android are declared with the <code>neverForLocation</code> flag: Pulse does not derive or read your location.</li>
+</ul>
+<h2>The connection relay</h2>
+<p>When your devices are far apart, Pulse uses a relay service to help the two phones find each other and, if a direct channel cannot open, to pass <strong>end-to-end encrypted packets</strong> between them. The relay:</p>
+<ul>
+<li>sees only random session tokens — nothing tied to your identity, phone number or account (there are none);</li>
+<li>cannot decrypt any content;</li>
+<li>stores session data ephemerally (deleted automatically within minutes);</li>
+<li>processes IP addresses transiently in memory for abuse rate-limiting only; they are not logged or stored with any content.</li>
+</ul>
+<h2>Purchases</h2>
+<p>The Pulse Premium subscription is processed entirely by Apple App Store or Google Play. We do not receive your name, payment details or address. The subscription status your device derives from the store receipt is stored locally on your device.</p>
+<h2>Crash reports</h2>
+<p>The app currently sends no crash reports. If optional crash reporting is ever added, it will be off by default and require your explicit consent.</p>
+<h2>Children</h2>
+<p>Pulse is intended for users aged 13 and older.</p>
+<h2>Data requests</h2>
+<p>Since we hold no personal data, there is nothing for us to hand over, correct or delete. Deleting the app (or a connection inside it) destroys the local keys irrevocably.</p>
+<h2>Changes</h2>
+<p>We will update this page and the effective date if the policy ever changes. Material changes will be announced in the app's release notes.</p>
+<h2>Contact</h2>
+<p>Questions: <strong>support@pulse.app</strong> &lt;!-- TODO: replace with the real support address before publishing --&gt;</p>
+  </section>
+  <hr class="split">
+  <section id="ru" lang="ru">
+<h1>Pulse — Политика конфиденциальности</h1>
+<p><em>Дата вступления в силу: 22 июля 2026 г.</em></p>
+<p>Pulse построен на простом принципе: <strong>мы не собираем о вас данные.</strong> Ни аккаунтов, ни аналитики, ни телеметрии, ни рекламных идентификаторов.</p>
+<h2>Что остаётся на ваших устройствах</h2>
+<ul>
+<li><strong>Ключи пар и связи.</strong> При создании пары криптографические ключи генерируются и хранятся только в защищённом хранилище устройства (iOS Keychain / шифрованное хранилище Android). У нас нет их копии и нет способа её получить.</li>
+<li><strong>Сигналы.</strong> Касания, вибрации, звуки и световые узоры передаются между сопряжёнными устройствами со сквозным шифрованием (Curve25519, AES-256-GCM). Никто посередине — включая нас — не может их прочитать.</li>
+<li><strong>Разрешения</strong> (Bluetooth, локальная сеть, микрофон, камера, датчики движения) используются исключительно для работы режимов на вашем устройстве. Звук и кадры камеры обрабатываются локально и не покидают телефон. Bluetooth-разрешения на Android объявлены с флагом <code>neverForLocation</code>: Pulse не определяет и не считывает ваше местоположение.</li>
+</ul>
+<h2>Реле соединения</h2>
+<p>Когда устройства далеко друг от друга, Pulse использует реле-сервис, который помогает телефонам найти друг друга и, если прямой канал не открылся, передаёт между ними <strong>сквозно зашифрованные пакеты</strong>. Реле:</p>
+<ul>
+<li>видит только случайные сессионные токены — ничего, что связано с вашей личностью, номером телефона или аккаунтом (их не существует);</li>
+<li>не может расшифровать содержимое;</li>
+<li>хранит данные сессии эфемерно (автоматическое удаление в течение минут);</li>
+<li>обрабатывает IP-адреса транзитно в памяти только для защиты от злоупотреблений (rate limiting); они не записываются в журналы вместе с каким-либо содержимым.</li>
+</ul>
+<h2>Покупки</h2>
+<p>Подписка Pulse Premium полностью обрабатывается Apple App Store или Google Play. Мы не получаем ваше имя, платёжные данные или адрес. Статус подписки, вычисленный из квитанции магазина, хранится локально на вашем устройстве.</p>
+<h2>Отчёты о сбоях</h2>
+<p>Сейчас приложение не отправляет отчёты о сбоях. Если опциональные crash-отчёты появятся, они будут выключены по умолчанию и потребуют вашего явного согласия.</p>
+<h2>Дети</h2>
+<p>Pulse предназначен для пользователей от 13 лет.</p>
+<h2>Запросы о данных</h2>
+<p>Поскольку мы не храним персональных данных, нам нечего выдавать, исправлять или удалять. Удаление приложения (или связи внутри него) безвозвратно уничтожает локальные ключи.</p>
+<h2>Изменения</h2>
+<p>При изменении политики мы обновим эту страницу и дату вступления в силу. О существенных изменениях сообщим в примечаниях к выпуску приложения.</p>
+<h2>Контакт</h2>
+<p>Вопросы: <strong>support@pulse.app</strong> &lt;!-- TODO: заменить на реальный адрес поддержки перед публикацией --&gt;</p>
+  </section>
+</div>
+</body>
+</html>

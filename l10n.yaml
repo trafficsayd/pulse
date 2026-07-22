@@ -1,7 +1,4 @@
-arb-dir: lib/l10n
-template-arb-file: app_en.arb
-output-localization-file: app_localizations.dart
-# Generate into lib/l10n/ (imported directly), not the synthetic flutter_gen
-# package. Required so `import '../l10n/app_localizations.dart'` resolves on
-# Flutter 3.27 (where synthetic-package still defaults to true).
-synthetic-package: false
+# Run dart format on the generated files so `flutter gen-l10n` output always
+# passes CI's `dart format --set-exit-if-changed .` (the Dart 3.10 formatter
+# ships tall-style only; unformatted generator output would fail the check).
+format: true

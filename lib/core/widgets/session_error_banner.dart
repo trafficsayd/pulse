@@ -18,8 +18,7 @@ class SessionErrorBanner extends ConsumerStatefulWidget {
   final Widget child;
 
   @override
-  ConsumerState<SessionErrorBanner> createState() =>
-      _SessionErrorBannerState();
+  ConsumerState<SessionErrorBanner> createState() => _SessionErrorBannerState();
 }
 
 class _SessionErrorBannerState extends ConsumerState<SessionErrorBanner> {

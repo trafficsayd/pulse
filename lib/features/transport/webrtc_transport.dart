@@ -176,8 +176,8 @@ class WebRtcTransport implements Transport {
       },
     );
 
-    final peerId = await completer.future
-        .timeout(_roleTimeout, onTimeout: () => null);
+    final peerId =
+        await completer.future.timeout(_roleTimeout, onTimeout: () => null);
     await _roleSub?.cancel();
     _roleSub = null;
     return peerId;
@@ -276,7 +276,8 @@ class WebRtcTransport implements Transport {
     _p2pDeadline = Timer(_p2pTimeout, () {
       if (!_connected && !_disposed) {
         if (kDebugMode) {
-          debugPrint('[WebRtcTransport] data channel not open — relay fallback');
+          debugPrint(
+              '[WebRtcTransport] data channel not open — relay fallback');
         }
         unawaited(_fallbackOrFail());
       }

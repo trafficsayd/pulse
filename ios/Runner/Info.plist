@@ -13,7 +13,7 @@
 		<key>CFBundleInfoDictionaryVersion</key>
 		<string>6.0</string>
 		<key>CFBundleName</key>
-		<string>pulse</string>
+		<string>Pulse</string>
 		<key>CFBundlePackageType</key>
 		<string>APPL</string>
 		<key>CFBundleShortVersionString</key>
@@ -64,10 +64,20 @@
 			<string>bluetooth-peripheral</string>
 			<string>audio</string>
 		</array>
+		<!-- Pulse ships its own end-to-end encryption (Curve25519 ECDH +
+		     AES-256-GCM), which is NOT exempt under App Store export rules —
+		     hence `true`. The App Store Connect answers ("standard
+		     algorithms"), the annual US self-classification report, and the
+		     French declaration are documented in
+		     docs/release/export_compliance.md. -->
 		<key>ITSAppUsesNonExemptEncryption</key>
-		<false/>
+		<true/>
+		<!-- Portrait-only app: opting out of iPad multitasking is REQUIRED for
+		     App Store validation when not all four iPad orientations are
+		     supported. Do not set this back to false without adding landscape
+		     support. -->
 		<key>UIRequiresFullScreen</key>
-		<false/>
+		<true/>
 		<key>UIStatusBarStyle</key>
 		<string>UIStatusBarStyleLightContent</string>
 		<key>UIViewControllerBasedStatusBarAppearance</key>

@@ -35,8 +35,9 @@ describe('V6 pairing-code invalidation', () => {
   it('still lets both peers share the session before the answer arrives', async () => {
     const code = '515151';
     const a = await callCreateSession(code);
-    expect(await post(`/session/${a.body.sessionId}/offer`, a.body.token, { sdp: 'v=0 offer' }))
-      .toBe(200);
+    expect(
+      await post(`/session/${a.body.sessionId}/offer`, a.body.token, { sdp: 'v=0 offer' }),
+    ).toBe(200);
     // Guest joins with the same code before any answer — must get the SAME session.
     const b = await callCreateSession(code);
     expect(b.body.sessionId).toBe(a.body.sessionId);

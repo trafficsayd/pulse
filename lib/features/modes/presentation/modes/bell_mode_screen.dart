@@ -144,7 +144,9 @@ class _BellModeViewState extends ConsumerState<_BellModeView>
       value: 0.0,
     );
     _sub = _accel.events.listen(_onAccel);
-    _partnerSub = ref.read(modeEventBusProvider).incoming
+    _partnerSub = ref
+        .read(modeEventBusProvider)
+        .incoming
         .where((e) => e.type == 'bell_ring')
         .listen((e) {
       if (mounted) _firePartnerRing();

@@ -20,22 +20,22 @@ dependencies:
   flutter_riverpod: ^2.6.1
 
   # Routing
-  go_router: ^14.6.2
+  go_router: ^14.8.1
 
   # Internationalization
   intl: any
 
   # Secure storage abstraction (iOS Keychain / Android EncryptedSharedPreferences)
-  flutter_secure_storage: ^9.2.2
+  flutter_secure_storage: ^9.2.4
 
   # QR rendering for the pairing screen
   qr_flutter: ^4.1.0
 
   # In-app purchases (Pulse Premium subscription via App Store / Play Store)
-  in_app_purchase: ^3.2.0
+  in_app_purchase: ^3.2.3
 
   # App version / build metadata used by the IAP receipts and About screen
-  package_info_plus: ^8.0.2
+  package_info_plus: ^8.3.1
 
   # Opening App Store / Play subscription-management URLs from the paywall.
   url_launcher: ^6.3.1
@@ -70,7 +70,7 @@ dependencies:
   # `signaling/`; once the data channel opens, sealed packets travel P2P
   # (DTLS-SRTP) and never touch the Worker. Falls back to the Worker relay
   # if the data channel cannot open (e.g. symmetric NAT without TURN).
-  flutter_webrtc: ^0.12.0
+  flutter_webrtc: ^0.12.12+hotfix.1
 
 dev_dependencies:
   flutter_test:

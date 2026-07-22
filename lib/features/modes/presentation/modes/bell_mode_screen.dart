@@ -126,7 +126,7 @@ class _BellModeViewState extends ConsumerState<_BellModeView>
   void initState() {
     super.initState();
     if (widget.accelerometerStream == null) {
-      _accel = FakeAccelerometer3DStream();
+      _accel = RealAccelerometer3DStream();
       _ownsAccel = true;
     } else {
       _accel = widget.accelerometerStream!;

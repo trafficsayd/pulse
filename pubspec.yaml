@@ -65,10 +65,28 @@ dependencies:
   # cannot silently change GATT behaviour between releases.
   flutter_blue_plus: ^1.32.0
 
+  # Track F3 — real WebRTC data-channel transport (P2P over the internet
+  # relay tier). SDP/ICE are brokered by the Cloudflare Worker in
+  # `signaling/`; once the data channel opens, sealed packets travel P2P
+  # (DTLS-SRTP) and never touch the Worker. Falls back to the Worker relay
+  # if the data channel cannot open (e.g. symmetric NAT without TURN).
+  flutter_webrtc: ^0.12.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^5.0.0
+
+  # On-device integration tests (integration_test/). Run on a real device:
+  #   flutter test integration_test -d <device-id>
+  integration_test:
+    sdk: flutter
+
+  # App icon + splash generation (dev-time only — run once, commit the output).
+  #   dart run flutter_launcher_icons
+  #   dart run flutter_native_splash:create
+  flutter_launcher_icons: ^0.14.1
+  flutter_native_splash: ^2.4.1
 
 flutter:
   uses-material-design: true
@@ -76,4 +94,27 @@ flutter:
 
   assets:
     - assets/sounds/
+    - assets/sounds/sneak/
     - assets/icons/
+
+# ── App icon (flutter_launcher_icons) ───────────────────────────────────────
+# Source art: assets/icon/app_icon.png (1024×1024). Regenerate with
+# `dart run flutter_launcher_icons`. Keeps Pulse's palette on the icon canvas.
+flutter_launcher_icons:
+  android: true
+  ios: true
+  remove_alpha_ios: true
+  image_path: "assets/icon/app_icon.png"
+  min_sdk_android: 29
+  background_color_ios: "#06070C"
+  adaptive_icon_background: "#06070C"
+  adaptive_icon_foreground: "assets/icon/app_icon.png"
+
+# ── Launch splash (flutter_native_splash) ───────────────────────────────────
+# Regenerate with `dart run flutter_native_splash:create`.
+flutter_native_splash:
+  color: "#06070C"
+  image: assets/icon/splash.png
+  android_12:
+    color: "#06070C"
+    image: assets/icon/splash.png

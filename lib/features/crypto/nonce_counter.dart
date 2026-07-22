@@ -68,8 +68,18 @@ class NonceCounter {
   /// session left the in-memory state consistent. Subsequent calls
   /// short-circuit unless [force] is true.
   ///
-  /// Throws [NonceRollbackException] if the persisted value is below
-  /// the recorded high-water mark.
+  /// [next] writes the high-water mark key *before* the main counter
+  /// key (see [next] for the ordering rationale). If the process is
+  /// killed in the narrow window between those two writes, storage is
+  /// left with `main == hwm - 1`: a perfectly honest state where the
+  /// HWM write landed but the main-counter write did not. That is not a
+  /// rollback — it is this exact crash-recovery case — so we heal it by
+  /// catching [_lastUsed] up to [hwm] instead of raising.
+  ///
+  /// Anything further behind (`main < hwm - 1`) cannot be explained by a
+  /// single crashed write and means the persisted value genuinely moved
+  /// backwards (tampering, restored backup, or a bug). That case still
+  /// throws [NonceRollbackException].
   Future<void> restore({bool force = false}) async {
     if (_loaded && !force) return;
     final mainRaw = await _storage.readString(_storageKey);
@@ -77,6 +87,14 @@ class NonceCounter {
     final main = int.tryParse(mainRaw ?? '') ?? 0;
     final hwm = int.tryParse(hwmRaw ?? '') ?? 0;
     if (main < hwm) {
+      if (main == hwm - 1) {
+        // Benign crash-recovery gap: the HWM write succeeded but the
+        // paired main-counter write never landed. Heal forward to the
+        // HWM rather than treating a single missed write as an attack.
+        _lastUsed = hwm;
+        _loaded = true;
+        return;
+      }
       throw NonceRollbackException(
         storageKey: _storageKey,
         persistedValue: main,

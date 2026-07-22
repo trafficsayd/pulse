@@ -1,9 +1,26 @@
 # `lib/features/transport/webrtc/`
 
-WebRTC-related primitives that the relay transport (`WebRtcTransport`) will
-build on. Nothing here imports `flutter_webrtc` directly — that arrives in
-Track F3. The files in this directory are designed to be plain Dart so they
-can be unit-tested without any native plugin.
+Support code for the real WebRTC data-channel transport (`WebRtcTransport`,
+in `../webrtc_transport.dart`). The files in **this** directory stay plain
+Dart (no `flutter_webrtc` import) so they remain unit-testable without the
+native plugin; `webrtc_transport.dart` is the one place that imports
+`flutter_webrtc`.
+
+## Establishing a connection (Track F3 — implemented)
+
+`WebRtcTransport` opens a real peer-to-peer `RTCDataChannel`:
+
+1. **Role** — both peers reconnect symmetrically, so each posts a random
+   128-bit claim (`pulse-role:<id>`) to the ICE endpoint; the larger id is the
+   offerer (deterministic, glare-free). See `WebRtcTransport.isOfferer`.
+2. **Vanilla ICE** — candidates are gathered fully and embedded in the SDP,
+   then exchanged once via the `offer`/`answer` slots. We avoid trickle ICE
+   because the Worker's ICE list is a single shared log with no per-sender
+   attribution.
+3. **P2P** — once the channel opens, sealed packets travel P2P over
+   DTLS-SRTP; the Worker only ever brokered the SDP.
+4. **Fallback** — if the channel can't open within `p2pTimeout`, the transport
+   transparently relays the sealed packets over the same session (`/messages`).
 
 ## Contents
 

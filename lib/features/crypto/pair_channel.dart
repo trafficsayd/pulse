@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:cryptography/cryptography.dart';
@@ -42,6 +43,10 @@ class PulsePacket {
 /// Each direction has its own monotonic [NonceCounter] so the two peers
 /// can never collide on a 96-bit AES-GCM nonce, even across app
 /// restarts.
+///
+/// Every packet is additionally bound to a channel-wide associated-data
+/// (AAD) tag via AES-GCM — see [_buildAad] for exactly how it is built
+/// and why it is safe for both peers to compute independently.
 class PairChannel {
   PairChannel({
     required RawByteChannel transport,
@@ -49,17 +54,61 @@ class PairChannel {
     required NonceCounter outboundCounter,
     required NonceCounter inboundCounter,
     AesGcmSealer? sealer,
+    int epoch = 0,
   })  : _transport = transport,
         _key = key,
         _outbound = outboundCounter,
         _inbound = inboundCounter,
-        _sealer = sealer ?? AesGcmSealer();
+        _sealer = sealer ?? AesGcmSealer(),
+        _epoch = epoch,
+        _aad = _buildAad(epoch);
 
   final RawByteChannel _transport;
   final SecretKey _key;
   final NonceCounter _outbound;
   final NonceCounter _inbound;
   final AesGcmSealer _sealer;
+
+  /// Rekey/session epoch this channel instance was constructed for.
+  ///
+  /// Defaults to `0` so every existing call site (which never mentions
+  /// epochs) keeps behaving exactly as before. Bumping it — once a
+  /// future rekey flow lands — forces both peers to construct a new
+  /// [PairChannel] with the same higher value, which changes [_aad] and
+  /// therefore makes packets sealed under one epoch fail to [open]
+  /// under another.
+  final int _epoch;
+
+  /// The rekey/session epoch this channel was constructed with. Exposed
+  /// for diagnostics/tests that want to confirm two [PairChannel]
+  /// instances agree before wiring them to the same transport.
+  int get epoch => _epoch;
+
+  /// Associated data authenticated (via AES-GCM) on every packet this
+  /// channel seals or opens.
+  ///
+  /// Deliberately **direction-independent**: it is a domain tag plus
+  /// the epoch, with no "in"/"out" marker. AES-GCM AAD is never placed
+  /// on the wire (see [AesGcmSealer]), so the only way [AesGcmSealer.open]
+  /// can succeed is if both peers pass it the exact same aad bytes that
+  /// were passed to the matching [AesGcmSealer.seal] call. If we encoded
+  /// direction literally ("out" vs. "in"), the sender's AAD for an
+  /// outbound packet ("...out...") would never match the receiver's AAD
+  /// for that same physical packet (which it experiences as inbound,
+  /// "...in..."), and every single packet would fail to authenticate.
+  /// Keeping AAD symmetric per epoch — the same bytes on both sides for
+  /// a given pairing session — is what makes [AesGcmSealer.seal] on one
+  /// peer and [AesGcmSealer.open] on the other agree.
+  ///
+  /// What this AAD *does* protect against: a packet sealed by this pair
+  /// under epoch N cannot be replayed and successfully opened as if it
+  /// belonged to epoch M (e.g. after a rekey/session bump changes the
+  /// epoch but the symmetric key is reused/derived similarly). Replay
+  /// and reordering *within* an epoch are still guarded exclusively by
+  /// the strict [NonceCounter] matching in [_processPacket] /
+  /// [send] — this AAD is a domain-separation belt, not a
+  /// replacement for the nonce-counter suspenders.
+  final Uint8List _aad;
 
   final _controller = StreamController<PulsePacket>.broadcast();
   StreamSubscription<Uint8List>? _sub;
@@ -95,6 +144,7 @@ class PairChannel {
         bytes,
         key: _key,
         expectedNonceCounter: expected,
+        aad: _aad,
       );
       // Advance the inbound counter only after a successful open so a
       // tampered packet cannot push us out of sync with the peer.
@@ -115,6 +165,7 @@ class PairChannel {
       plaintext,
       key: _key,
       nonceCounter: counter,
+      aad: _aad,
     );
     await _transport.send(packet);
   }
@@ -124,5 +175,29 @@ class PairChannel {
     await _transport.close();
     await _controller.close();
     await _errors.close();
+  }
+
+  /// Build the direction-independent AAD tag for [epoch].
+  ///
+  /// Format: the ASCII/UTF-8 domain tag `"pulse:v1:aad:"` followed by
+  /// [epoch] encoded as a big-endian uint32 (4 bytes). Both peers derive
+  /// this from nothing but the epoch they agree they're on — no
+  /// direction, connection id, or transport detail leaks in, so it is
+  /// trivial for the sender's `seal()` call and the receiver's `open()`
+  /// call to land on identical bytes for the same packet.
+  static Uint8List _buildAad(int epoch) {
+    if (epoch < 0) {
+      throw ArgumentError.value(epoch, 'epoch', 'Epoch must be non-negative');
+    }
+    const domainTag = 'pulse:v1:aad:';
+    final tagBytes = utf8.encode(domainTag);
+    final out = Uint8List(tagBytes.length + 4);
+    out.setRange(0, tagBytes.length, tagBytes);
+    var value = epoch;
+    for (var i = tagBytes.length + 3; i >= tagBytes.length; i--) {
+      out[i] = value & 0xff;
+      value >>= 8;
+    }
+    return out;
   }
 }

@@ -116,6 +116,103 @@ void main() {
       final b = AesGcmSealer.nonceFromCounter(2);
       expect(a, isNot(equals(b)));
     });
+
+    test('roundtrip with non-empty aad: seal then open with the same aad '
+        'returns the original plaintext', () async {
+      final plaintext = Uint8List.fromList(
+        utf8Bytes('pulse mode_event: aad bound packet'),
+      );
+      final aad = utf8Bytes('pulse:v1:aad:epoch-0');
+
+      final packet = await sealer.seal(
+        plaintext,
+        key: key,
+        nonceCounter: 3,
+        aad: aad,
+      );
+
+      // Wire layout is unaffected by aad: nonce(12) | ct(N) | mac(16).
+      // AAD is authenticated-only and never appended to the buffer.
+      expect(packet.length, plaintext.length + 12 + 16);
+
+      final opened = await sealer.open(
+        packet,
+        key: key,
+        expectedNonceCounter: 3,
+        aad: aad,
+      );
+      expect(opened, equals(plaintext));
+    });
+
+    test('open with a different aad than what was used to seal fails '
+        'authentication', () async {
+      final plaintext = Uint8List.fromList(utf8Bytes('aad must match'));
+      final sealAad = utf8Bytes('pulse:v1:aad:epoch-0');
+      final openAad = utf8Bytes('pulse:v1:aad:epoch-1');
+
+      final packet = await sealer.seal(
+        plaintext,
+        key: key,
+        nonceCounter: 4,
+        aad: sealAad,
+      );
+
+      await expectLater(
+        () => sealer.open(
+          packet,
+          key: key,
+          expectedNonceCounter: 4,
+          aad: openAad,
+        ),
+        throwsA(isA<StateError>()),
+      );
+    });
+
+    test('open with no aad fails authentication when seal used a '
+        'non-empty aad', () async {
+      final plaintext = Uint8List.fromList(utf8Bytes('aad presence matters'));
+      final aad = utf8Bytes('pulse:v1:aad:epoch-0');
+
+      final packet = await sealer.seal(
+        plaintext,
+        key: key,
+        nonceCounter: 5,
+        aad: aad,
+      );
+
+      // Default aad on open() is the empty list — must not silently
+      // succeed against a packet sealed with non-empty aad.
+      await expectLater(
+        () => sealer.open(packet, key: key, expectedNonceCounter: 5),
+        throwsA(isA<StateError>()),
+      );
+    });
+
+    test('empty aad (explicit or defaulted) behaves identically — backward '
+        'compatibility for every pre-existing call site', () async {
+      final plaintext = Uint8List.fromList(utf8Bytes('no aad here'));
+
+      final packet = await sealer.seal(
+        plaintext,
+        key: key,
+        nonceCounter: 6,
+      );
+
+      final openedDefault = await sealer.open(
+        packet,
+        key: key,
+        expectedNonceCounter: 6,
+      );
+      expect(openedDefault, equals(plaintext));
+
+      final openedExplicitEmpty = await sealer.open(
+        packet,
+        key: key,
+        expectedNonceCounter: 6,
+        aad: const [],
+      );
+      expect(openedExplicitEmpty, equals(plaintext));
+    });
   });
 }
 

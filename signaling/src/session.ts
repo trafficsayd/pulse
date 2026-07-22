@@ -138,6 +138,22 @@ export async function getAnswer(env: Env, sessionId: string): Promise<AnswerPayl
 }
 
 /**
+ * V6 — close the rendezvous once a pair has completed its SDP exchange.
+ *
+ * Deletes only the `pairing:<hash>` → sessionId lookup, so a subsequent
+ * `createSession(code)` mints a fresh, empty session instead of joining the
+ * just-completed one. An attacker who later guesses the same 6-digit code
+ * therefore cannot inject themselves into an already-established pairing —
+ * the guessing window collapses to the brief pre-answer interval (and the
+ * SAS check still guards that). The two current peers already hold
+ * `sessionId` and keep using the `session:<id>` record directly, so this
+ * does not disrupt them.
+ */
+export async function invalidatePairingCode(env: Env, pairingCode: string): Promise<void> {
+  await env.SIGNALING_SESSIONS.delete(KEY.pairing(await sha256Hex(pairingCode)));
+}
+
+/**
  * Read the full ICE list. Empty list when nothing has been stored yet.
  */
 export async function readIce(env: Env, sessionId: string): Promise<IceCandidate[]> {

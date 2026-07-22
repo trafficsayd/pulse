@@ -1,6 +1,6 @@
 /// Bluetooth Low Energy GATT identifiers for the Pulse direct transport.
 ///
-/// These three UUIDs are part of the public over-the-air contract between
+/// These UUIDs are part of the public over-the-air contract between
 /// two paired Pulse devices and MUST remain stable across releases — they
 /// are baked into peripheral advertising filters and central scan filters
 /// on every shipped client. Bumping any of them is a breaking change that
@@ -36,3 +36,18 @@ const String pulseTxCharacteristicUuid = 'a1c1feed-0001-4001-8000-00805f9b34fb';
 /// peripheral can deliver back-pressure / flow-control signals later
 /// without taking over the TX channel.
 const String pulseRxCharacteristicUuid = 'a1c1feed-0002-4001-8000-00805f9b34fb';
+
+/// Sneak-signal characteristic — the shadow BLE channel used to receive a
+/// "Sneak In" nudge (spec §7) even while the main TX/RX pair is idle or the
+/// app is backgrounded.
+///
+/// This is a separate GATT characteristic (not a new [pulseServiceUuid]
+/// value) so a scanning peripheral can subscribe to it independently of the
+/// primary mode-event pipe: Sneak In is deliberately low-frequency and
+/// latency-tolerant, so it does not need to share back-pressure with TX/RX.
+/// Payload framing is identical to TX/RX — `packet_codec.dart`'s
+/// `{"k":"sneak_signal","p":"<base64>"}` envelope — and the bytes remain
+/// end-to-end encrypted by `PairChannel` before they ever reach this
+/// characteristic; the BLE layer still never inspects them.
+const String pulseSneakSignalCharacteristicUuid =
+    'a1c1feed-0003-4001-8000-00805f9b34fb';

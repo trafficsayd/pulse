@@ -12,6 +12,7 @@ import '../../../core/widgets/section_header.dart';
 import '../../connections/application/connections_controller.dart';
 import '../../connections/domain/connection.dart';
 import '../../connections/domain/connection_status.dart';
+import '../../subscription/application/subscription_controller.dart';
 
 /// "My People" — saved connections list with status, transport hint, and
 /// per-row affordances.
@@ -47,7 +48,7 @@ class PeopleScreen extends ConsumerWidget {
                   ),
                   trailing: PulseRoundButton(
                     icon: Icons.person_add_alt_1_rounded,
-                    onTap: () => context.go(Routes.pairing),
+                    onTap: () => _onAddConnection(context, ref),
                     color: AppColors.pulse,
                     subtle: true,
                   ),
@@ -111,6 +112,25 @@ class PeopleScreen extends ConsumerWidget {
       ),
     );
   }
+}
+
+/// MONETIZATION (spec §9): the "add connection" affordance on this screen
+/// is a second entry point into a brand-new pairing flow (the first being
+/// [PairingScreen] itself on first launch), so it needs the exact same
+/// saved-connections cap check before it hands control to the pairing
+/// screen — otherwise a user could dodge the paywall entirely by only ever
+/// using this button.
+void _onAddConnection(BuildContext context, WidgetRef ref) {
+  final maxConnections =
+      ref.read(subscriptionControllerProvider.notifier).maxConnections;
+  final canAdd = ref
+      .read(connectionsControllerProvider.notifier)
+      .canAddConnection(maxConnections);
+  if (!canAdd) {
+    context.go(Routes.subscription);
+    return;
+  }
+  context.go(Routes.pairing);
 }
 
 class _PersonRow extends ConsumerWidget {

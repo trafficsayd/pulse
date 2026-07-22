@@ -1,0 +1,7 @@
+/* Localized iOS permission usage descriptions (English). */
+"NSBluetoothAlwaysUsageDescription" = "Pulse uses Bluetooth Low Energy to discover and connect to a paired phone nearby. No data leaves the two devices.";
+"NSBluetoothPeripheralUsageDescription" = "Pulse uses Bluetooth Low Energy to be discovered by a paired phone nearby. No data leaves the two devices.";
+"NSLocalNetworkUsageDescription" = "Pulse uses the local Wi-Fi network to keep your direct connection alive when Bluetooth is out of range. No data leaves the local network.";
+"NSMicrophoneUsageDescription" = "Pulse uses the microphone to sense whispers, blowing, and ambient sound in modes like Whisper and Candle. Audio never leaves your phone.";
+"NSCameraUsageDescription" = "Pulse uses the camera for light-based modes like Lens and Morse. Frames never leave your phone.";
+"NSMotionUsageDescription" = "Pulse uses motion sensors for modes like Bell, Cradle, and Balance.";

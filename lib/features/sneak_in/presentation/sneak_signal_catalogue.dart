@@ -8,6 +8,8 @@ class SneakSignal {
     required this.id,
     required this.icon,
     required this.assetPath,
+    required this.emoji,
+    required this.titleKey,
   });
 
   /// Stable id persisted in the protocol — never rename.
@@ -18,6 +20,13 @@ class SneakSignal {
 
   /// Path inside `assets/sounds/`.
   final String assetPath;
+
+  /// Emoji glyph rendered on the wheel tile.
+  final String emoji;
+
+  /// Key of the localized display label (see `AppLocalizations`). Metadata
+  /// only — kept stable so the wheel and future surfaces can name a signal.
+  final String titleKey;
 }
 
 /// Curated set rendered in the Sneak In wheel. The order is intentional —
@@ -27,40 +36,56 @@ const List<SneakSignal> kSneakSignals = [
     id: 'knock',
     icon: Icons.touch_app_rounded,
     assetPath: 'assets/sounds/sneak/knock.opus',
+    emoji: '🤭',
+    titleKey: 'sneakSignalHiccup',
   ),
   SneakSignal(
     id: 'whistle',
     icon: Icons.air_rounded,
     assetPath: 'assets/sounds/sneak/whistle.opus',
+    emoji: '💨',
+    titleKey: 'sneakSignalToot',
   ),
   SneakSignal(
     id: 'bell',
     icon: Icons.notifications_rounded,
     assetPath: 'assets/sounds/sneak/bell.opus',
+    emoji: '🔔',
+    titleKey: 'sneakSignalBell',
   ),
   SneakSignal(
     id: 'kiss',
     icon: Icons.favorite_rounded,
     assetPath: 'assets/sounds/sneak/kiss.opus',
+    emoji: '👻',
+    titleKey: 'sneakSignalKnock',
   ),
   SneakSignal(
     id: 'pop',
     icon: Icons.bubble_chart_rounded,
     assetPath: 'assets/sounds/sneak/pop.opus',
+    emoji: '🤫',
+    titleKey: 'sneakSignalWhisper',
   ),
   SneakSignal(
     id: 'giggle',
     icon: Icons.sentiment_very_satisfied_rounded,
     assetPath: 'assets/sounds/sneak/giggle.opus',
+    emoji: '👏',
+    titleKey: 'sneakSignalClap',
   ),
   SneakSignal(
     id: 'meow',
     icon: Icons.pets_rounded,
     assetPath: 'assets/sounds/sneak/meow.opus',
+    emoji: '💥',
+    titleKey: 'sneakSignalBoom',
   ),
   SneakSignal(
     id: 'hiccup',
     icon: Icons.water_drop_rounded,
     assetPath: 'assets/sounds/sneak/hiccup.opus',
+    emoji: '🐭',
+    titleKey: 'sneakSignalSqueak',
   ),
 ];

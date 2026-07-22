@@ -58,7 +58,7 @@ dependencies:
   sensors_plus: ^4.0.2
   vibration: ^1.9.0
   record: ^5.1.2
-  permission_handler: ^11.3.1
+  permission_handler: ^12.0.0
 
   # Track F1 — real Bluetooth Low Energy transport (central + Android
   # peripheral scaffolding). Pinned to a minor floor so a transitive bump
@@ -75,7 +75,7 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^5.0.0
+  flutter_lints: ^6.0.0
 
   # On-device integration tests (integration_test/). Run on a real device:
   #   flutter test integration_test -d <device-id>

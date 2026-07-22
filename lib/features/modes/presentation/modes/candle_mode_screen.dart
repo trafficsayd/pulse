@@ -98,7 +98,7 @@ class _CandleModeViewState extends ConsumerState<_CandleModeView>
   void initState() {
     super.initState();
     if (widget.micLevelStream == null) {
-      _mic = FakeMicLevelStream();
+      _mic = RealMicLevelStream();
       _ownsMic = true;
     } else {
       _mic = widget.micLevelStream!;

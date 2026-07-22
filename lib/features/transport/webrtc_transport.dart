@@ -46,7 +46,9 @@ class WebRtcTransport implements Transport {
     _state.add(TransportKind.searching);
     final signalingToken = reconnectTokens['signalingToken'];
     if (signalingToken == null || signalingToken.isEmpty) {
-      debugPrint('[WebRtcTransport] no signalingToken — skipping connect');
+      if (kDebugMode) {
+        debugPrint('[WebRtcTransport] no signalingToken — skipping connect');
+      }
       return;
     }
 
@@ -56,10 +58,12 @@ class WebRtcTransport implements Transport {
       _connected = true;
       _state.add(TransportKind.relay);
     } on SignalingException catch (e) {
-      debugPrint('[WebRtcTransport] signaling error: $e');
+      // SECURITY (§4/§14 zero-logging): log only that signaling failed,
+      // never the token/session values that flow through this path.
+      if (kDebugMode) debugPrint('[WebRtcTransport] signaling error: $e');
       _state.add(TransportKind.searching);
     } catch (e) {
-      debugPrint('[WebRtcTransport] connect failed: $e');
+      if (kDebugMode) debugPrint('[WebRtcTransport] connect failed: $e');
       _state.add(TransportKind.searching);
     }
   }
@@ -68,7 +72,9 @@ class WebRtcTransport implements Transport {
   Future<void> send(TransportPacket packet) async {
     final session = _session;
     if (!_connected || session == null) {
-      debugPrint('[WebRtcTransport] send() dropped while disconnected');
+      if (kDebugMode) {
+        debugPrint('[WebRtcTransport] send() dropped while disconnected');
+      }
       return;
     }
     try {
@@ -83,7 +89,7 @@ class WebRtcTransport implements Transport {
         ),
       );
     } on Object catch (e) {
-      debugPrint('[WebRtcTransport] send failed: $e');
+      if (kDebugMode) debugPrint('[WebRtcTransport] send failed: $e');
       _connected = false;
       _state.add(TransportKind.searching);
     }
@@ -118,7 +124,9 @@ class WebRtcTransport implements Transport {
         ));
       },
       onError: (Object e) {
-        debugPrint('[WebRtcTransport] message stream error: $e');
+        if (kDebugMode) {
+          debugPrint('[WebRtcTransport] message stream error: $e');
+        }
         _connected = false;
         _state.add(TransportKind.searching);
       },

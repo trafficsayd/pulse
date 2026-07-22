@@ -35,9 +35,9 @@ class WhisperModeScreen extends ConsumerWidget {
     this.requiredConsecutive = 2,
   });
 
-  /// Optional override. When null, the screen constructs a
-  /// [FakeMicLevelStream] which never auto-emits — a future PR will
-  /// swap in the real `record`-backed implementation.
+  /// Optional override. Tests pass in a [FakeMicLevelStream] and push
+  /// synthetic samples through [FakeMicLevelStream.add]. When null, the
+  /// screen constructs the real `record`-backed [RealMicLevelStream].
   final MicLevelStream? micLevelStream;
 
   /// Optional override for the haptic engine. Tests pass in a
@@ -121,7 +121,7 @@ class _WhisperModeViewState extends ConsumerState<_WhisperModeView>
   void initState() {
     super.initState();
     if (widget.micLevelStream == null) {
-      _mic = FakeMicLevelStream();
+      _mic = RealMicLevelStream();
       _ownsMic = true;
     } else {
       _mic = widget.micLevelStream!;

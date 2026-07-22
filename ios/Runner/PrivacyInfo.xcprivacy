@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	  Pulse privacy manifest (App Store requirement since 2024).
+
+	  Pulse collects NO data and performs NO tracking: no accounts, no
+	  analytics, no telemetry. All pairing keys and traffic stay on the two
+	  devices (see docs/spec_ru.md §4, §6). Hence the collected-data and
+	  tracking sections are intentionally empty.
+
+	  NOTE: this file must be added to the "Runner" target in Xcode
+	  (Runner ▸ Build Phases ▸ Copy Bundle Resources) so it ships in the app
+	  bundle. Adding it here declares intent; the target membership is set in
+	  the .xcodeproj.
+	-->
+	<key>NSPrivacyTracking</key>
+	<false/>
+	<key>NSPrivacyTrackingDomains</key>
+	<array/>
+	<key>NSPrivacyCollectedDataTypes</key>
+	<array/>
+	<key>NSPrivacyAccessedAPITypes</key>
+	<array>
+		<dict>
+			<!-- UserDefaults — used by Flutter plugins (e.g. package_info,
+			     preferences) for app functionality only. -->
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategoryUserDefaults</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<string>CA92.1</string>
+			</array>
+		</dict>
+		<dict>
+			<!-- File timestamp — secure storage / path_provider read file
+			     metadata to manage local key material. -->
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategoryFileTimestamp</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<string>C617.1</string>
+			</array>
+		</dict>
+	</array>
+</dict>
+</plist>

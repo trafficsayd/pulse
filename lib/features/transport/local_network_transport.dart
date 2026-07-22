@@ -54,12 +54,12 @@ class LocalNetworkTransport implements Transport {
     _identityToken = reconnectTokens['signalingToken'] ?? '';
 
     final port = _portFromToken(_identityToken!);
-    debugPrint('[LAN] attempting to bind port $port');
+    if (kDebugMode) debugPrint('[LAN] attempting to bind port $port');
 
     // Try to become the listener first.
     try {
       _server = await ServerSocket.bind(InternetAddress.anyIPv4, port);
-      debugPrint('[LAN] listening on port $port');
+      if (kDebugMode) debugPrint('[LAN] listening on port $port');
       _serverSub = _server!.listen(_onClientConnected);
       final host = reconnectTokens['localNetworkHost'];
       if (host != null && host.isNotEmpty) {
@@ -67,7 +67,7 @@ class LocalNetworkTransport implements Transport {
       }
     } on SocketException {
       // Port already in use — another peer is already listening. Connect.
-      debugPrint('[LAN] port $port in use — connecting as client');
+      if (kDebugMode) debugPrint('[LAN] port $port in use — connecting as client');
       await _tryConnect(port, host: reconnectTokens['localNetworkHost']);
     }
   }
@@ -115,7 +115,9 @@ class LocalNetworkTransport implements Transport {
 
   /// Handle an incoming TCP client on the server socket.
   void _onClientConnected(Socket client) {
-    debugPrint('[LAN] client connected from ${client.remoteAddress.address}');
+    if (kDebugMode) {
+      debugPrint('[LAN] client connected from ${client.remoteAddress.address}');
+    }
     _attachSocket(client);
   }
 
@@ -131,7 +133,9 @@ class LocalNetworkTransport implements Transport {
           port,
           timeout: const Duration(seconds: 5),
         );
-        debugPrint('[LAN] connected to $targetHost:$port as client');
+        if (kDebugMode) {
+          debugPrint('[LAN] connected to $targetHost:$port as client');
+        }
         _attachSocket(socket);
         return;
       } on SocketException catch (e) {
@@ -139,10 +143,12 @@ class LocalNetworkTransport implements Transport {
         final delay = Duration(
           seconds: _backoffSeconds(_reconnectAttempts),
         );
-        debugPrint(
-          '[LAN] connect attempt $_reconnectAttempts failed: $e — '
-          'retrying in ${delay.inSeconds}s',
-        );
+        if (kDebugMode) {
+          debugPrint(
+            '[LAN] connect attempt $_reconnectAttempts failed: $e — '
+            'retrying in ${delay.inSeconds}s',
+          );
+        }
         await Future<void>.delayed(delay);
       }
     }
@@ -174,11 +180,11 @@ class LocalNetworkTransport implements Transport {
           ..write(content);
       },
       onError: (Object e) {
-        debugPrint('[LAN] socket error: $e');
+        if (kDebugMode) debugPrint('[LAN] socket error: $e');
         _onDisconnected();
       },
       onDone: () {
-        debugPrint('[LAN] socket closed');
+        if (kDebugMode) debugPrint('[LAN] socket closed');
         _onDisconnected();
       },
     );
@@ -193,10 +199,15 @@ class LocalNetworkTransport implements Transport {
       // Identity handshake line.
       if (json.containsKey('identity')) {
         final peerToken = json['identity'] as String;
-        debugPrint('[LAN] peer identity: $peerToken');
+        // SECURITY (§4/§14 zero-logging): never print the reconnection token
+        // value — it is sensitive pairing material. Log only that an
+        // identity line arrived, and only in debug builds.
+        if (kDebugMode) debugPrint('[LAN] peer identity received');
         final expected = _identityToken;
         if (expected != null && expected.isNotEmpty && peerToken != expected) {
-          debugPrint('[LAN] peer identity mismatch — disconnecting');
+          if (kDebugMode) {
+            debugPrint('[LAN] peer identity mismatch — disconnecting');
+          }
           unawaited(disconnect());
           return;
         }
@@ -218,7 +229,10 @@ class LocalNetworkTransport implements Transport {
         ));
       }
     } catch (e) {
-      debugPrint('[LAN] malformed line: $line ($e)');
+      // SECURITY (§4/§14 zero-logging): the raw line may itself be a
+      // malformed identity/token exchange — never print its contents,
+      // only that a line failed to parse and why.
+      if (kDebugMode) debugPrint('[LAN] malformed line dropped: $e');
     }
   }
 

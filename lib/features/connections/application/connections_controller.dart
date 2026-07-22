@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/storage/secure_key_store.dart';
+import '../../crypto/pair_keys.dart';
 import '../data/connections_repository.dart';
 import '../domain/connection.dart';
 import '../domain/connection_status.dart';
@@ -204,6 +205,13 @@ class ConnectionsController extends Notifier<ConnectionsState> {
 
   Future<void> delete(String id) async {
     await _repo.delete(id);
+    // SECURITY (§6 "паническое стирание"): removing a connection MUST
+    // destroy all of its cryptographic material — the symmetric AES key,
+    // the partner's public key and both nonce counters — not just the
+    // metadata entry. Otherwise the key survives in the Keychain /
+    // EncryptedSharedPreferences indefinitely and history stays recoverable.
+    final store = ref.read(secureKeyStoreProvider);
+    await PairKeys.wipe(store, id);
     state = state.copyWith(
       connections: [
         for (final c in state.connections)
@@ -232,6 +240,30 @@ class ConnectionsController extends Notifier<ConnectionsState> {
     await _repo.update(c);
     return c;
   }
+
+  /// Number of saved connections counted against the tier's `maxConnections`
+  /// cap (spec §9).
+  ///
+  /// This is the *total* number of local connection-book entries —
+  /// including [ConnectionStatus.archived] ones. §7 defines "сохранённая
+  /// связь" as anything persisted in the local connection book (it still
+  /// has a UUID, key material on disk, etc.); archiving only changes a
+  /// connection's status, it does not remove the entry. Counting only
+  /// active/paused rows would let a paying-free user dodge the paywall by
+  /// archiving an old connection right before pairing a new one while the
+  /// old key material — and the "slot" it occupies per the spec's wording
+  /// — is still sitting on disk.
+  int get savedConnectionsCount => state.connections.length;
+
+  /// Whether a brand-new connection can be added under [maxConnections] for
+  /// the caller's current subscription tier.
+  ///
+  /// [maxConnections] must come from the live `Entitlements`/
+  /// `SubscriptionController` (see `maxConnections` there) so there is a
+  /// single source of truth for the tier's cap — this controller never
+  /// hardcodes the 3 / 2 / 10 numbers from spec §9 itself.
+  bool canAddConnection(int maxConnections) =>
+      savedConnectionsCount < maxConnections;
 }
 
 class _SeedSpec {

@@ -9,7 +9,20 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/gradient_button.dart';
 import '../../../core/widgets/pulse_mockup.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../connections/application/connections_controller.dart';
+import '../../subscription/application/subscription_controller.dart';
 import '../application/pairing_controller.dart';
+
+/// True when the saved-connections cap for the current tier has already
+/// been reached (spec §9). Shared by the host and join entry points so
+/// starting a brand-new pairing handshake never bypasses monetisation.
+bool _connectionLimitReached(WidgetRef ref) {
+  final maxConnections =
+      ref.read(subscriptionControllerProvider.notifier).maxConnections;
+  return !ref
+      .read(connectionsControllerProvider.notifier)
+      .canAddConnection(maxConnections);
+}
 
 /// First-launch screen: create a new pair (host) or join one (guest).
 ///
@@ -30,7 +43,19 @@ class _PairingScreenState extends ConsumerState<PairingScreen> {
     // Kick the handshake off the moment we land on this screen so that
     // by the time the user finishes reading "share this code" the SAS
     // has already been derived from the real ECDH secret.
+    //
+    // MONETIZATION (spec §9): this is the entry point for a brand-new
+    // "create pair" flow, so it's where the saved-connections cap must be
+    // enforced. If the cap for the current tier is already reached, the
+    // handshake (which would burn a radio/signaling round-trip for a
+    // connection the user isn't allowed to keep) never starts — the user
+    // is redirected straight to the paywall instead.
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (_connectionLimitReached(ref)) {
+        context.go(Routes.subscription);
+        return;
+      }
       ref.read(pairingControllerProvider.notifier).startHostHandshake();
     });
   }
@@ -209,10 +234,25 @@ class _PairingScreenState extends ConsumerState<PairingScreen> {
   }
 
   void _onCreatePair(BuildContext context) {
+    // Re-check the cap right before committing to the pairing flow — the
+    // handshake itself already refused to start in initState() if the
+    // limit was hit, but this guards the (rare) case where state changed
+    // while the user was staring at the QR/SAS code.
+    if (_connectionLimitReached(ref)) {
+      context.go(Routes.subscription);
+      return;
+    }
     context.go(Routes.connecting);
   }
 
   void _onJoinPair(BuildContext context) {
+    // MONETIZATION (spec §9): "join" is the other brand-new-pairing entry
+    // point, so it needs the same cap check before a single byte of the
+    // join handshake goes out.
+    if (_connectionLimitReached(ref)) {
+      context.go(Routes.subscription);
+      return;
+    }
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: AppColors.surfaceElevated,
@@ -386,6 +426,16 @@ class _JoinByCodeSheetState extends ConsumerState<_JoinByCodeSheet> {
               label: _joining ? t.connectingTitle : t.pairingJoin,
               onPressed: _code.length == 6 && !_joining
                   ? () async {
+                      // MONETIZATION (spec §9): last-moment re-check right
+                      // before the join handshake actually talks to the
+                      // signaling server — the cap may have been hit while
+                      // this sheet was open (e.g. another device on the
+                      // same account finished pairing in the meantime).
+                      if (_connectionLimitReached(ref)) {
+                        Navigator.of(context).pop();
+                        context.go(Routes.subscription);
+                        return;
+                      }
                       setState(() => _joining = true);
                       await ref
                           .read(pairingControllerProvider.notifier)

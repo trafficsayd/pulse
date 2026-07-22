@@ -17,10 +17,10 @@ class PairKeys {
     required this.connectionId,
     required this.symmetricKey,
     required this.partnerPublicKey,
-    required this.localPrivateKey,
+    this.localPrivateKey,
   })  : assert(symmetricKey.length == 32, 'Pulse uses AES-256 (32-byte key)'),
         assert(partnerPublicKey.length == 32),
-        assert(localPrivateKey.length == 32);
+        assert(localPrivateKey == null || localPrivateKey.length == 32);
 
   final String connectionId;
 
@@ -31,9 +31,16 @@ class PairKeys {
   /// fresh symmetric key if the user later re-pairs (e.g. after a reset).
   final Uint8List partnerPublicKey;
 
-  /// Local Curve25519 private key. Generated once per connection and never
-  /// reused across connections.
-  final Uint8List localPrivateKey;
+  /// Local Curve25519 **ephemeral** private key.
+  ///
+  /// SECURITY (forward secrecy): this key is intentionally NEVER written to
+  /// disk. It lives only in memory during the handshake and is dropped once
+  /// the symmetric key is derived. Persisting it would let anyone who later
+  /// compromises the key store recompute the shared secret from the stored
+  /// partner public key — defeating forward secrecy for no functional gain
+  /// (the symmetric key is already stored). Hence [toJson] omits it and
+  /// [fromJson] always rehydrates it as null.
+  final Uint8List? localPrivateKey;
 
   /// Secure-storage key for this connection's serialized [PairKeys].
   static String storageKey(String connectionId) => 'pair_keys::$connectionId';
@@ -47,11 +54,13 @@ class PairKeys {
   static String inboundNonceKey(String connectionId) =>
       'pair_nonce::in::$connectionId';
 
+  /// Serialize for at-rest storage. The ephemeral [localPrivateKey] is
+  /// deliberately excluded — see the field doc for the forward-secrecy
+  /// rationale.
   Map<String, Object?> toJson() => <String, Object?>{
         'connectionId': connectionId,
         'symmetricKey': base64.encode(symmetricKey),
         'partnerPublicKey': base64.encode(partnerPublicKey),
-        'localPrivateKey': base64.encode(localPrivateKey),
       };
 
   factory PairKeys.fromJson(Map<String, Object?> json) {
@@ -61,7 +70,9 @@ class PairKeys {
       connectionId: json['connectionId']! as String,
       symmetricKey: decode(json['symmetricKey']),
       partnerPublicKey: decode(json['partnerPublicKey']),
-      localPrivateKey: decode(json['localPrivateKey']),
+      // Legacy records may still carry a private key; drop it on read so it
+      // is scrubbed from memory going forward and never re-persisted.
+      localPrivateKey: null,
     );
   }
 

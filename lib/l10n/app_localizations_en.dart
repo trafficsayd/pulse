@@ -593,4 +593,17 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get errorGeneric => 'Something went wrong';
+
+  @override
+  String get verifyCodeTitle => 'Make sure it\'s really them';
+
+  @override
+  String get verifyCodeBody =>
+      'Check that this code is identical to the one shown on your partner\'s screen.';
+
+  @override
+  String get verifyCodeMatch => 'The codes match';
+
+  @override
+  String get verifyCodeMismatch => 'They don\'t match';
 }

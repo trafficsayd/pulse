@@ -186,10 +186,46 @@ void main() {
     expect(hostState.sasCode, guestState.sasCode);
     expect(hostState.connectionId, guestState.connectionId);
 
-    final hostKeys = await hostController.confirmAndPersist();
-    final guestKeys = await guestController.confirmAndPersist();
+    // Both users compared the SAS on their screens and it matched.
+    final hostKeys = await hostController.confirmAndPersist(sasConfirmed: true);
+    final guestKeys =
+        await guestController.confirmAndPersist(sasConfirmed: true);
     expect(hostKeys?.connectionId, guestKeys?.connectionId);
     expect(hostKeys?.symmetricKey, guestKeys?.symmetricKey);
+
+    // SECURITY: the ephemeral private key must never be persisted.
+    expect(hostKeys?.localPrivateKey, isNull);
+    expect(guestKeys?.localPrivateKey, isNull);
+  });
+
+  test('confirmAndPersist refuses to persist when SAS is not confirmed',
+      () async {
+    final server = _RendezvousServer();
+    final host = _container(server);
+    final guest = _container(server);
+    addTearDown(host.dispose);
+    addTearDown(guest.dispose);
+
+    final hostController = host.read(pairingControllerProvider.notifier);
+    final guestController = guest.read(pairingControllerProvider.notifier);
+
+    final hostFuture = hostController.startHostHandshake(
+      timeout: const Duration(seconds: 5),
+    );
+    await _waitFor(host, (s) => s.pairingCode != null);
+    final code = host.read(pairingControllerProvider).pairingCode!;
+    await guestController.joinHandshake(code, timeout: const Duration(seconds: 5));
+    await hostFuture;
+
+    // User did NOT confirm the codes match — persisting must be refused and
+    // no key material may be returned (anti-MITM gate).
+    final refused = await hostController.confirmAndPersist(sasConfirmed: false);
+    expect(refused, isNull);
+    expect(host.read(pairingControllerProvider).phase, PairingPhase.failed);
+    expect(
+      host.read(pairingControllerProvider).error,
+      isA<SasNotConfirmedException>(),
+    );
   });
 }
 

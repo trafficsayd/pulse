@@ -5,7 +5,7 @@ compatibility_flags = ["nodejs_compat"]
 
 # Replace this with the real Cloudflare account_id before the first deploy.
 # `wrangler whoami` will print it once you have logged in via `wrangler login`.
-account_id = "REPLACE_ME_ACCOUNT_ID"
+account_id = "75377a196e8fd601606b3fcf2a458356"
 
 # Workers Logs (free tier) — keeps stdout/stderr visible in the dashboard.
 [observability]

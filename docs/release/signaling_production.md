@@ -4,19 +4,29 @@ Worker (`signaling/`) брокерит SDP/ICE для WebRTC и служит ш�
 релеем-фолбэком. Содержимого сообщений он не видит (E2E), хранит только
 эфемерные сессии в KV с TTL.
 
+> ℹ️ `account_id` в `wrangler.toml` уже вписан
+> (`75377a196e8fd601606b3fcf2a458356`) — подтверждён через API вашего
+> подключённого аккаунта Cloudflare. Осталось создать KV и задеплоить.
+>
+> Почему это делается руками, а не агентом: OAuth-подключение Cloudflare к
+> Hyperagent выдаёт токен **только на чтение** (проверено — создание KV,
+> деплой Worker и регистрация workers.dev-поддомена возвращают
+> «Authentication error»). Первый деплой всё равно требует интерактивной
+> регистрации workers.dev-поддомена, что делается только в браузере. У
+> `wrangler login` — свой OAuth с полными правами, поэтому команды ниже
+> отработают штатно.
+
 ## 1. Однократная настройка Cloudflare
 
 ```bash
 cd signaling
 npm ci
-npx wrangler login                     # браузерная авторизация
-npx wrangler whoami                    # покажет account_id
+npx wrangler login                     # браузерная авторизация (полные права)
 ```
 
-В `signaling/wrangler.toml` замените:
-
-- `account_id = "REPLACE_ME_ACCOUNT_ID"` → ваш account id;
-- создайте KV и подставьте id:
+`account_id` уже проставлен. Создайте KV-неймспейсы и подставьте id в
+`signaling/wrangler.toml` (в блок `[[kv_namespaces]]` вместо
+`REPLACE_ME_KV_NAMESPACE_ID` / `REPLACE_ME_KV_NAMESPACE_PREVIEW_ID`):
 
 ```bash
 npx wrangler kv namespace create SIGNALING_SESSIONS

@@ -181,13 +181,17 @@ class _PairingScreenState extends ConsumerState<PairingScreen> {
                               ),
                               const SizedBox(height: 10),
                               Text(
-                                pairing.hasShortCode
-                                    ? t.connectingSecuredLink
-                                    : pairing.hasPairingCode
-                                        ? t.pairingEnterCode
-                                        : t.pairingDerivingCode,
-                                style: const TextStyle(
-                                  color: AppColors.textMuted,
+                                pairing.phase == PairingPhase.failed
+                                    ? t.errorGeneric
+                                    : pairing.hasShortCode
+                                        ? t.connectingSecuredLink
+                                        : pairing.hasPairingCode
+                                            ? t.pairingEnterCode
+                                            : t.pairingDerivingCode,
+                                style: TextStyle(
+                                  color: pairing.phase == PairingPhase.failed
+                                      ? AppColors.heart
+                                      : AppColors.textMuted,
                                   fontSize: 12,
                                   fontWeight: FontWeight.w600,
                                 ),

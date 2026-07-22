@@ -199,19 +199,23 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
                 ),
               ],
               const SizedBox(height: 6),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+              // Wrap, not Row: the RU labels («Условия использования» +
+              // «Политика конфиденциальности») overflow narrow screens by a
+              // couple of pixels — let the second link fall to its own line.
+              Wrap(
+                alignment: WrapAlignment.center,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 16,
+                runSpacing: 2,
                 children: [
                   _FootLink(
                     label: t.subscriptionTermsOfUse,
                     onTap: () => _openLegalLink(_kTermsUrl),
                   ),
-                  const SizedBox(width: 16),
                   const Text(
                     '·',
                     style: TextStyle(color: AppColors.textMuted),
                   ),
-                  const SizedBox(width: 16),
                   _FootLink(
                     label: t.subscriptionPrivacyPolicy,
                     onTap: () => _openLegalLink(_kPrivacyUrl),

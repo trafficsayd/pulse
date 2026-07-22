@@ -1,6 +1,9 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+
+import '../routing/routes.dart';
 
 import '../theme/app_colors.dart';
 
@@ -99,7 +102,19 @@ class PulseHeader extends StatelessWidget {
           leading ??
               PulseRoundButton(
                 icon: Icons.arrow_back_rounded,
-                onTap: onBack ?? () => Navigator.of(context).maybePop(),
+                // Every screen is a top-level GoRoute reached via go(), so
+                // there is usually nothing to pop — maybePop() silently did
+                // nothing and the back button felt dead. Fall back to the
+                // hub, the app's home surface.
+                onTap: onBack ??
+                    () {
+                      final router = GoRouter.of(context);
+                      if (router.canPop()) {
+                        router.pop();
+                      } else {
+                        context.go(Routes.hub);
+                      }
+                    },
                 subtle: true,
               ),
           Expanded(

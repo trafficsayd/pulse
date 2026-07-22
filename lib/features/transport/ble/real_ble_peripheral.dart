@@ -43,7 +43,11 @@ class RealBlePeripheral {
     BlePermissionGate? permissions,
     MethodChannel? channel,
   })  : _permissions = permissions ?? const RealBlePermissionGate(),
-        _channel = channel ?? const MethodChannel(_methodChannelName);
+        _channel = channel ?? const MethodChannel(_methodChannelName) {
+    // Data-plane bridge: the native side pushes central writes and
+    // connection lifecycle events back through the same channel.
+    _channel.setMethodCallHandler(_onNativeCall);
+  }
 
   static const String _methodChannelName = 'app.pulse.ble/peripheral';
 
@@ -132,10 +136,73 @@ class RealBlePeripheral {
     _setState(BlePeripheralState.idle);
   }
 
+  final StreamController<Uint8List> _rxWrites =
+      StreamController<Uint8List>.broadcast();
+  final StreamController<bool> _centralConnected =
+      StreamController<bool>.broadcast();
+
+  /// Raw frames written by the connected central onto the RX
+  /// characteristic. Framing/decryption is the caller's job — this layer
+  /// shuttles opaque bytes, mirroring `RealBleClient.incoming`.
+  Stream<Uint8List> get rxWrites => _rxWrites.stream;
+
+  /// `true` when a central connects to our GATT server, `false` when it
+  /// drops. Useful for pairing UX («партнёр рядом»).
+  Stream<bool> get centralConnected => _centralConnected.stream;
+
+  /// Push one frame to the connected central via a TX-characteristic
+  /// notification. Throws [BleTransportException] when no central is
+  /// connected or the native notify fails.
+  Future<void> sendTx(Uint8List bytes) async {
+    if (!isSupported) {
+      throw const BleTransportException(
+        BleTransportFailure.writeFailed,
+        'BLE peripheral mode is not supported on this platform.',
+      );
+    }
+    try {
+      await _channel.invokeMethod<void>('txNotify', <String, dynamic>{
+        'bytes': bytes,
+      });
+    } on PlatformException catch (e) {
+      throw BleTransportException(
+        BleTransportFailure.writeFailed,
+        'Failed to notify central: ${e.message}',
+        cause: e,
+      );
+    }
+  }
+
+  Future<dynamic> _onNativeCall(MethodCall call) async {
+    switch (call.method) {
+      case 'onRxWrite':
+        final args = call.arguments;
+        if (args is Map && args['bytes'] is Uint8List) {
+          _rxWrites.add(args['bytes'] as Uint8List);
+        }
+        break;
+      case 'onCentralConnected':
+        _centralConnected.add(true);
+        break;
+      case 'onCentralDisconnected':
+        _centralConnected.add(false);
+        break;
+    }
+    return null;
+  }
+
   /// Permanently release this peripheral. Safe to call multiple times.
   Future<void> dispose() async {
     await stop();
     await _state.close().timeout(
+          const Duration(seconds: 3),
+          onTimeout: () {},
+        );
+    await _rxWrites.close().timeout(
+          const Duration(seconds: 3),
+          onTimeout: () {},
+        );
+    await _centralConnected.close().timeout(
           const Duration(seconds: 3),
           onTimeout: () {},
         );

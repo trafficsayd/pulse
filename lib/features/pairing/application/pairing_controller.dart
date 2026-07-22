@@ -1,11 +1,10 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
-import 'dart:typed_data';
 
 import 'package:cryptography/cryptography.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:meta/meta.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/storage/secure_key_store.dart';
@@ -13,6 +12,7 @@ import '../../crypto/curve25519_pairing_service.dart';
 import '../../crypto/nonce_counter.dart';
 import '../../crypto/pair_keys.dart';
 import '../../transport/webrtc/signaling_client.dart';
+import '../data/ble_pairing_rendezvous.dart';
 
 /// Thrown when [PairingController.confirmAndPersist] is invoked without the
 /// user having verified that the SAS codes on both phones match. Persisting
@@ -126,11 +126,28 @@ class PairingController extends Notifier<PairingState> {
   bool _disposed = false;
   int _epoch = 0;
 
+  // Offline fallback (spec §4 «работа без интернета»): when the signaling
+  // Worker is unreachable the handshake retargets a local BLE rendezvous.
+  // The host role needs a GATT server (Android-only for now); the joiner
+  // role is a plain central scan and works on both platforms.
+  BleHostRendezvous Function() _bleHostFactory = BleHostRendezvous.new;
+  BleJoinerRendezvous Function() _bleJoinerFactory = BleJoinerRendezvous.new;
+  bool _bleHostSupported = BleHostRendezvous.isPlatformSupported;
+  bool _bleJoinerSupported = BleJoinerRendezvous.isPlatformSupported;
+
   @visibleForTesting
   void overrideForTesting({
     Curve25519PairingService? service,
+    BleHostRendezvous Function()? bleHostFactory,
+    BleJoinerRendezvous Function()? bleJoinerFactory,
+    bool? bleHostSupported,
+    bool? bleJoinerSupported,
   }) {
     if (service != null) _service = service;
+    if (bleHostFactory != null) _bleHostFactory = bleHostFactory;
+    if (bleJoinerFactory != null) _bleJoinerFactory = bleJoinerFactory;
+    if (bleHostSupported != null) _bleHostSupported = bleHostSupported;
+    if (bleJoinerSupported != null) _bleJoinerSupported = bleJoinerSupported;
   }
 
   @override
@@ -161,15 +178,40 @@ class PairingController extends Notifier<PairingState> {
       if (_disposed || epoch != _epoch) return;
       final pubB64 = await localKeyPair.publicKeyBase64Url();
       if (_disposed || epoch != _epoch) return;
-      final session = await _signaling.createSession(pairingCode);
-      await _signaling.postOffer(
-        sessionId: session.sessionId,
-        token: session.token,
-        offer: SignalingSessionDescription(
-          type: 'offer',
-          sdp: _encodePublicKey(pubB64),
-        ),
-      );
+      SignalingSession? session;
+      try {
+        session = await _signaling.createSession(pairingCode);
+        await _signaling.postOffer(
+          sessionId: session.sessionId,
+          token: session.token,
+          offer: SignalingSessionDescription(
+            type: 'offer',
+            sdp: _encodePublicKey(pubB64),
+          ),
+        );
+      } catch (signalingError) {
+        // No internet (or the Worker is down) — pairing must still work
+        // when the two phones are physically next to each other.
+        if (!_bleHostSupported) rethrow;
+        if (kDebugMode) {
+          debugPrint(
+            'Pairing: signaling unreachable ($signalingError), '
+            'falling back to BLE rendezvous as host.',
+          );
+        }
+        session = null;
+      }
+      if (_disposed || epoch != _epoch) return;
+      if (session == null) {
+        await _hostViaBle(
+          epoch: epoch,
+          pairingCode: pairingCode,
+          localKeyPair: localKeyPair,
+          pubB64: pubB64,
+          timeout: timeout,
+        );
+        return;
+      }
       state = state.copyWith(
         phase: PairingPhase.awaitingPartner,
         pairingCode: pairingCode,
@@ -238,7 +280,31 @@ class PairingController extends Notifier<PairingState> {
       final localKeyPair = await _service.generateLocalKeyPair();
       if (_disposed || epoch != _epoch) return;
       final pubB64 = await localKeyPair.publicKeyBase64Url();
-      final session = await _signaling.createSession(pairingCode);
+      if (_disposed || epoch != _epoch) return;
+      SignalingSession? session;
+      try {
+        session = await _signaling.createSession(pairingCode);
+      } catch (signalingError) {
+        if (!_bleJoinerSupported) rethrow;
+        if (kDebugMode) {
+          debugPrint(
+            'Pairing: signaling unreachable ($signalingError), '
+            'falling back to BLE rendezvous as joiner.',
+          );
+        }
+        session = null;
+      }
+      if (_disposed || epoch != _epoch) return;
+      if (session == null) {
+        await _joinViaBle(
+          epoch: epoch,
+          pairingCode: pairingCode,
+          localKeyPair: localKeyPair,
+          pubB64: pubB64,
+          timeout: timeout,
+        );
+        return;
+      }
       state = state.copyWith(
         phase: PairingPhase.awaitingPartner,
         connectionId: session.sessionId,
@@ -289,6 +355,90 @@ class PairingController extends Notifier<PairingState> {
       if (_disposed) return;
       state = state.copyWith(phase: PairingPhase.failed, error: e);
     }
+  }
+
+  /// Host-side offline path: advertise over BLE and wait for the joiner to
+  /// present the pairing code. Fills the same [PairingState] fields as the
+  /// signaling path so the UI and [confirmAndPersist] stay unchanged.
+  Future<void> _hostViaBle({
+    required int epoch,
+    required String pairingCode,
+    required Curve25519KeyPair localKeyPair,
+    required String pubB64,
+    required Duration timeout,
+  }) async {
+    state = state.copyWith(
+      phase: PairingPhase.awaitingPartner,
+      pairingCode: pairingCode,
+      localKeyPair: localKeyPair,
+      localPublicKeyBase64: pubB64,
+    );
+    final rendezvous = await _bleHostFactory().waitForPartner(
+      pairingCode: pairingCode,
+      localPublicKeyBase64: pubB64,
+      timeout: timeout,
+    );
+    if (_disposed || epoch != _epoch) return;
+    await _finishBleRendezvous(
+      epoch: epoch,
+      localKeyPair: localKeyPair,
+      rendezvous: rendezvous,
+    );
+  }
+
+  /// Joiner-side offline path: scan for the advertising host and swap
+  /// public keys over GATT.
+  Future<void> _joinViaBle({
+    required int epoch,
+    required String pairingCode,
+    required Curve25519KeyPair localKeyPair,
+    required String pubB64,
+    required Duration timeout,
+  }) async {
+    state = state.copyWith(
+      phase: PairingPhase.awaitingPartner,
+      localKeyPair: localKeyPair,
+      localPublicKeyBase64: pubB64,
+    );
+    final rendezvous = await _bleJoinerFactory().exchange(
+      pairingCode: pairingCode,
+      localPublicKeyBase64: pubB64,
+      timeout: timeout,
+    );
+    if (_disposed || epoch != _epoch) return;
+    await _finishBleRendezvous(
+      epoch: epoch,
+      localKeyPair: localKeyPair,
+      rendezvous: rendezvous,
+    );
+  }
+
+  /// Common tail of both BLE paths: decode the partner key, run ECDH+HKDF,
+  /// derive the SAS and hand control back to the confirmation screen. The
+  /// anti-MITM SAS comparison applies to BLE exactly as it does online.
+  Future<void> _finishBleRendezvous({
+    required int epoch,
+    required Curve25519KeyPair localKeyPair,
+    required BlePairingResult rendezvous,
+  }) async {
+    final partnerKey = _publicKeyFromBase64(rendezvous.peerPublicKeyBase64);
+    state = state.copyWith(
+      phase: PairingPhase.derivingSecret,
+      connectionId: rendezvous.connectionId,
+      signalingToken: rendezvous.signalingToken,
+      partnerPublicKey: partnerKey,
+    );
+    final shared = await _service.deriveSharedSecret(
+      localKeyPair: localKeyPair.keyPair,
+      peerPublicKey: partnerKey,
+    );
+    if (_disposed || epoch != _epoch) return;
+    final sas = _service.deriveShortCode(shared);
+    state = state.copyWith(
+      phase: PairingPhase.awaitingConfirmation,
+      sharedSecret: shared,
+      sasCode: sas,
+    );
   }
 
   /// User confirmed the SAS codes match on both phones — persist everything
@@ -401,7 +551,10 @@ class PairingController extends Notifier<PairingState> {
     if (!encoded.startsWith(prefix)) {
       throw const FormatException('malformed pairing public key payload');
     }
-    final raw = encoded.substring(prefix.length);
+    return _publicKeyFromBase64(encoded.substring(prefix.length));
+  }
+
+  static SimplePublicKey _publicKeyFromBase64(String raw) {
     final padded = raw.padRight(raw.length + (4 - raw.length % 4) % 4, '=');
     final bytes = base64Url.decode(padded);
     if (bytes.length != 32) {

@@ -22,7 +22,7 @@ android {
     // by each year's deadline (35 required since 2025-08-31). Explicit values
     // so a Flutter upgrade cannot silently move the app out of the
     // compliance window. Bump deliberately, together with a device pass.
-    compileSdk = 35
+    compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
@@ -37,7 +37,7 @@ android {
     defaultConfig {
         applicationId = "io.pulseapp.pulse"
         // WebRTC / BLE / secure-storage plugins require API 23+.
-        minSdkVersion = 23
+        minSdkVersion = flutter.minSdkVersion
         targetSdk = 35
         versionCode = flutter.versionCode
         versionName = flutter.versionName

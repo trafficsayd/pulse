@@ -4,9 +4,11 @@ import 'dart:io';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter_blue_plus/flutter_blue_plus.dart' as fbp;
 import 'package:uuid/uuid.dart';
 
 import '../../transport/ble/ble_client.dart';
+import '../../transport/ble/ble_transport_exception.dart';
 import '../../transport/ble/packet_codec.dart';
 import '../../transport/ble/real_ble_client.dart';
 import '../../transport/ble/real_ble_peripheral.dart';
@@ -90,6 +92,29 @@ Map<String, Object?>? _decodeBody(Uint8List payload) {
   }
 }
 
+/// Best-effort "turn Bluetooth on" nudge. After airplane mode Android
+/// leaves the adapter off and users rarely notice — `turnOn` pops the
+/// system enable dialog. A refusal becomes a clear, mappable error;
+/// anything else (missing plugin in tests, unsupported platform) is
+/// swallowed so the actual radio call can report its own failure.
+Future<void> _ensureAdapterOn() async {
+  try {
+    if (!Platform.isAndroid) return;
+    if (await fbp.FlutterBluePlus.adapterState.first ==
+        fbp.BluetoothAdapterState.on) {
+      return;
+    }
+    await fbp.FlutterBluePlus.turnOn();
+  } on fbp.FlutterBluePlusException {
+    throw const BleTransportException(
+      BleTransportFailure.writeFailed,
+      'Bluetooth is turned off and the user declined to enable it.',
+    );
+  } catch (_) {
+    // Tests / platforms without the plugin — let start()/connect() speak.
+  }
+}
+
 /// Host side: advertise, wait for a `pair_hello` carrying the right code,
 /// answer with `pair_reply`. One-shot — create a fresh instance per attempt.
 class BleHostRendezvous {
@@ -136,6 +161,7 @@ class BleHostRendezvous {
           ),
         );
       });
+      await _ensureAdapterOn();
       await peripheral.start();
       deadline = Timer(timeout, () {
         if (!completer.isCompleted) {
@@ -311,6 +337,7 @@ class BleJoinerRendezvous {
           );
         }
       });
+      await _ensureAdapterOn();
       await client.connect(scanTimeout: scanTimeout);
       await client.send(
         Packet(

@@ -131,8 +131,11 @@ class FlutterBluePlusScanner implements BleScanner {
           device: _FbpDevice(r.device),
           rssi: r.rssi,
           serviceUuids: [
+            // str128: FBP's `str` collapses SIG-base UUIDs to their short
+            // 16-bit form ("feed"), which would never match the full-form
+            // constants in ble_uuids.dart.
             for (final g in r.advertisementData.serviceUuids)
-              g.str.toLowerCase(),
+              g.str128.toLowerCase(),
           ],
         ),
     ];
@@ -184,7 +187,7 @@ class _FbpService implements BleGattService {
   final fbp.BluetoothService _service;
 
   @override
-  String get uuid => _service.serviceUuid.str.toLowerCase();
+  String get uuid => _service.serviceUuid.str128.toLowerCase();
 
   @override
   List<BleGattCharacteristic> get characteristics => [
@@ -198,7 +201,7 @@ class _FbpCharacteristic implements BleGattCharacteristic {
   final fbp.BluetoothCharacteristic _characteristic;
 
   @override
-  String get uuid => _characteristic.characteristicUuid.str.toLowerCase();
+  String get uuid => _characteristic.characteristicUuid.str128.toLowerCase();
 
   @override
   Stream<List<int>> get onValueReceived =>

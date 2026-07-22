@@ -611,4 +611,32 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get verifyCodeMismatch => 'They don\'t match';
+
+  @override
+  String get pairingErrorCodeMismatch =>
+      'The code didn\'t match — check the digits and try again';
+
+  @override
+  String get pairingErrorRejected => 'The partner declined the pairing request';
+
+  @override
+  String get pairingErrorPermission =>
+      'Bluetooth permission is missing. Allow nearby-devices access in settings';
+
+  @override
+  String get pairingErrorPartnerNotFound =>
+      'No partner found nearby. Make sure their phone shows the “Create pair” screen and Bluetooth is on';
+
+  @override
+  String get pairingErrorLinkDropped => 'The link dropped. Please try again';
+
+  @override
+  String get pairingErrorBluetooth =>
+      'Bluetooth is unavailable or turned off. Turn it on and retry';
+
+  @override
+  String get pairingErrorTimeout => 'Timed out. Please try again';
+
+  @override
+  String get pairingRetry => 'Try again';
 }

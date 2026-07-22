@@ -248,5 +248,13 @@
   "verifyCodeTitle": "Убедитесь, что это точно они",
   "verifyCodeBody": "Проверьте, что этот код в точности совпадает с кодом на экране вашего партнёра.",
   "verifyCodeMatch": "Коды совпадают",
-  "verifyCodeMismatch": "Не совпадают"
+  "verifyCodeMismatch": "Не совпадают",
+  "pairingErrorCodeMismatch": "Код не совпал — проверьте цифры и попробуйте ещё раз",
+  "pairingErrorRejected": "Партнёр отклонил запрос на сопряжение",
+  "pairingErrorPermission": "Нет разрешения на Bluetooth. Разрешите доступ к устройствам поблизости в настройках",
+  "pairingErrorPartnerNotFound": "Партнёр рядом не найден. Проверьте, что на его телефоне открыт экран «Создать пару» и включён Bluetooth",
+  "pairingErrorLinkDropped": "Связь оборвалась. Попробуйте ещё раз",
+  "pairingErrorBluetooth": "Bluetooth недоступен или выключен. Включите его и повторите",
+  "pairingErrorTimeout": "Время ожидания вышло. Попробуйте ещё раз",
+  "pairingRetry": "Попробовать снова"
 }

@@ -40,6 +40,12 @@ ios/Flutter/Generated.xcconfig
 ios/Flutter/flutter_export_environment.sh
 ios/Flutter/ephemeral/
 
+# Release signing — the upload keystore and its passwords must never be
+# committed. See docs/release/android_signing.md.
+android/key.properties
+*.keystore
+*.jks
+
 # Symbolication related
 app.*.symbols
 

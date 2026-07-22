@@ -49,6 +49,20 @@ class PulseSession {
       .where((e) => e != null)
       .cast<ModeEvent>();
 
+  /// Send a Sneak In signal to the partner. Travels the exact same path as
+  /// every other mode event: encoded to JSON, sealed by [PairChannel], and
+  /// handed to the active transport.
+  ///
+  /// [signalId] must be a stable id from `kSneakSignals`. [senderId] lets the
+  /// receiver attribute the signal (defaults to this session's
+  /// [connectionId]).
+  Future<void> sendSneak(String signalId, {String? senderId}) =>
+      sendEvent(ModeEvent.sneak(signalId, senderId: senderId ?? connectionId));
+
+  /// Inbound Sneak In signals from the partner, filtered out of the shared
+  /// [events] stream. Reuses the single encrypted channel — no second pipe.
+  Stream<ModeEvent> get sneaks => events.where((e) => e.isSneak);
+
   /// Tear everything down. Safe to call multiple times.
   Future<void> dispose() async {
     await pairChannel.close();

@@ -210,5 +210,76 @@ void main() {
       expect(await other.peek(), 2);
       expect(await counter.peek(), 3);
     });
+
+    test(
+      'restore() heals a benign crash between the hwm write and the main '
+      'counter write: current == hwm - 1 is not a rollback',
+      () async {
+        // Burn three nonces — HWM is now 3 and current is 3.
+        expect(await counter.next(), 1);
+        expect(await counter.next(), 2);
+        expect(await counter.next(), 3);
+
+        // Simulate next() being killed right after it persisted the new
+        // HWM (4) but before the paired write to the main counter slot
+        // landed: main is still 3, one behind the HWM of 4.
+        await store.writeString('test::out::hwm', '4');
+
+        final recovered = NonceCounter(
+          storage: store,
+          storageKey: 'test::out',
+        );
+        // Must NOT throw — this is the documented crash-recovery gap,
+        // not tampering. The counter heals forward to the HWM.
+        await recovered.restore();
+        expect(recovered.lastUsed, 4);
+        expect(await recovered.peek(), 5);
+        expect(await recovered.next(), 5);
+      },
+    );
+
+    test(
+      'restore() still throws NonceRollbackException when current is more '
+      'than one behind the high-water mark',
+      () async {
+        // Burn four nonces — HWM is now 4 and current is 4.
+        expect(await counter.next(), 1);
+        expect(await counter.next(), 2);
+        expect(await counter.next(), 3);
+        expect(await counter.next(), 4);
+
+        // current == hwm - 2: two full increments behind. This cannot
+        // be explained by a single crashed write and must still be
+        // treated as a genuine rollback.
+        await store.writeString('test::out', '2');
+
+        final tampered = NonceCounter(
+          storage: store,
+          storageKey: 'test::out',
+        );
+        await expectLater(
+          tampered.restore(),
+          throwsA(isA<NonceRollbackException>()),
+        );
+      },
+    );
+
+    test(
+      'next() also heals the current == hwm - 1 gap instead of throwing',
+      () async {
+        expect(await counter.next(), 1);
+        expect(await counter.next(), 2);
+
+        // Same benign gap as above, but exercised through next() (which
+        // calls restore() internally) rather than restore() directly.
+        await store.writeString('test::out::hwm', '3');
+
+        final recovered = NonceCounter(
+          storage: store,
+          storageKey: 'test::out',
+        );
+        expect(await recovered.next(), 4);
+      },
+    );
   });
 }

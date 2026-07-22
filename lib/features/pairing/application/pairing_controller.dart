@@ -14,6 +14,24 @@ import '../../crypto/nonce_counter.dart';
 import '../../crypto/pair_keys.dart';
 import '../../transport/webrtc/signaling_client.dart';
 
+/// Thrown when [PairingController.confirmAndPersist] is invoked without the
+/// user having verified that the SAS codes on both phones match. Persisting
+/// key material is refused in that case.
+class SasNotConfirmedException implements Exception {
+  const SasNotConfirmedException();
+  @override
+  String toString() =>
+      'Pairing refused: the SAS codes were not confirmed as matching.';
+}
+
+/// Raised when the user reports that the SAS codes did NOT match — a strong
+/// indicator of an active man-in-the-middle on the signaling path.
+class SasMismatchException implements Exception {
+  const SasMismatchException();
+  @override
+  String toString() => 'Pairing aborted: SAS codes did not match (possible MITM).';
+}
+
 /// Discrete steps the pairing handshake walks through. Drives both the
 /// pairing screen badge and the connecting screen's three-step indicator.
 enum PairingPhase {
@@ -272,9 +290,28 @@ class PairingController extends Notifier<PairingState> {
     }
   }
 
-  /// User pressed "Confirm" — persist everything to secure storage and
-  /// return the new [PairKeys] so callers can wire connections.
-  Future<PairKeys?> confirmAndPersist({String? connectionId}) async {
+  /// User confirmed the SAS codes match on both phones — persist everything
+  /// to secure storage and return the new [PairKeys] so callers can wire
+  /// connections.
+  ///
+  /// SECURITY (anti-MITM): the short authentication string (SAS) is the only
+  /// defence against an active man-in-the-middle that swaps public keys on
+  /// the signaling path. Callers MUST pass [sasConfirmed] `true` ONLY after
+  /// the human has compared the code shown on both devices. When it is
+  /// `false` (or omitted) this method refuses to persist any key material
+  /// and transitions to [PairingPhase.failed]. See [abortPairing] for the
+  /// explicit "codes did not match" path.
+  Future<PairKeys?> confirmAndPersist({
+    String? connectionId,
+    required bool sasConfirmed,
+  }) async {
+    if (!sasConfirmed) {
+      state = state.copyWith(
+        phase: PairingPhase.failed,
+        error: const SasNotConfirmedException(),
+      );
+      return null;
+    }
     final keyPair = state.localKeyPair;
     final partner = state.partnerPublicKey;
     final secret = state.sharedSecret;
@@ -284,12 +321,12 @@ class PairingController extends Notifier<PairingState> {
     state = state.copyWith(phase: PairingPhase.persisting);
     try {
       final id = connectionId ?? state.connectionId ?? const Uuid().v4();
-      final privateBytes = await keyPair.keyPair.extractPrivateKeyBytes();
       final pair = PairKeys(
         connectionId: id,
         symmetricKey: secret.bytes,
         partnerPublicKey: Uint8List.fromList(partner.bytes),
-        localPrivateKey: Uint8List.fromList(privateBytes),
+        // Ephemeral private key is intentionally NOT persisted (forward
+        // secrecy) — see PairKeys.localPrivateKey.
       );
       final store = ref.read(secureKeyStoreProvider);
       await pair.persist(store);
@@ -315,6 +352,19 @@ class PairingController extends Notifier<PairingState> {
       state = state.copyWith(phase: PairingPhase.failed, error: e);
       return null;
     }
+  }
+
+  /// User reported that the SAS codes on the two phones did NOT match — a
+  /// strong signal of an active man-in-the-middle. Tear the handshake down
+  /// without persisting anything and drop the derived secret from memory.
+  void abortPairing() {
+    _cancelWatchdog();
+    _epoch++;
+    if (_disposed) return;
+    state = const PairingState(
+      phase: PairingPhase.failed,
+      error: SasMismatchException(),
+    );
   }
 
   /// Cancel any pending watchdog and reset back to idle. Safe to call

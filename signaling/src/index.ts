@@ -7,6 +7,7 @@ import {
   getAnswer,
   getOffer,
   getSession,
+  invalidatePairingCode,
   readIceSince,
   readMessagesSince,
   storeAnswer,
@@ -290,6 +291,9 @@ async function handlePostAnswer(ctx: RouteContext, sessionId: string): Promise<R
     ...(parsedIce ? { ice: parsedIce } : {}),
   };
   await storeAnswer(ctx.env, sessionId, payload);
+  // V6: the SDP exchange is complete — retire the 6-digit code so a third
+  // party who guesses it can no longer be brokered into this rendezvous.
+  await invalidatePairingCode(ctx.env, session.pairingCode);
   return json({ ok: true }, { status: 200 });
 }
 

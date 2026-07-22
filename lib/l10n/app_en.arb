@@ -410,5 +410,14 @@
   },
 
   "errorGeneric": "Something went wrong",
-  "@errorGeneric": {}
+  "@errorGeneric": {},
+
+  "verifyCodeTitle": "Make sure it's really them",
+  "@verifyCodeTitle": {},
+  "verifyCodeBody": "Check that this code is identical to the one shown on your partner's screen.",
+  "@verifyCodeBody": {},
+  "verifyCodeMatch": "The codes match",
+  "@verifyCodeMatch": {},
+  "verifyCodeMismatch": "They don't match",
+  "@verifyCodeMismatch": {}
 }

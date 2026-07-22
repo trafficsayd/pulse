@@ -38,10 +38,29 @@ class ModeEventBus {
     await _session.sendEvent(event);
   }
 
+  /// Send a Sneak In signal to the partner over the live channel.
+  ///
+  /// Returns `true` if there was a live session to hand the signal to,
+  /// `false` when the bus is inert (no active connection / pairing
+  /// incomplete). Never throws — a missing session is a normal, expected
+  /// state, not an error.
+  Future<bool> sendSneak(String signalId, {String? senderId}) async {
+    final session = _session;
+    if (_inert || session == null) return false;
+    await session.sendSneak(signalId, senderId: senderId);
+    return true;
+  }
+
   /// Inbound events from the partner. Empty stream if inert.
   Stream<ModeEvent> get incoming {
     if (_inert || _session == null) return const Stream.empty();
     return _session.events;
+  }
+
+  /// Inbound Sneak In signals from the partner. Empty stream if inert.
+  Stream<ModeEvent> get sneaks {
+    if (_inert || _session == null) return const Stream.empty();
+    return _session.sneaks;
   }
 }
 

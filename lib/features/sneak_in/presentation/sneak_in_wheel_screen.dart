@@ -15,6 +15,7 @@ import '../../connections/application/connections_controller.dart';
 import '../../connections/domain/connection.dart';
 import '../../connections/domain/connection_status.dart';
 import '../application/sneak_in_controller.dart';
+import 'sneak_signal_catalogue.dart';
 
 /// 8-emoji selector wheel. Tap to highlight a sound, swipe up (or tap the
 /// glowing center disc) to send it to the active partner.
@@ -28,16 +29,10 @@ class SneakInWheelScreen extends ConsumerStatefulWidget {
 class _SneakInWheelScreenState extends ConsumerState<SneakInWheelScreen> {
   int _selected = 0;
 
-  static const List<_SneakEmoji> _emojis = [
-    _SneakEmoji('🤭', 'sneakSignalHiccup'),
-    _SneakEmoji('💨', 'sneakSignalToot'),
-    _SneakEmoji('🔔', 'sneakSignalBell'),
-    _SneakEmoji('👻', 'sneakSignalKnock'),
-    _SneakEmoji('🤫', 'sneakSignalWhisper'),
-    _SneakEmoji('👏', 'sneakSignalClap'),
-    _SneakEmoji('💥', 'sneakSignalBoom'),
-    _SneakEmoji('🐭', 'sneakSignalSqueak'),
-  ];
+  /// Single source of truth for the wheel — the shared protocol catalogue.
+  /// Order determines the angular position on the dial; ids are the wire
+  /// payload sent to the partner.
+  static const List<SneakSignal> _signals = kSneakSignals;
 
   @override
   Widget build(BuildContext context) {
@@ -84,7 +79,7 @@ class _SneakInWheelScreenState extends ConsumerState<SneakInWheelScreen> {
                 Expanded(
                   child: Center(
                     child: _Wheel(
-                      emojis: _emojis,
+                      signals: _signals,
                       selectedIndex: _selected,
                       onSelect: (i) {
                         setState(() => _selected = i);
@@ -134,39 +129,42 @@ class _SneakInWheelScreenState extends ConsumerState<SneakInWheelScreen> {
     if (targets.isEmpty) return;
     final t = AppLocalizations.of(context)!;
     final target = targets.first;
-    final ok = await ref
+    final signal = _signals[_selected];
+    // Quota check + real delivery over the encrypted session.
+    final result = await ref
         .read(sneakInControllerProvider.notifier)
-        .tryRecordSneakIn(target.id);
-    if (!ok) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(t.sneakInLimitReached)),
-      );
-      return;
-    }
-    HapticFeedback.mediumImpact();
+        .sendSneak(target.id, signal.id);
     if (!mounted) return;
-    context.go(
-      '${Routes.sneakInIncoming}?connectionId=${target.id}',
-    );
+    switch (result) {
+      case SneakSendResult.limitReached:
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(t.sneakInLimitReached)),
+        );
+        return;
+      case SneakSendResult.noChannel:
+        // No live partner channel: distinct error buzz, no navigation and
+        // no fabricated copy (no offline string exists to reuse honestly).
+        HapticFeedback.vibrate();
+        return;
+      case SneakSendResult.sent:
+        HapticFeedback.mediumImpact();
+        context.go(
+          '${Routes.sneakInIncoming}?connectionId=${target.id}',
+        );
+        return;
+    }
   }
-}
-
-class _SneakEmoji {
-  const _SneakEmoji(this.emoji, this.titleKey);
-  final String emoji;
-  final String titleKey;
 }
 
 class _Wheel extends StatelessWidget {
   const _Wheel({
-    required this.emojis,
+    required this.signals,
     required this.selectedIndex,
     required this.onSelect,
     required this.onCenterTap,
   });
 
-  final List<_SneakEmoji> emojis;
+  final List<SneakSignal> signals;
   final int selectedIndex;
   final ValueChanged<int> onSelect;
   final VoidCallback onCenterTap;
@@ -203,11 +201,11 @@ class _Wheel extends StatelessWidget {
               size: const Size.square(300),
               painter: _WheelPainter(selectedIndex: selectedIndex),
             ),
-            for (var i = 0; i < emojis.length; i++)
+            for (var i = 0; i < signals.length; i++)
               _emojiTile(
                 context,
                 index: i,
-                total: emojis.length,
+                total: signals.length,
                 radius: 118,
               ),
             GestureDetector(
@@ -277,7 +275,7 @@ class _Wheel extends StatelessWidget {
           ),
           alignment: Alignment.center,
           child: Text(
-            emojis[index].emoji,
+            signals[index].emoji,
             style: TextStyle(fontSize: selected ? 29 : 25),
           ),
         ),

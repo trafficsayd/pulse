@@ -41,14 +41,19 @@ class _ConnectingScreenState extends ConsumerState<ConnectingScreen>
       vsync: this,
       duration: const Duration(seconds: 4),
     )..repeat();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _finalizePairing());
+    // NOTE: persistence is NOT started automatically. Key material is only
+    // written after the user explicitly confirms the SAS codes match — see
+    // the verification gate in [build] and [_confirmMatch]. This is the
+    // anti-MITM defence required by §6 of the spec.
   }
 
-  Future<void> _finalizePairing() async {
+  /// User compared the SAS code shown here with their partner's screen and
+  /// confirmed the two are identical. Only now do we persist key material.
+  Future<void> _confirmMatch() async {
     if (_persisting || _routed) return;
-    _persisting = true;
+    setState(() => _persisting = true);
     final controller = ref.read(pairingControllerProvider.notifier);
-    final result = await controller.confirmAndPersist();
+    final result = await controller.confirmAndPersist(sasConfirmed: true);
     if (!mounted) return;
     if (result == null) {
       // Persistence failed — bounce back to pairing so the user can
@@ -71,6 +76,14 @@ class _ConnectingScreenState extends ConsumerState<ConnectingScreen>
     context.go(Routes.hub);
   }
 
+  /// User reported the codes do NOT match — abort without persisting and
+  /// return to pairing. A mismatch is a strong indicator of a MITM.
+  void _abortMismatch() {
+    ref.read(pairingControllerProvider.notifier).abortPairing();
+    if (!mounted) return;
+    context.go(Routes.pairing);
+  }
+
   @override
   void dispose() {
     _orbit.dispose();
@@ -82,13 +95,25 @@ class _ConnectingScreenState extends ConsumerState<ConnectingScreen>
     final t = AppLocalizations.of(context)!;
     final state = ref.watch(pairingControllerProvider);
     final step = _stepFromPhase(state.phase);
+    // Anti-MITM gate: while the handshake sits at awaitingConfirmation and we
+    // have not yet started persisting, show the SAS comparison screen instead
+    // of the progress animation. Persistence cannot proceed until the user
+    // taps "the codes match".
+    final showVerifyGate =
+        state.phase == PairingPhase.awaitingConfirmation && !_persisting;
     return Scaffold(
       backgroundColor: AppColors.background,
       body: PulseBackdrop(
         child: SafeArea(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(20, 10, 20, 28),
-            child: Column(
+            child: showVerifyGate
+                ? _VerifyGate(
+                    code: state.sasCode ?? '······',
+                    onMatch: _confirmMatch,
+                    onMismatch: _abortMismatch,
+                  )
+                : Column(
               children: [
                 PulseHeader(title: t.connectingTitle),
                 const SizedBox(height: 34),
@@ -196,6 +221,99 @@ class _ConnectingScreenState extends ConsumerState<ConnectingScreen>
       case PairingPhase.failed:
         return 0;
     }
+  }
+}
+
+/// SAS comparison gate. Presents the short authentication string large and
+/// centred with two explicit choices. Confirming persistence is impossible
+/// without the affirmative "codes match" tap, which is the app's only
+/// defence against an active man-in-the-middle on the signaling path.
+class _VerifyGate extends StatelessWidget {
+  const _VerifyGate({
+    required this.code,
+    required this.onMatch,
+    required this.onMismatch,
+  });
+
+  final String code;
+  final VoidCallback onMatch;
+  final VoidCallback onMismatch;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context)!;
+    return Column(
+      children: [
+        PulseHeader(title: t.connectingTitle),
+        const Spacer(),
+        const PulseGlowCircle(
+          size: 78,
+          color: AppColors.pulse,
+          fill: AppColors.surface,
+          blur: 30,
+          borderWidth: 1,
+          child: Icon(Icons.verified_user_rounded,
+              color: AppColors.pulse, size: 34),
+        ),
+        const SizedBox(height: 26),
+        Text(
+          t.verifyCodeTitle,
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            color: AppColors.textPrimary,
+            fontSize: 24,
+            fontWeight: FontWeight.w700,
+            letterSpacing: -0.3,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: Text(
+            t.verifyCodeBody,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 15,
+              height: 1.4,
+            ),
+          ),
+        ),
+        const SizedBox(height: 28),
+        PulsePanel(
+          radius: 22,
+          padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 22),
+          child: Text(
+            code,
+            style: const TextStyle(
+              color: AppColors.pulse,
+              fontSize: 40,
+              height: 1,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 10,
+              fontFamily: 'monospace',
+            ),
+          ),
+        ),
+        const Spacer(),
+        SizedBox(
+          width: double.infinity,
+          height: 54,
+          child: ElevatedButton(
+            onPressed: onMatch,
+            child: Text(t.verifyCodeMatch),
+          ),
+        ),
+        const SizedBox(height: 8),
+        TextButton(
+          onPressed: onMismatch,
+          child: Text(
+            t.verifyCodeMismatch,
+            style: const TextStyle(color: AppColors.danger),
+          ),
+        ),
+      ],
+    );
   }
 }
 

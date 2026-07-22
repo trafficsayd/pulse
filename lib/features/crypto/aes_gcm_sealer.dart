@@ -19,6 +19,12 @@ import 'package:cryptography/cryptography.dart';
 /// currently always zero), and the low 64 bits hold the counter encoded
 /// as a big-endian uint64. This makes nonce-reuse a programmer error
 /// rather than a probabilistic risk.
+///
+/// [seal] and [open] additionally accept optional associated data
+/// (`aad`). AAD is authenticated by the GCM tag but is never written to
+/// the wire buffer above — callers on both ends must derive it out of
+/// band (see [PairChannel] for how Pulse binds it to the channel's
+/// domain + epoch) and pass matching bytes, or authentication fails.
 class AesGcmSealer {
   AesGcmSealer({AesGcm? algorithm}) : _algo = algorithm ?? AesGcm.with256bits();
 
@@ -32,16 +38,25 @@ class AesGcmSealer {
 
   /// Encrypt [plaintext] under [key] using a counter-derived nonce and
   /// return a single buffer `nonce || ciphertext || mac`.
+  ///
+  /// [aad] is optional associated data that is authenticated (but never
+  /// encrypted or embedded in the returned buffer). It defaults to an
+  /// empty list, which AES-GCM treats identically to "no AAD" — so every
+  /// pre-existing call site keeps working unchanged. Callers that do pass
+  /// [aad] MUST supply the exact same bytes to [open], or authentication
+  /// will fail.
   Future<Uint8List> seal(
     Uint8List plaintext, {
     required SecretKey key,
     required int nonceCounter,
+    List<int> aad = const [],
   }) async {
     final nonce = nonceFromCounter(nonceCounter);
     final box = await _algo.encrypt(
       plaintext,
       secretKey: key,
       nonce: nonce,
+      aad: aad,
     );
     final ct = box.cipherText;
     final mac = box.mac.bytes;
@@ -58,11 +73,16 @@ class AesGcmSealer {
 
   /// Reverse [seal]. Throws [StateError] when the embedded nonce does
   /// not match [expectedNonceCounter] or when AES-GCM authentication
-  /// fails (tampered ciphertext / wrong key).
+  /// fails (tampered ciphertext / wrong key / mismatched [aad]).
+  ///
+  /// [aad] defaults to an empty list for the same backward-compatibility
+  /// reason as in [seal]. It must exactly match the [aad] passed to the
+  /// [seal] call that produced [packet].
   Future<Uint8List> open(
     Uint8List packet, {
     required SecretKey key,
     required int expectedNonceCounter,
+    List<int> aad = const [],
   }) async {
     if (packet.length < nonceLength + macLength) {
       throw const FormatException(
@@ -85,7 +105,7 @@ class AesGcmSealer {
       mac: Mac(mac),
     );
     try {
-      final plain = await _algo.decrypt(box, secretKey: key);
+      final plain = await _algo.decrypt(box, secretKey: key, aad: aad);
       return Uint8List.fromList(plain);
     } on SecretBoxAuthenticationError catch (e) {
       throw StateError('AES-GCM authentication failed: $e');

@@ -264,7 +264,7 @@ class _SwitchTile extends StatelessWidget {
         child: SwitchListTile.adaptive(
           value: value,
           onChanged: onChanged,
-          activeThumbColor: AppColors.pulse,
+          activeColor: AppColors.pulse,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(18),
           ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/pulse_mockup.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../capabilities/application/capability_providers.dart';
 import '../../capabilities/domain/device_capability.dart';
@@ -27,38 +28,49 @@ class DiagnosticsScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: AppColors.background,
-        title: Text(t.diagnosticsTitle),
-        centerTitle: false,
-      ),
-      body: caps.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (_, __) => Center(child: Text(t.errorGeneric)),
-        data: (capabilities) => ListView(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          children: [
-            _SectionHeader(label: t.diagnosticsHardwareSection),
-            const SizedBox(height: 8),
-            ...DeviceCapability.values.map(
-              (c) => _CapabilityRow(
-                label: _labelFor(t, c),
-                available: capabilities.has(c),
-                statusOk: t.diagnosticsStatusOk,
-                statusMissing: t.diagnosticsStatusMissing,
+      body: PulseBackdrop(
+        child: SafeArea(
+          child: Column(
+            children: [
+              PulseHeader(
+                title: t.diagnosticsTitle,
+                onBack: () => Navigator.of(context).maybePop(),
               ),
-            ),
-            const SizedBox(height: 24),
-            _SectionHeader(label: t.diagnosticsModesSection),
-            const SizedBox(height: 8),
-            ...kAllModes.map(
-              (mode) => _ModeRow(
-                mode: mode,
-                missing: capabilities.missing(mode.requiredCapabilities),
-                t: t,
+              Expanded(
+                child: caps.when(
+                  loading: () =>
+                      const Center(child: CircularProgressIndicator()),
+                  error: (_, __) => Center(child: Text(t.errorGeneric)),
+                  data: (capabilities) => ListView(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
+                    children: [
+                      _SectionHeader(label: t.diagnosticsHardwareSection),
+                      const SizedBox(height: 8),
+                      ...DeviceCapability.values.map(
+                        (c) => _CapabilityRow(
+                          label: _labelFor(t, c),
+                          available: capabilities.has(c),
+                          statusOk: t.diagnosticsStatusOk,
+                          statusMissing: t.diagnosticsStatusMissing,
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      _SectionHeader(label: t.diagnosticsModesSection),
+                      const SizedBox(height: 8),
+                      ...kAllModes.map(
+                        (mode) => _ModeRow(
+                          mode: mode,
+                          missing:
+                              capabilities.missing(mode.requiredCapabilities),
+                          t: t,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

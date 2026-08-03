@@ -36,6 +36,13 @@ android {
         versionName = flutter.versionName
     }
 
+    packagingOptions {
+        // Strip the debug-only Vulkan validation layer (≈13 MB per ABI) from
+        // release builds. Play Console rejects APKs containing it, and it
+        // is only useful when developing the renderer.
+        resources.excludes += "lib/*/libVkLayer_khronos_validation.so"
+    }
+
     signingConfigs {
         release {
             if (keystoreProperties.containsKey("storeFile")) {

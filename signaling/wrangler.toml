@@ -35,5 +35,8 @@ preview_id = "REPLACE_ME_KV_NAMESPACE_PREVIEW_ID"
 # these via `wrangler secret put`.
 ICE_LONG_POLL_TIMEOUT_MS = "25000"
 ICE_LONG_POLL_INTERVAL_MS = "500"
-RATE_LIMIT_PER_MINUTE = "30"
+# Local dev: two emulators NAT through the host so they share the source IP.
+# 30/min trips during two-device handshakes; 240/min gives headroom while
+# still exercising the limiter code path. Production keeps 30 via env override.
+RATE_LIMIT_PER_MINUTE = "240"
 SESSION_TTL_SECONDS = "600"

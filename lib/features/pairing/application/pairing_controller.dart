@@ -137,29 +137,44 @@ class PairingController extends Notifier<PairingState> {
     final epoch = ++_epoch;
     if (_disposed) return;
     final pairingCode = _generatePairingCode();
-    // Publish the pairing code immediately so the user can start sharing it
-    // while the keypair generation and signaling rendezvous happen in the
-    // background. Keeping the code in state before the network step also
-    // guarantees it stays visible if the rendezvous fails — the screen can
-    // then surface a retry instead of an eternal "deriving" spinner.
     state = PairingState(
       phase: PairingPhase.generatingKeys,
       pairingCode: pairingCode,
     );
+
+    // Boot race: at app cold-start the signaling server may not yet be
+    // reachable from the emulator (wrangler still warming up, DNS not
+    // resolved, kernel net stack still bringing interfaces up). Try the
+    // rendezvous a few times with exponential backoff before giving up so
+    // the user doesn't have to tap Retry on first open.
+    Future<T> retryNet<T>(Future<T> Function() fn, {int attempts = 3}) async {
+      Object? lastErr;
+      for (var i = 0; i < attempts; i++) {
+        try {
+          return await fn();
+        } catch (e) {
+          lastErr = e;
+          if (_disposed || epoch != _epoch) rethrow;
+          await Future<void>.delayed(Duration(milliseconds: 250 * (1 << i)));
+        }
+      }
+      throw lastErr ?? StateError('unreachable');
+    }
+
     try {
       final localKeyPair = await _service.generateLocalKeyPair();
       if (_disposed || epoch != _epoch) return;
       final pubB64 = await localKeyPair.publicKeyBase64Url();
       if (_disposed || epoch != _epoch) return;
-      final session = await _signaling.createSession(pairingCode);
-      await _signaling.postOffer(
+      final session = await retryNet(() => _signaling.createSession(pairingCode));
+      await retryNet(() => _signaling.postOffer(
         sessionId: session.sessionId,
         token: session.token,
         offer: SignalingSessionDescription(
           type: 'offer',
           sdp: _encodePublicKey(pubB64),
         ),
-      );
+      ));
       state = state.copyWith(
         phase: PairingPhase.awaitingPartner,
         pairingCode: pairingCode,
@@ -228,7 +243,26 @@ class PairingController extends Notifier<PairingState> {
       final localKeyPair = await _service.generateLocalKeyPair();
       if (_disposed || epoch != _epoch) return;
       final pubB64 = await localKeyPair.publicKeyBase64Url();
-      final session = await _signaling.createSession(pairingCode);
+
+      // Boot race: see comment in [startHostHandshake]. The joiner can hit
+      // a cold signaling path too — both createSession and the first
+      // getOffer are retried so a slow wrangler cold-start on the host
+      // doesn't bounce the user back with "Couldn't reach the server."
+      Future<T> retryNet<T>(Future<T> Function() fn, {int attempts = 3}) async {
+        Object? lastErr;
+        for (var i = 0; i < attempts; i++) {
+          try {
+            return await fn();
+          } catch (e) {
+            lastErr = e;
+            if (_disposed || epoch != _epoch) rethrow;
+            await Future<void>.delayed(Duration(milliseconds: 250 * (1 << i)));
+          }
+        }
+        throw lastErr ?? StateError('unreachable');
+      }
+
+      final session = await retryNet(() => _signaling.createSession(pairingCode));
       state = state.copyWith(
         phase: PairingPhase.awaitingPartner,
         connectionId: session.sessionId,
@@ -237,11 +271,23 @@ class PairingController extends Notifier<PairingState> {
         localPublicKeyBase64: pubB64,
       );
 
-      final offer = await _pollForOffer(
-        sessionId: session.sessionId,
-        token: session.token,
-        timeout: timeout,
-      );
+      // Poll the host's offer. The host may still be in `awaitingPartner`
+      // (we race them to `createSession` returning the same id) — keep
+      // polling until timeout. Single failures are retried inside the loop.
+      SignalingSessionDescription? offer;
+      final deadline = DateTime.now().add(timeout);
+      while (!_disposed && DateTime.now().isBefore(deadline)) {
+        try {
+          offer = await _signaling.getOffer(
+            sessionId: session.sessionId,
+            token: session.token,
+          );
+        } catch (_) {
+          // transient signaling hiccup → keep polling until deadline
+        }
+        if (offer != null) break;
+        await Future<void>.delayed(const Duration(milliseconds: 700));
+      }
       if (_disposed || epoch != _epoch) return;
       if (offer == null) {
         throw TimeoutException('Pairing offer timed out', timeout);
@@ -258,14 +304,14 @@ class PairingController extends Notifier<PairingState> {
       );
       if (_disposed || epoch != _epoch) return;
 
-      await _signaling.postAnswer(
+      await retryNet(() => _signaling.postAnswer(
         sessionId: session.sessionId,
         token: session.token,
         answer: SignalingSessionDescription(
           type: 'answer',
           sdp: _encodePublicKey(pubB64),
         ),
-      );
+      ));
       if (_disposed || epoch != _epoch) return;
 
       final sas = _service.deriveShortCode(shared);
@@ -366,23 +412,6 @@ class PairingController extends Notifier<PairingState> {
       throw const FormatException('Curve25519 public key must be 32 bytes');
     }
     return SimplePublicKey(bytes, type: KeyPairType.x25519);
-  }
-
-  Future<SignalingSessionDescription?> _pollForOffer({
-    required String sessionId,
-    required String token,
-    required Duration timeout,
-  }) async {
-    final deadline = DateTime.now().add(timeout);
-    while (!_disposed && DateTime.now().isBefore(deadline)) {
-      final offer = await _signaling.getOffer(
-        sessionId: sessionId,
-        token: token,
-      );
-      if (offer != null) return offer;
-      await Future<void>.delayed(const Duration(milliseconds: 700));
-    }
-    return null;
   }
 
   Future<SignalingSessionDescription?> _pollForAnswer({

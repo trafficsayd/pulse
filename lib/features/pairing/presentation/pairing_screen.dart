@@ -31,7 +31,16 @@ class _PairingScreenState extends ConsumerState<PairingScreen> {
     // by the time the user finishes reading "share this code" the SAS
     // has already been derived from the real ECDH secret.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(pairingControllerProvider.notifier).startHostHandshake();
+      // Idempotent entry: only kick off the handshake if we're truly idle.
+      // We deliberately do NOT auto-restart from `failed` — that state must
+      // be reached only by an explicit user tap on the Retry button, otherwise
+      // each frame rebuild rotates the pairing code and the partner's already-
+      // submitted answer (posted against the previous session) never reaches
+      // the new poller.
+      final current = ref.read(pairingControllerProvider).phase;
+      if (current == PairingPhase.idle) {
+        ref.read(pairingControllerProvider.notifier).startHostHandshake();
+      }
     });
   }
 
@@ -56,6 +65,26 @@ class _PairingScreenState extends ConsumerState<PairingScreen> {
     final t = AppLocalizations.of(context)!;
     final pairing = ref.watch(pairingControllerProvider);
     final displayCode = pairing.sasCode ?? pairing.pairingCode ?? '······';
+
+    // Host-side auto-route: once the handshake reaches `awaitingConfirmation`
+    // (we have partner's public key + derived shared secret + SAS), push the
+    // connecting screen which will persist the keys and forward to the hub.
+    // Without this the host is stuck on a "Create pair" button that is only
+    // enabled after `isReadyToConfirm` — the joiner side already auto-routes
+    // via `joinHandshake`, host was asymmetric.
+    ref.listen<PairingState>(pairingControllerProvider, (prev, next) {
+      if (prev?.phase != PairingPhase.awaitingConfirmation &&
+          next.phase == PairingPhase.awaitingConfirmation &&
+          next.sasCode != null &&
+          next.connectionId != null) {
+        // Capture router before the gap so the linter is happy and we don't
+        // re-lookup `BuildContext` after an async boundary.
+        final router = GoRouter.of(context);
+        Future.microtask(() {
+          if (mounted) router.go(Routes.connecting);
+        });
+      }
+    });
 
     return Scaffold(
       backgroundColor: AppColors.background,

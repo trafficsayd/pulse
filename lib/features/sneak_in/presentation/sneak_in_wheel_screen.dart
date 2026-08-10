@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -16,6 +17,7 @@ import '../../connections/domain/connection.dart';
 import '../../connections/domain/connection_status.dart';
 import '../application/sneak_in_controller.dart';
 import 'sneak_signal_catalogue.dart';
+import 'sneak_sound_player.dart';
 
 /// 8-emoji selector wheel. Tap to highlight a sound, swipe up (or tap the
 /// glowing center disc) to send it to the active partner.
@@ -84,6 +86,13 @@ class _SneakInWheelScreenState extends ConsumerState<SneakInWheelScreen> {
                       onSelect: (i) {
                         setState(() => _selected = i);
                         HapticFeedback.selectionClick();
+                        // Preview the signal so picking one is done by ear,
+                        // not by reading labels. Fails soft (see player).
+                        unawaited(
+                          ref
+                              .read(sneakSoundPlayerProvider)
+                              .playSignal(_signals[i].id),
+                        );
                       },
                       onCenterTap: () => _send(pausedTargets),
                     ),
@@ -148,6 +157,10 @@ class _SneakInWheelScreenState extends ConsumerState<SneakInWheelScreen> {
         return;
       case SneakSendResult.sent:
         HapticFeedback.mediumImpact();
+        // Sender-side confirmation: hear what the partner will hear.
+        unawaited(
+          ref.read(sneakSoundPlayerProvider).playSignal(signal.id),
+        );
         context.go(
           '${Routes.sneakInIncoming}?connectionId=${target.id}',
         );

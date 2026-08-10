@@ -60,6 +60,10 @@ dependencies:
   record: ^5.1.2
   permission_handler: ^11.3.1
 
+  # Sneak In signal sounds — short bundled SFX (v1.1). Assets are mono
+  # AAC (.m4a): raw .opus is not decodable by the iOS system players.
+  audioplayers: ^6.1.0
+
   # Track F1 — real Bluetooth Low Energy transport (central + Android
   # peripheral scaffolding). Pinned to a minor floor so a transitive bump
   # cannot silently change GATT behaviour between releases.

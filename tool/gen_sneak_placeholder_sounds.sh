@@ -3,17 +3,23 @@
 #
 # These are still synthesized stand-ins (not licensed sound design), but each
 # is shaped to feel distinct and lively — a step up from plain sine tones —
-# until a real audio pass lands. Mono Opus @24 kbps (spec §12).
+# until a real audio pass lands.
 #
-# Requires: ffmpeg with libopus. Run from the repo root:
+# Format: mono AAC-LC in .m4a. Raw .opus is NOT decodable by the iOS system
+# players (AVAudioPlayer/AVPlayer), so bundled SFX ship as AAC, which decodes
+# natively on both platforms. Spec §12's Opus @24 kbps applies to the
+# real-time session audio channel, not to bundled effects.
+#
+# Requires: ffmpeg with the native aac encoder. Run from the repo root:
 #   bash tool/gen_sneak_placeholder_sounds.sh
 set -euo pipefail
 out="assets/sounds/sneak"
 mkdir -p "$out"
 
 gen() { # name  lavfi-source  filterchain
-  ffmpeg -y -f lavfi -i "$2" -af "$3" -ac 1 -c:a libopus -b:a 24k "$out/$1.opus" >/dev/null 2>&1
-  echo "  wrote $out/$1.opus"
+  ffmpeg -y -f lavfi -i "$2" -af "$3" -ac 1 -c:a aac -b:a 48k \
+    -movflags +faststart "$out/$1.m4a" >/dev/null 2>&1
+  echo "  wrote $out/$1.m4a"
 }
 
 # knock   — short woody tap (brown-noise burst through a lowpass)

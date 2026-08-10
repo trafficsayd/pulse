@@ -1,17 +1,21 @@
-# Sneak In — placeholder sounds
+# Sneak In — signal sounds
 
-These `*.opus` files are **placeholders**: short, distinct sine tones that stand
-in for the real "deliberately silly" Sneak In signals (knock, whistle, bell,
-kiss, pop, giggle, meow, hiccup — see `lib/features/sneak_in/presentation/sneak_signal_catalogue.dart`).
+These `*.m4a` files are the 8 Sneak In signal sounds (knock, whistle, bell,
+kiss, pop, giggle, meow, hiccup — see
+`lib/features/sneak_in/presentation/sneak_signal_catalogue.dart`).
 
-They exist so the asset references resolve and the Sneak In wheel can be wired
-end-to-end before final audio is produced. Encoding: mono Opus @24 kbps (spec §12).
+Encoding: mono AAC-LC in `.m4a`. Raw `.opus` is NOT decodable by the iOS
+system players (AVAudioPlayer/AVPlayer), so bundled SFX ship as AAC —
+spec §12's Opus @24 kbps applies to the real-time session audio channel,
+not to bundled effects.
 
-Regenerate any time with:
+The current files are still **synthesized stand-ins** (shaped ffmpeg tones,
+not licensed sound design). Regenerate any time with:
 
 ```bash
 bash tool/gen_sneak_placeholder_sounds.sh
 ```
 
-Replace with real sound design before store release. Keep the file names/ids —
-`id` in the catalogue is part of the on-the-wire protocol and must not change.
+Replace with real sound design when ready. Keep the file names — the
+catalogue `id` doubles as the on-the-wire protocol value and the asset
+file name, and must not change.

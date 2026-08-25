@@ -8,6 +8,7 @@ import type {
   RelayMessagePayload,
   SignalingSession,
 } from './types';
+import { appendD1IceCandidate, readD1IceCandidatesSince, signalingStore } from './storage';
 
 /**
  * KV key helpers. All keys are namespaced so a single `SIGNALING_SESSIONS`
@@ -54,15 +55,32 @@ async function sha256Hex(value: string): Promise<string> {
 export async function createSession(
   env: Env,
   pairingCode: string,
+  clientId?: string,
   nowMs: number = Date.now(),
-): Promise<SignalingSession> {
+): Promise<{ session: SignalingSession; isInitiator: boolean }> {
   const ttl = ttlSeconds(env);
   const pairingKey = KEY.pairing(await sha256Hex(pairingCode));
-  const existingId = await env.SIGNALING_SESSIONS.get(pairingKey);
+  const existingId = await signalingStore(env).get(pairingKey);
   if (existingId) {
     const existing = await getSession(env, existingId);
     if (existing) {
-      return existing;
+      const lastOffer = clientId ? await getOffer(env, existing.sessionId) : null;
+      const offerIsStale = lastOffer
+        ? nowMs - lastOffer.storedAt > 30_000
+        : nowMs - existing.createdAt > 30_000;
+      if (
+        clientId &&
+        (!existing.initiatorClientId || (existing.initiatorClientId !== clientId && offerIsStale))
+      ) {
+        existing.initiatorClientId = clientId;
+        await signalingStore(env).put(KEY.session(existing.sessionId), JSON.stringify(existing), {
+          expirationTtl: Math.max(1, Math.ceil((existing.expiresAt - nowMs) / 1000)),
+        });
+      }
+      return {
+        session: existing,
+        isInitiator: clientId ? existing.initiatorClientId === clientId : false,
+      };
     }
   }
 
@@ -71,18 +89,19 @@ export async function createSession(
     pairingCode,
     createdAt: nowMs,
     expiresAt: nowMs + ttl * 1000,
+    ...(clientId ? { initiatorClientId: clientId } : {}),
   };
-  await env.SIGNALING_SESSIONS.put(KEY.session(session.sessionId), JSON.stringify(session), {
+  await signalingStore(env).put(KEY.session(session.sessionId), JSON.stringify(session), {
     expirationTtl: ttl,
   });
-  await env.SIGNALING_SESSIONS.put(pairingKey, session.sessionId, {
+  await signalingStore(env).put(pairingKey, session.sessionId, {
     expirationTtl: ttl,
   });
-  return session;
+  return { session, isInitiator: true };
 }
 
 export async function getSession(env: Env, sessionId: string): Promise<SignalingSession | null> {
-  const raw = await env.SIGNALING_SESSIONS.get(KEY.session(sessionId));
+  const raw = await signalingStore(env).get(KEY.session(sessionId));
   if (!raw) {
     return null;
   }
@@ -98,13 +117,13 @@ export async function storeOffer(
   sessionId: string,
   payload: OfferPayload,
 ): Promise<void> {
-  await env.SIGNALING_SESSIONS.put(KEY.offer(sessionId), JSON.stringify(payload), {
+  await signalingStore(env).put(KEY.offer(sessionId), JSON.stringify(payload), {
     expirationTtl: ttlSeconds(env),
   });
 }
 
 export async function getOffer(env: Env, sessionId: string): Promise<OfferPayload | null> {
-  const raw = await env.SIGNALING_SESSIONS.get(KEY.offer(sessionId));
+  const raw = await signalingStore(env).get(KEY.offer(sessionId));
   if (!raw) {
     return null;
   }
@@ -120,13 +139,13 @@ export async function storeAnswer(
   sessionId: string,
   payload: AnswerPayload,
 ): Promise<void> {
-  await env.SIGNALING_SESSIONS.put(KEY.answer(sessionId), JSON.stringify(payload), {
+  await signalingStore(env).put(KEY.answer(sessionId), JSON.stringify(payload), {
     expirationTtl: ttlSeconds(env),
   });
 }
 
 export async function getAnswer(env: Env, sessionId: string): Promise<AnswerPayload | null> {
-  const raw = await env.SIGNALING_SESSIONS.get(KEY.answer(sessionId));
+  const raw = await signalingStore(env).get(KEY.answer(sessionId));
   if (!raw) {
     return null;
   }
@@ -141,7 +160,7 @@ export async function getAnswer(env: Env, sessionId: string): Promise<AnswerPayl
  * Read the full ICE list. Empty list when nothing has been stored yet.
  */
 export async function readIce(env: Env, sessionId: string): Promise<IceCandidate[]> {
-  const raw = await env.SIGNALING_SESSIONS.get(KEY.ice(sessionId));
+  const raw = await signalingStore(env).get(KEY.ice(sessionId));
   if (!raw) {
     return [];
   }
@@ -170,9 +189,16 @@ export async function appendIce(
   sessionId: string,
   candidate: IceCandidate,
 ): Promise<number> {
+  const d1Cursor = await appendD1IceCandidate(
+    env,
+    sessionId,
+    JSON.stringify(candidate),
+    ttlSeconds(env),
+  );
+  if (d1Cursor !== null) return d1Cursor;
   const current = await readIce(env, sessionId);
   current.push(candidate);
-  await env.SIGNALING_SESSIONS.put(KEY.ice(sessionId), JSON.stringify(current), {
+  await signalingStore(env).put(KEY.ice(sessionId), JSON.stringify(current), {
     expirationTtl: ttlSeconds(env),
   });
   return current.length;
@@ -187,8 +213,20 @@ export async function readIceSince(
   sessionId: string,
   since: number,
 ): Promise<IcePayload> {
-  const all = await readIce(env, sessionId);
   const safeSince = Number.isFinite(since) && since >= 0 ? Math.floor(since) : 0;
+  const d1Rows = await readD1IceCandidatesSince(env, sessionId, safeSince);
+  if (d1Rows !== null) {
+    const candidates = d1Rows.flatMap((row) => {
+      try {
+        return [JSON.parse(row.value) as IceCandidate];
+      } catch {
+        return [];
+      }
+    });
+    const cursor = d1Rows.length > 0 ? d1Rows.at(-1)!.cursor : safeSince;
+    return { candidates, cursor };
+  }
+  const all = await readIce(env, sessionId);
   const cursor = all.length;
   if (safeSince >= cursor) {
     return { candidates: [], cursor };
@@ -201,7 +239,7 @@ export async function readIceSince(
  * yet. These are encrypted app packets, not SDP/ICE metadata.
  */
 export async function readMessages(env: Env, sessionId: string): Promise<RelayMessage[]> {
-  const raw = await env.SIGNALING_SESSIONS.get(KEY.messages(sessionId));
+  const raw = await signalingStore(env).get(KEY.messages(sessionId));
   if (!raw) {
     return [];
   }
@@ -229,7 +267,7 @@ export async function appendMessage(
 ): Promise<number> {
   const current = await readMessages(env, sessionId);
   current.push(message);
-  await env.SIGNALING_SESSIONS.put(KEY.messages(sessionId), JSON.stringify(current), {
+  await signalingStore(env).put(KEY.messages(sessionId), JSON.stringify(current), {
     expirationTtl: ttlSeconds(env),
   });
   return current.length;

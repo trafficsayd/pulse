@@ -29,8 +29,9 @@ class ConnectionStatusScreen extends ConsumerWidget {
     final connections = ref.watch(connectionsControllerProvider);
     final active = connections.active;
     final session = ref.watch(sessionProvider);
-    final transportKind =
-        session.valueOrNull?.currentTransport ?? TransportKind.searching;
+    final transportKind = ref.watch(transportStateProvider).valueOrNull ??
+        session.valueOrNull?.currentTransport ??
+        TransportKind.searching;
 
     return Scaffold(
       backgroundColor: AppColors.background,

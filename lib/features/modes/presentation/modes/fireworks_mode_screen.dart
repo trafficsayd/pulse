@@ -47,7 +47,9 @@ class _FireworksModeScreenState extends ConsumerState<FireworksModeScreen>
   void initState() {
     super.initState();
     _player = HapticPatternPlayer(ref.read(hapticEngineProvider));
-    _partnerSub = ref.read(modeEventBusProvider).incoming
+    _partnerSub = ref
+        .read(modeEventBusProvider)
+        .incoming
         .where((e) => e.type == 'firework')
         .listen(_onPartnerFirework);
   }
@@ -56,26 +58,38 @@ class _FireworksModeScreenState extends ConsumerState<FireworksModeScreen>
     if (!mounted) return;
     final x = (event.data['x'] as num?)?.toDouble() ?? 0.5;
     final y = (event.data['y'] as num?)?.toDouble() ?? 0.3;
-    final size = context.size;
-    if (size == null) return;
-    _launch(Offset(x * size.width, y * size.height), isLocal: false);
+    final rawColor = (event.data['color'] as num?)?.toInt();
+    final color = rawColor == null
+        ? _colors[_random.nextInt(_colors.length)]
+        : Color(rawColor);
+    _launch(Offset(x, y), color: color, isLocal: false);
   }
 
   Future<void> _onTap(TapDownDetails details) async {
-    _launch(details.localPosition, isLocal: true);
-    HapticFeedback.lightImpact();
     final size = context.size;
     if (size == null) return;
+    final normalized = Offset(
+      details.localPosition.dx / size.width,
+      details.localPosition.dy / size.height,
+    );
+    final color = _colors[_random.nextInt(_colors.length)];
+    _launch(normalized, color: color, isLocal: true);
+    HapticFeedback.lightImpact();
     await ref.read(modeEventBusProvider).send(ModeEvent(
-      type: 'firework',
-      data: {
-        'x': details.localPosition.dx / size.width,
-        'y': details.localPosition.dy / size.height,
-      },
-    ));
+          type: 'firework',
+          data: {
+            'x': normalized.dx,
+            'y': normalized.dy,
+            'color': color.toARGB32(),
+          },
+        ));
   }
 
-  void _launch(Offset target, {required bool isLocal}) {
+  void _launch(
+    Offset normalizedTarget, {
+    required Color color,
+    required bool isLocal,
+  }) {
     final rocketController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 600),
@@ -84,9 +98,8 @@ class _FireworksModeScreenState extends ConsumerState<FireworksModeScreen>
       vsync: this,
       duration: const Duration(milliseconds: 1200),
     );
-    final color = _colors[_random.nextInt(_colors.length)];
     final firework = _Firework(
-      target: target,
+      target: normalizedTarget,
       color: color,
       rocketController: rocketController,
       burstController: burstController,
@@ -182,26 +195,42 @@ class _Firework {
 }
 
 class _FireworksPainter extends CustomPainter {
-  _FireworksPainter({required this.fireworks});
+  _FireworksPainter({required this.fireworks})
+      : super(
+          repaint: Listenable.merge(
+            fireworks
+                .expand(
+                  (firework) => [
+                    firework.rocketController,
+                    firework.burstController,
+                  ],
+                )
+                .toList(growable: false),
+          ),
+        );
   final List<_Firework> fireworks;
 
   @override
   void paint(Canvas canvas, Size size) {
     for (final fw in fireworks) {
+      final target = Offset(
+        fw.target.dx * size.width,
+        fw.target.dy * size.height,
+      );
       // Rocket phase: trail from bottom to target.
       if (fw.rocketController.isAnimating) {
         final p = fw.rocketController.value;
         final startY = size.height;
         final current = Offset(
-          fw.target.dx,
-          startY + (fw.target.dy - startY) * p,
+          target.dx,
+          startY + (target.dy - startY) * p,
         );
         final trailPaint = Paint()
           ..color = fw.color.withValues(alpha: 0.6)
           ..strokeWidth = 2
           ..strokeCap = StrokeCap.round;
         canvas.drawLine(
-          Offset(fw.target.dx, startY),
+          Offset(target.dx, startY),
           current,
           trailPaint,
         );
@@ -217,8 +246,8 @@ class _FireworksPainter extends CustomPainter {
           for (var i = 0; i < particleCount; i++) {
             final theta = (i / particleCount) * 2 * math.pi;
             final drift = i * 0.7;
-            final px = fw.target.dx + math.cos(theta) * radius;
-            final py = fw.target.dy + math.sin(theta) * radius + drift * p;
+            final px = target.dx + math.cos(theta) * radius;
+            final py = target.dy + math.sin(theta) * radius + drift * p;
             final paint = Paint()
               ..color = fw.color.withValues(alpha: fade)
               ..style = PaintingStyle.fill;

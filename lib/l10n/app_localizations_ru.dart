@@ -102,7 +102,7 @@ class AppLocalizationsRu extends AppLocalizations {
   String get transportLocalWifi => 'Локальная сеть (Wi-Fi Direct)';
 
   @override
-  String get transportRelayWebrtc => 'Интернет-реле (WebRTC)';
+  String get transportRelayWebrtc => 'WebRTC (P2P / TURN)';
 
   @override
   String get peopleTitle => 'Мои люди';
@@ -420,6 +420,9 @@ class AppLocalizationsRu extends AppLocalizations {
   String get sketchHint => 'Рисуй вживую или отправь готовую открытку';
 
   @override
+  String get sketchCanvas => 'Холст';
+
+  @override
   String get whisperHint => 'Шёпот в микрофон — лучи дышат вместе с тобой';
 
   @override
@@ -436,6 +439,21 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get candleBlowHint => 'Подуй, чтобы погасить';
+
+  @override
+  String get candleClassic => 'Классика';
+
+  @override
+  String get candleGlass => 'Стекло';
+
+  @override
+  String get candleViolet => 'Фиолетовая';
+
+  @override
+  String get breathInhale => 'вдох';
+
+  @override
+  String get breathExhale => 'выдох';
 
   @override
   String get modesUnsupportedTitle => 'Здесь этот режим не работает';

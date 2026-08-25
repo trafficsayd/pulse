@@ -1,4 +1,5 @@
 import type { Env } from './types';
+import { signalingStore } from './storage';
 
 /**
  * Sliding-window rate limiter backed by KV.
@@ -52,7 +53,7 @@ function parseLimit(env: Env): number {
 }
 
 async function readCounter(env: Env, key: string): Promise<number> {
-  const v = await env.SIGNALING_SESSIONS.get(key);
+  const v = await signalingStore(env).get(key);
   if (!v) {
     return 0;
   }
@@ -93,7 +94,7 @@ export async function checkAndIncrementRateLimit(
     return { allowed: false, count: Math.round(weighted), limit, retryAfterSeconds };
   }
 
-  await env.SIGNALING_SESSIONS.put(currentKey, String(current + 1), {
+  await signalingStore(env).put(currentKey, String(current + 1), {
     expirationTtl: BUCKET_TTL_SECONDS,
   });
 

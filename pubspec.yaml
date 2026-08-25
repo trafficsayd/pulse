@@ -47,6 +47,10 @@ dependencies:
   # between two peers via the Cloudflare Worker in `signaling/`.
   http: ^1.2.2
 
+  # Native WebRTC DataChannel. ICE tries host/STUN candidates first and uses
+  # TURN only when a direct path cannot be established.
+  flutter_webrtc: ^1.6.0
+
   # Utilities
   collection: ^1.18.0
   uuid: ^4.5.1

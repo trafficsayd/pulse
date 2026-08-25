@@ -33,6 +33,10 @@ class _SyncModeScreenState extends ConsumerState<SyncModeScreen>
   Timer? _beatTimer;
   DateTime? _localTapTime;
   DateTime? _partnerTapTime;
+  int? _localBeat;
+  int? _partnerBeat;
+  int? _localOffsetMs;
+  int? _partnerOffsetMs;
   bool _synced = false;
   StreamSubscription<ModeEvent>? _partnerSub;
   late final HapticPatternPlayer _player;
@@ -49,13 +53,10 @@ class _SyncModeScreenState extends ConsumerState<SyncModeScreen>
       vsync: this,
       duration: const Duration(milliseconds: 600),
     );
-    // Steady beat every 2 seconds.
-    _beatTimer = Timer.periodic(const Duration(seconds: 2), (_) {
-      if (!mounted) return;
-      _pulse..reset()..forward();
-      _checkSync();
-    });
-    _partnerSub = ref.read(modeEventBusProvider).incoming
+    _scheduleNextBeat();
+    _partnerSub = ref
+        .read(modeEventBusProvider)
+        .incoming
         .where((e) => e.type == 'sync_tap')
         .listen(_onPartnerTap);
   }
@@ -63,23 +64,43 @@ class _SyncModeScreenState extends ConsumerState<SyncModeScreen>
   void _onPartnerTap(ModeEvent event) {
     if (!mounted) return;
     _partnerTapTime = DateTime.now();
+    _partnerBeat = (event.data['beat'] as num?)?.toInt();
+    _partnerOffsetMs = (event.data['offset'] as num?)?.toInt();
     setState(() {});
     _checkSync();
   }
 
   Future<void> _onTap() async {
     HapticFeedback.lightImpact();
-    _localTapTime = DateTime.now();
+    final now = DateTime.now();
+    _localTapTime = now;
+    _localBeat = now.millisecondsSinceEpoch ~/ 2000;
+    _localOffsetMs = now.millisecondsSinceEpoch % 2000;
     setState(() {});
     _checkSync();
-    await ref.read(modeEventBusProvider).send(const ModeEvent(type: 'sync_tap'));
+    await ref.read(modeEventBusProvider).send(ModeEvent(
+          type: 'sync_tap',
+          data: {'beat': _localBeat, 'offset': _localOffsetMs},
+        ));
   }
 
   void _checkSync() {
+    if (_localBeat != null &&
+        _partnerBeat != null &&
+        _localOffsetMs != null &&
+        _partnerOffsetMs != null) {
+      if (_localBeat != _partnerBeat) return;
+      _markSyncedIfClose((_localOffsetMs! - _partnerOffsetMs!).abs());
+      return;
+    }
     final local = _localTapTime;
     final partner = _partnerTapTime;
     if (local == null || partner == null) return;
     final diff = (local.difference(partner)).inMilliseconds.abs();
+    _markSyncedIfClose(diff);
+  }
+
+  void _markSyncedIfClose(int diff) {
     if (diff < 400 && !_synced) {
       setState(() => _synced = true);
       unawaited(_player.play(HapticPatterns.heartbeat));
@@ -88,6 +109,19 @@ class _SyncModeScreenState extends ConsumerState<SyncModeScreen>
         if (mounted) setState(() => _synced = false);
       });
     }
+  }
+
+  void _scheduleNextBeat() {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final delay = 2000 - now % 2000;
+    _beatTimer = Timer(Duration(milliseconds: delay), () {
+      if (!mounted) return;
+      _pulse
+        ..reset()
+        ..forward();
+      _checkSync();
+      _scheduleNextBeat();
+    });
   }
 
   @override
@@ -211,8 +245,10 @@ class _SyncPainter extends CustomPainter {
 
     // Local satellite (left orbit).
     final localAngle = orbit * 2 * math.pi + math.pi;
-    final localPos = center + Offset(math.cos(localAngle), math.sin(localAngle)) * baseRadius * 2.5;
-    final localColor = localTapped ? AppColors.pulse : AppColors.pulse.withValues(alpha: 0.4);
+    final localPos = center +
+        Offset(math.cos(localAngle), math.sin(localAngle)) * baseRadius * 2.5;
+    final localColor =
+        localTapped ? AppColors.pulse : AppColors.pulse.withValues(alpha: 0.4);
     canvas.drawCircle(
       localPos,
       localTapped ? 14 : 10,
@@ -221,8 +257,13 @@ class _SyncPainter extends CustomPainter {
 
     // Partner satellite (right orbit, offset by pi).
     final partnerAngle = orbit * 2 * math.pi;
-    final partnerPos = center + Offset(math.cos(partnerAngle), math.sin(partnerAngle)) * baseRadius * 2.5;
-    final partnerColor = partnerTapped ? AppColors.heart : AppColors.heart.withValues(alpha: 0.4);
+    final partnerPos = center +
+        Offset(math.cos(partnerAngle), math.sin(partnerAngle)) *
+            baseRadius *
+            2.5;
+    final partnerColor = partnerTapped
+        ? AppColors.heart
+        : AppColors.heart.withValues(alpha: 0.4);
     canvas.drawCircle(
       partnerPos,
       partnerTapped ? 14 : 10,

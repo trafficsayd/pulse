@@ -102,7 +102,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get transportLocalWifi => 'Local network (Wi-Fi Direct)';
 
   @override
-  String get transportRelayWebrtc => 'Internet relay (WebRTC)';
+  String get transportRelayWebrtc => 'WebRTC (P2P / TURN)';
 
   @override
   String get peopleTitle => 'My People';
@@ -418,6 +418,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sketchHint => 'Draw live or send a finished card';
 
   @override
+  String get sketchCanvas => 'Canvas';
+
+  @override
   String get whisperHint =>
       'Whisper into the mic — the spokes follow your breath';
 
@@ -435,6 +438,21 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get candleBlowHint => 'Blow to extinguish';
+
+  @override
+  String get candleClassic => 'Classic';
+
+  @override
+  String get candleGlass => 'Glass';
+
+  @override
+  String get candleViolet => 'Violet';
+
+  @override
+  String get breathInhale => 'inhale';
+
+  @override
+  String get breathExhale => 'exhale';
 
   @override
   String get modesUnsupportedTitle => 'This mode can\'t run here';

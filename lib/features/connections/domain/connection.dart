@@ -20,6 +20,7 @@ class Connection {
     required this.createdAt,
     this.bleAddressToken,
     this.signalingToken,
+    this.transportClientId,
   });
 
   /// Stable local UUID. Not visible to the partner.
@@ -46,6 +47,9 @@ class Connection {
   /// The server only ever sees pairings of these tokens — no PII.
   final String? signalingToken;
 
+  /// Random per-device id used only to keep WebRTC roles stable on restart.
+  final String? transportClientId;
+
   Connection copyWith({
     String? nickname,
     int? colorIndex,
@@ -54,6 +58,7 @@ class Connection {
     PermissionFlags? permissions,
     String? bleAddressToken,
     String? signalingToken,
+    String? transportClientId,
   }) {
     return Connection(
       id: id,
@@ -65,6 +70,7 @@ class Connection {
       createdAt: createdAt,
       bleAddressToken: bleAddressToken ?? this.bleAddressToken,
       signalingToken: signalingToken ?? this.signalingToken,
+      transportClientId: transportClientId ?? this.transportClientId,
     );
   }
 
@@ -78,6 +84,7 @@ class Connection {
         'createdAt': createdAt.toIso8601String(),
         'bleAddressToken': bleAddressToken,
         'signalingToken': signalingToken,
+        'transportClientId': transportClientId,
       };
 
   factory Connection.fromJson(Map<String, Object?> json) => Connection(
@@ -92,6 +99,7 @@ class Connection {
         createdAt: DateTime.parse(json['createdAt']! as String),
         bleAddressToken: json['bleAddressToken'] as String?,
         signalingToken: json['signalingToken'] as String?,
+        transportClientId: json['transportClientId'] as String?,
       );
 
   @override

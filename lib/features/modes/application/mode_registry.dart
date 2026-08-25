@@ -115,8 +115,7 @@ final List<PulseModeDescriptor> kAllModes = [
       DeviceCapability.vibration,
       DeviceCapability.vibrationAmplitude,
     },
-    builder: (context) =>
-        const GoosebumpsModeScreen(),
+    builder: (context) => const GoosebumpsModeScreen(),
   ),
   PulseModeDescriptor(
     id: PulseModeId.thread,
@@ -134,10 +133,7 @@ final List<PulseModeDescriptor> kAllModes = [
     isStarter: false,
     tint: AppColors.textSecondary,
     glyph: '⚡',
-    requiredCapabilities: const {
-      DeviceCapability.microphone,
-      DeviceCapability.flashlight,
-    },
+    requiredCapabilities: const {DeviceCapability.flashlight},
     builder: (context) => const ThunderModeScreen(),
   ),
   PulseModeDescriptor(
@@ -147,8 +143,7 @@ final List<PulseModeDescriptor> kAllModes = [
     isStarter: false,
     tint: AppColors.textSecondary,
     glyph: '🎆',
-    builder: (context) =>
-        const FireworksModeScreen(),
+    builder: (context) => const FireworksModeScreen(),
   ),
   PulseModeDescriptor(
     id: PulseModeId.balance,
@@ -205,6 +200,32 @@ PulseModeDescriptor? findMode(PulseModeId id) {
   }
   return null;
 }
+
+/// Resolve a wire event to the mode that owns it. Kept next to the registry
+/// so incoming notifications and tests share one exhaustive mapping.
+PulseModeId? modeForEventType(String type) => switch (type) {
+      'tap' => PulseModeId.tapTap,
+      'hold_start' || 'hold_end' => PulseModeId.halfHeart,
+      'candle_light' || 'candle_blow' => PulseModeId.candle,
+      'whisper_level' => PulseModeId.whisper,
+      'bell_ring' => PulseModeId.bell,
+      'ray_point' ||
+      'ray_end' ||
+      'ray_clear' ||
+      'ray_canvas' ||
+      'ray_card' =>
+        PulseModeId.ray,
+      'star' => PulseModeId.constellation,
+      'goosebumps_wave' => PulseModeId.goosebumps,
+      'thread_point' || 'thread_end' => PulseModeId.thread,
+      'thunder_strike' => PulseModeId.thunder,
+      'firework' => PulseModeId.fireworks,
+      'balance_ball' => PulseModeId.balance,
+      'sandbox_particle' => PulseModeId.sandbox,
+      'breath_level' => PulseModeId.breath,
+      'sync_tap' => PulseModeId.sync,
+      _ => null,
+    };
 
 /// Resolve the localized title for [m] from the supplied l10n object.
 String localizedModeTitle(PulseModeDescriptor m, AppLocalizations l10n) {

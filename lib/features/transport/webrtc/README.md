@@ -1,9 +1,8 @@
 # `lib/features/transport/webrtc/`
 
-WebRTC-related primitives that the relay transport (`WebRtcTransport`) will
-build on. Nothing here imports `flutter_webrtc` directly — that arrives in
-Track F3. The files in this directory are designed to be plain Dart so they
-can be unit-tested without any native plugin.
+WebRTC primitives used by `WebRtcTransport`. `native_peer.dart` is the narrow
+adapter around `flutter_webrtc`; signaling and ICE models remain plain Dart so
+the complete negotiation can be unit-tested with an in-memory peer.
 
 ## Contents
 
@@ -11,42 +10,40 @@ can be unit-tested without any native plugin.
   configure the WebRTC stack.
 * `signaling_client.dart` — thin HTTP client that talks to the
   Cloudflare Worker in [`../../../../signaling/`](../../../../signaling/).
+* `native_peer.dart` — native `RTCPeerConnection` / `RTCDataChannel` adapter.
 
 ## TURN credentials
 
-The default `kIceServers` list contains:
+Every connection starts with public STUN. The authenticated signaling Worker
+then requests a short-lived Cloudflare TURN credential and adds it to the same
+ICE configuration. Libwebrtc prefers host/STUN candidates and selects TURN only
+when a firewall or NAT prevents direct P2P.
 
 | URL | Purpose |
 | --- | ------- |
 | `stun:stun.l.google.com:19302` | Public Google STUN. |
 | `stun:stun.cloudflare.com:3478` | Public Cloudflare STUN. |
-| `turn:turn.pulse.app:3478` | Pulse's TURN relay (placeholder). |
+| Cloudflare `turn:` / `turns:` URLs | Automatic fallback only. |
 
-The TURN entry's `username` and `credential` come from compile-time
-`--dart-define` values. Without them the relay is still listed but with
-empty auth fields — TURN simply fails for that peer and the connection
-falls back to direct/STUN paths.
+Configure production secrets on the Worker (never in the app binary):
 
 To enable TURN in a real build, pass:
 
-```bash
-flutter build apk \
-  --dart-define=TURN_USER=$REAL_TURN_USER \
-  --dart-define=TURN_CRED=$REAL_TURN_CRED \
-  --dart-define=TURN_URL=turn:turn.pulse.app:3478
+```sh
+npx wrangler secret put TURN_KEY_ID
+npx wrangler secret put TURN_KEY_API_TOKEN
 ```
 
-Production credential rotation is handled outside this repo — the build
-pipeline is expected to mint short-lived credentials from a TURN auth
-service and inject them into `--dart-define`.
-
-`hasTurnCredentials` exposes whether the current build was compiled with
-credentials, so the diagnostics screen and tests can degrade gracefully.
+The Worker calls Cloudflare's `generate-ice-servers` endpoint with a 24-hour
+TTL. The long-term API token stays in Worker secrets. Builds can still use the
+legacy `TURN_USER` / `TURN_CRED` dart-defines for isolated development, but
+production must use short-lived credentials.
 
 ## Signaling base URL
 
 `SignalingClient` resolves its base URL from the `SIGNALING_BASE_URL`
-`--dart-define`, defaulting to `https://pulse-signaling.example.workers.dev`.
+`--dart-define`, defaulting to the production Pulse Worker at
+`https://pulse-signaling.trafficsayd-pulse.workers.dev`.
 Override per environment:
 
 ```bash

@@ -2,23 +2,24 @@
 
 A small Cloudflare Worker that acts as a rendezvous broker between two
 Pulse peers behind separate NATs. The Worker relays opaque SDP/ICE metadata
-and encrypted app packets. Packet payload bytes are sealed on-device before
-they reach the Worker, so this server cannot see mode events or user data.
+and mints short-lived TURN credentials. Mode events travel through the native
+WebRTC DataChannel, not through the Worker.
 
 ## Routes
 
-| Method | Path                            | Auth   | Purpose                                                                                                      |
-| ------ | ------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------ |
-| `POST` | `/session`                      | none   | Create a new signaling session. Body: `{ "pairingCode": "..." }`. Returns `{ sessionId, token, expiresAt }`. |
-| `POST` | `/session/:id/offer`            | bearer | Store the SDP offer (and optional initial ICE candidates).                                                   |
-| `GET`  | `/session/:id/offer`            | bearer | Read the stored offer. `204` if not yet posted.                                                              |
-| `POST` | `/session/:id/answer`           | bearer | Store the SDP answer.                                                                                        |
-| `GET`  | `/session/:id/answer`           | bearer | Read the stored answer. `204` if not yet posted.                                                             |
-| `POST` | `/session/:id/ice`              | bearer | Append one trickle-ICE candidate.                                                                            |
-| `GET`  | `/session/:id/ice?since=N`      | bearer | Long-poll (up to 25 s) for ICE candidates after cursor `N`. Returns `204` on timeout.                        |
-| `POST` | `/session/:id/messages`         | bearer | Append one encrypted app packet. Body: `{ senderId, kind, payload }`, where `payload` is base64.             |
-| `GET`  | `/session/:id/messages?since=N` | bearer | Long-poll for encrypted app packets after cursor `N`. Returns `204` on timeout.                              |
-| `GET`  | `/health`                       | none   | Liveness probe.                                                                                              |
+| Method | Path                            | Auth   | Purpose                                                                                          |
+| ------ | ------------------------------- | ------ | ------------------------------------------------------------------------------------------------ |
+| `POST` | `/session`                      | none   | Join a signaling session. Returns `{ sessionId, token, expiresAt, isInitiator }`.                |
+| `POST` | `/session/:id/offer`            | bearer | Store the SDP offer (and optional initial ICE candidates).                                       |
+| `GET`  | `/session/:id/offer`            | bearer | Read the stored offer. `204` if not yet posted.                                                  |
+| `POST` | `/session/:id/answer`           | bearer | Store the SDP answer.                                                                            |
+| `GET`  | `/session/:id/answer`           | bearer | Read the stored answer. `204` if not yet posted.                                                 |
+| `POST` | `/session/:id/ice`              | bearer | Append one trickle-ICE candidate.                                                                |
+| `GET`  | `/session/:id/ice?since=N`      | bearer | Long-poll (up to 25 s) for ICE candidates after cursor `N`. Returns `204` on timeout.            |
+| `GET`  | `/session/:id/turn`             | bearer | Mint Cloudflare TURN credentials valid for 24 hours; `204` when TURN secrets are not configured. |
+| `POST` | `/session/:id/messages`         | bearer | Legacy encrypted relay, retained for old app builds only.                                        |
+| `GET`  | `/session/:id/messages?since=N` | bearer | Legacy encrypted relay, retained for old app builds only.                                        |
+| `GET`  | `/health`                       | none   | Liveness probe.                                                                                  |
 
 ### Auth model
 
@@ -56,6 +57,10 @@ wrangler kv:namespace create SIGNALING_SESSIONS --preview
 
 # Set the HMAC key used to sign session tokens.
 wrangler secret put WORKER_SECRET
+
+# Server-only Cloudflare Realtime TURN credentials.
+wrangler secret put TURN_KEY_ID
+wrangler secret put TURN_KEY_API_TOKEN
 
 # Deploy.
 wrangler deploy

@@ -1,11 +1,10 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
-import 'dart:typed_data';
 
 import 'package:cryptography/cryptography.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:meta/meta.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/storage/secure_key_store.dart';
@@ -155,7 +154,11 @@ class PairingController extends Notifier<PairingState> {
         } catch (e) {
           lastErr = e;
           if (_disposed || epoch != _epoch) rethrow;
-          await Future<void>.delayed(Duration(milliseconds: 250 * (1 << i)));
+          await Future<void>.delayed(
+            e is SignalingException && e.retryAfter != null
+                ? e.retryAfter!
+                : Duration(milliseconds: 250 * (1 << i)),
+          );
         }
       }
       throw lastErr ?? StateError('unreachable');
@@ -166,15 +169,16 @@ class PairingController extends Notifier<PairingState> {
       if (_disposed || epoch != _epoch) return;
       final pubB64 = await localKeyPair.publicKeyBase64Url();
       if (_disposed || epoch != _epoch) return;
-      final session = await retryNet(() => _signaling.createSession(pairingCode));
+      final session =
+          await retryNet(() => _signaling.createSession(pairingCode));
       await retryNet(() => _signaling.postOffer(
-        sessionId: session.sessionId,
-        token: session.token,
-        offer: SignalingSessionDescription(
-          type: 'offer',
-          sdp: _encodePublicKey(pubB64),
-        ),
-      ));
+            sessionId: session.sessionId,
+            token: session.token,
+            offer: SignalingSessionDescription(
+              type: 'offer',
+              sdp: _encodePublicKey(pubB64),
+            ),
+          ));
       state = state.copyWith(
         phase: PairingPhase.awaitingPartner,
         pairingCode: pairingCode,
@@ -188,6 +192,7 @@ class PairingController extends Notifier<PairingState> {
         sessionId: session.sessionId,
         token: session.token,
         timeout: timeout,
+        epoch: epoch,
       );
       if (_disposed || epoch != _epoch) return;
       if (answer == null) {
@@ -215,6 +220,7 @@ class PairingController extends Notifier<PairingState> {
     } catch (e) {
       _cancelWatchdog();
       if (_disposed) return;
+      debugPrint('[Pairing] host handshake failed: $e');
       state = state.copyWith(phase: PairingPhase.failed, error: e);
     }
   }
@@ -256,13 +262,18 @@ class PairingController extends Notifier<PairingState> {
           } catch (e) {
             lastErr = e;
             if (_disposed || epoch != _epoch) rethrow;
-            await Future<void>.delayed(Duration(milliseconds: 250 * (1 << i)));
+            await Future<void>.delayed(
+              e is SignalingException && e.retryAfter != null
+                  ? e.retryAfter!
+                  : Duration(milliseconds: 250 * (1 << i)),
+            );
           }
         }
         throw lastErr ?? StateError('unreachable');
       }
 
-      final session = await retryNet(() => _signaling.createSession(pairingCode));
+      final session =
+          await retryNet(() => _signaling.createSession(pairingCode));
       state = state.copyWith(
         phase: PairingPhase.awaitingPartner,
         connectionId: session.sessionId,
@@ -276,17 +287,25 @@ class PairingController extends Notifier<PairingState> {
       // polling until timeout. Single failures are retried inside the loop.
       SignalingSessionDescription? offer;
       final deadline = DateTime.now().add(timeout);
-      while (!_disposed && DateTime.now().isBefore(deadline)) {
+      var pollAttempt = 0;
+      while (
+          !_disposed && epoch == _epoch && DateTime.now().isBefore(deadline)) {
+        Duration? serverBackoff;
         try {
           offer = await _signaling.getOffer(
             sessionId: session.sessionId,
             token: session.token,
           );
-        } catch (_) {
+        } on SignalingException catch (error) {
+          serverBackoff = error.retryAfter;
+          // Transient signaling hiccup → keep polling until deadline.
+        } on Object {
           // transient signaling hiccup → keep polling until deadline
         }
         if (offer != null) break;
-        await Future<void>.delayed(const Duration(milliseconds: 700));
+        await Future<void>.delayed(
+          serverBackoff ?? _pairingPollDelay(pollAttempt++),
+        );
       }
       if (_disposed || epoch != _epoch) return;
       if (offer == null) {
@@ -305,13 +324,13 @@ class PairingController extends Notifier<PairingState> {
       if (_disposed || epoch != _epoch) return;
 
       await retryNet(() => _signaling.postAnswer(
-        sessionId: session.sessionId,
-        token: session.token,
-        answer: SignalingSessionDescription(
-          type: 'answer',
-          sdp: _encodePublicKey(pubB64),
-        ),
-      ));
+            sessionId: session.sessionId,
+            token: session.token,
+            answer: SignalingSessionDescription(
+              type: 'answer',
+              sdp: _encodePublicKey(pubB64),
+            ),
+          ));
       if (_disposed || epoch != _epoch) return;
 
       final sas = _service.deriveShortCode(shared);
@@ -418,18 +437,45 @@ class PairingController extends Notifier<PairingState> {
     required String sessionId,
     required String token,
     required Duration timeout,
+    required int epoch,
   }) async {
     final deadline = DateTime.now().add(timeout);
-    while (!_disposed && DateTime.now().isBefore(deadline)) {
-      final answer = await _signaling.getAnswer(
-        sessionId: sessionId,
-        token: token,
+    var pollAttempt = 0;
+    while (!_disposed && epoch == _epoch && DateTime.now().isBefore(deadline)) {
+      Duration? serverBackoff;
+      try {
+        final answer = await _signaling.getAnswer(
+          sessionId: sessionId,
+          token: token,
+        );
+        if (answer != null) return answer;
+      } on SignalingException catch (error) {
+        final status = error.statusCode;
+        final transient = status == null ||
+            status == 404 ||
+            status == 408 ||
+            status == 429 ||
+            status >= 500;
+        if (!transient) rethrow;
+        serverBackoff = error.retryAfter;
+        // Mobile networks and emulators can drop an individual short poll.
+        // Cloudflare KV can also briefly return 404 from another edge right
+        // after creation. Neither invalidates the published host offer.
+      } on TimeoutException {
+        // Same transient short-poll failure, keep the rendezvous alive.
+      }
+      await Future<void>.delayed(
+        serverBackoff ?? _pairingPollDelay(pollAttempt++),
       );
-      if (answer != null) return answer;
-      await Future<void>.delayed(const Duration(milliseconds: 700));
     }
     return null;
   }
+
+  /// Keep the first pairing response snappy, then taper the request rate.
+  /// Host and guest usually share one NAT address, and pairing may run while
+  /// an existing connection is reconnecting in the background.
+  static Duration _pairingPollDelay(int attempt) =>
+      Duration(milliseconds: min(1500, 400 + attempt * 200));
 }
 
 final pairingSignalingClientProvider = Provider<SignalingClient>((ref) {

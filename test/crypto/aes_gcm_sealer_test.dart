@@ -116,6 +116,17 @@ void main() {
       final b = AesGcmSealer.nonceFromCounter(2);
       expect(a, isNot(equals(b)));
     });
+
+    test('counterFromNonce reverses nonceFromCounter', () {
+      for (final counter in <int>[0, 1, 255, 256, 65535, 4294967297]) {
+        expect(
+          AesGcmSealer.counterFromNonce(
+            AesGcmSealer.nonceFromCounter(counter),
+          ),
+          counter,
+        );
+      }
+    });
   });
 }
 

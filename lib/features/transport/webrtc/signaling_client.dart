@@ -5,12 +5,14 @@ import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import 'package:meta/meta.dart';
 
+import 'ice_servers.dart';
+
 /// Compile-time-configurable signaling Worker base URL.
 ///
 /// Override at build time with `--dart-define=SIGNALING_BASE_URL=...`.
 const String _kSignalingBaseUrl = String.fromEnvironment(
   'SIGNALING_BASE_URL',
-  defaultValue: 'https://pulse-signaling.example.workers.dev',
+  defaultValue: 'https://pulse-signaling.trafficsayd-pulse.workers.dev',
 );
 
 /// Default per-call HTTP timeouts. POSTs are short because the Worker is
@@ -27,6 +29,7 @@ class SignalingSession {
     required this.sessionId,
     required this.token,
     required this.expiresAt,
+    this.isInitiator = false,
   });
 
   factory SignalingSession.fromJson(Map<String, Object?> json) {
@@ -40,12 +43,16 @@ class SignalingSession {
       sessionId: sessionId,
       token: token,
       expiresAt: DateTime.fromMillisecondsSinceEpoch(expiresAt.toInt()),
+      isInitiator: json['isInitiator'] == true,
     );
   }
 
   final String sessionId;
   final String token;
   final DateTime expiresAt;
+
+  /// True only for the first peer that opened this rendezvous generation.
+  final bool isInitiator;
 }
 
 /// Lightweight SDP description that we own end-to-end inside Pulse.
@@ -59,6 +66,9 @@ class SignalingSessionDescription {
   const SignalingSessionDescription({
     required this.type,
     required this.sdp,
+    this.senderId,
+    this.negotiationId,
+    this.storedAt,
   });
 
   factory SignalingSessionDescription.fromJson(Map<String, Object?> json) {
@@ -67,7 +77,19 @@ class SignalingSessionDescription {
     if (type is! String || sdp is! String) {
       throw const FormatException('malformed SDP payload');
     }
-    return SignalingSessionDescription(type: type, sdp: sdp);
+    return SignalingSessionDescription(
+      type: type,
+      sdp: sdp,
+      senderId: json['senderId'] is String ? json['senderId']! as String : null,
+      negotiationId: json['negotiationId'] is String
+          ? json['negotiationId']! as String
+          : null,
+      storedAt: json['storedAt'] is num
+          ? DateTime.fromMillisecondsSinceEpoch(
+              (json['storedAt']! as num).toInt(),
+            )
+          : null,
+    );
   }
 
   /// `'offer'` or `'answer'`.
@@ -76,9 +98,15 @@ class SignalingSessionDescription {
   /// Raw SDP string.
   final String sdp;
 
+  final String? senderId;
+  final String? negotiationId;
+  final DateTime? storedAt;
+
   Map<String, Object?> toJson() => <String, Object?>{
         'type': type,
         'sdp': sdp,
+        if (senderId != null) 'senderId': senderId,
+        if (negotiationId != null) 'negotiationId': negotiationId,
       };
 }
 
@@ -90,6 +118,8 @@ class SignalingIceCandidate {
     this.sdpMid,
     this.sdpMLineIndex,
     this.usernameFragment,
+    this.senderId,
+    this.negotiationId,
   });
 
   factory SignalingIceCandidate.fromJson(Map<String, Object?> json) {
@@ -105,6 +135,10 @@ class SignalingIceCandidate {
       sdpMid: sdpMid is String ? sdpMid : null,
       sdpMLineIndex: sdpMLineIndex is num ? sdpMLineIndex.toInt() : null,
       usernameFragment: ufrag is String ? ufrag : null,
+      senderId: json['senderId'] is String ? json['senderId']! as String : null,
+      negotiationId: json['negotiationId'] is String
+          ? json['negotiationId']! as String
+          : null,
     );
   }
 
@@ -112,12 +146,16 @@ class SignalingIceCandidate {
   final String? sdpMid;
   final int? sdpMLineIndex;
   final String? usernameFragment;
+  final String? senderId;
+  final String? negotiationId;
 
   Map<String, Object?> toJson() => <String, Object?>{
         'candidate': candidate,
         if (sdpMid != null) 'sdpMid': sdpMid,
         if (sdpMLineIndex != null) 'sdpMLineIndex': sdpMLineIndex,
         if (usernameFragment != null) 'usernameFragment': usernameFragment,
+        if (senderId != null) 'senderId': senderId,
+        if (negotiationId != null) 'negotiationId': negotiationId,
       };
 }
 
@@ -164,10 +202,28 @@ class SignalingRelayMessage {
 
 /// Anything the signaling client can fail with.
 class SignalingException implements Exception {
-  const SignalingException(this.message, {this.statusCode});
+  const SignalingException(
+    this.message, {
+    this.statusCode,
+    this.retryAfter,
+  });
+
+  factory SignalingException.fromResponse(
+    String operation,
+    http.Response response,
+  ) {
+    final seconds = int.tryParse(response.headers['retry-after'] ?? '');
+    return SignalingException(
+      '$operation failed: ${response.body}',
+      statusCode: response.statusCode,
+      retryAfter:
+          seconds != null && seconds > 0 ? Duration(seconds: seconds) : null,
+    );
+  }
 
   final String message;
   final int? statusCode;
+  final Duration? retryAfter;
 
   @override
   String toString() => statusCode == null
@@ -225,7 +281,10 @@ class SignalingClient {
       };
 
   /// `POST /session` — create a new signaling session.
-  Future<SignalingSession> createSession(String pairingCode) async {
+  Future<SignalingSession> createSession(
+    String pairingCode, {
+    String? clientId,
+  }) async {
     final Uri uri = _resolve('/session');
     final http.Response res = await _http
         .post(
@@ -233,14 +292,14 @@ class SignalingClient {
           headers: const <String, String>{
             'content-type': 'application/json; charset=utf-8'
           },
-          body: jsonEncode(<String, Object?>{'pairingCode': pairingCode}),
+          body: jsonEncode(<String, Object?>{
+            'pairingCode': pairingCode,
+            if (clientId != null) 'clientId': clientId,
+          }),
         )
         .timeout(_postTimeout);
     if (res.statusCode != 201) {
-      throw SignalingException(
-        'createSession failed: ${res.body}',
-        statusCode: res.statusCode,
-      );
+      throw SignalingException.fromResponse('createSession', res);
     }
     return SignalingSession.fromJson(
       jsonDecode(res.body) as Map<String, Object?>,
@@ -257,7 +316,7 @@ class SignalingClient {
   }) async {
     final Uri uri = _resolve('/session/$sessionId/offer');
     final Map<String, Object?> body = <String, Object?>{
-      'sdp': offer.sdp,
+      ...offer.toJson(),
       if (initialIce != null && initialIce.isNotEmpty)
         'ice': initialIce.map((SignalingIceCandidate c) => c.toJson()).toList(),
     };
@@ -265,10 +324,7 @@ class SignalingClient {
         .post(uri, headers: _authHeaders(token), body: jsonEncode(body))
         .timeout(_postTimeout);
     if (res.statusCode != 200) {
-      throw SignalingException(
-        'postOffer failed: ${res.body}',
-        statusCode: res.statusCode,
-      );
+      throw SignalingException.fromResponse('postOffer', res);
     }
   }
 
@@ -286,10 +342,7 @@ class SignalingClient {
       return null;
     }
     if (res.statusCode != 200) {
-      throw SignalingException(
-        'getOffer failed: ${res.body}',
-        statusCode: res.statusCode,
-      );
+      throw SignalingException.fromResponse('getOffer', res);
     }
     return SignalingSessionDescription.fromJson(
       jsonDecode(res.body) as Map<String, Object?>,
@@ -305,7 +358,7 @@ class SignalingClient {
   }) async {
     final Uri uri = _resolve('/session/$sessionId/answer');
     final Map<String, Object?> body = <String, Object?>{
-      'sdp': answer.sdp,
+      ...answer.toJson(),
       if (initialIce != null && initialIce.isNotEmpty)
         'ice': initialIce.map((SignalingIceCandidate c) => c.toJson()).toList(),
     };
@@ -313,11 +366,35 @@ class SignalingClient {
         .post(uri, headers: _authHeaders(token), body: jsonEncode(body))
         .timeout(_postTimeout);
     if (res.statusCode != 200) {
-      throw SignalingException(
-        'postAnswer failed: ${res.body}',
-        statusCode: res.statusCode,
-      );
+      throw SignalingException.fromResponse('postAnswer', res);
     }
+  }
+
+  /// Fetch short-lived Cloudflare TURN credentials for this authenticated
+  /// session. A deployment without TURN secrets returns an empty list; STUN
+  /// remains available and direct P2P is still attempted.
+  Future<List<IceServer>> getTurnIceServers({
+    required String sessionId,
+    required String token,
+  }) async {
+    final Uri uri = _resolve('/session/$sessionId/turn');
+    final http.Response res = await _http
+        .get(uri, headers: _authHeaders(token))
+        .timeout(_shortGetTimeout);
+    if (res.statusCode == 204 || res.statusCode == 503) {
+      return const <IceServer>[];
+    }
+    if (res.statusCode != 200) {
+      throw SignalingException.fromResponse('getTurnIceServers', res);
+    }
+    final Object? decoded = jsonDecode(res.body);
+    if (decoded is! Map<String, Object?> || decoded['iceServers'] is! List) {
+      throw const SignalingException('malformed TURN credentials response');
+    }
+    return (decoded['iceServers']! as List<Object?>)
+        .whereType<Map<String, Object?>>()
+        .map(IceServer.fromJson)
+        .toList(growable: false);
   }
 
   /// `GET /session/:id/answer` — read the stored answer, or `null` if the
@@ -334,10 +411,7 @@ class SignalingClient {
       return null;
     }
     if (res.statusCode != 200) {
-      throw SignalingException(
-        'getAnswer failed: ${res.body}',
-        statusCode: res.statusCode,
-      );
+      throw SignalingException.fromResponse('getAnswer', res);
     }
     return SignalingSessionDescription.fromJson(
       jsonDecode(res.body) as Map<String, Object?>,
@@ -356,10 +430,7 @@ class SignalingClient {
             headers: _authHeaders(token), body: jsonEncode(candidate.toJson()))
         .timeout(_postTimeout);
     if (res.statusCode != 200) {
-      throw SignalingException(
-        'postIce failed: ${res.body}',
-        statusCode: res.statusCode,
-      );
+      throw SignalingException.fromResponse('postIce', res);
     }
   }
 
@@ -405,10 +476,7 @@ class SignalingClient {
             headers: _authHeaders(token), body: jsonEncode(message.toJson()))
         .timeout(_postTimeout);
     if (res.statusCode != 200) {
-      throw SignalingException(
-        'postMessage failed: ${res.body}',
-        statusCode: res.statusCode,
-      );
+      throw SignalingException.fromResponse('postMessage', res);
     }
   }
 
@@ -458,6 +526,12 @@ class SignalingClient {
           // 30s client timeout. On client-side timeout we simply retry with
           // the same cursor.
           continue;
+        } on http.ClientException {
+          // Mobile networks routinely reset idle long-poll sockets while the
+          // peer-to-peer channel remains healthy. Keep the cursor and retry
+          // instead of terminating the stream with an unhandled exception.
+          await Future<void>.delayed(const Duration(milliseconds: 500));
+          continue;
         }
         if (isStopped()) {
           return;
@@ -468,10 +542,7 @@ class SignalingClient {
         }
         if (res.statusCode != 200) {
           controller.addError(
-            SignalingException(
-              'iceCandidates failed: ${res.body}',
-              statusCode: res.statusCode,
-            ),
+            SignalingException.fromResponse('iceCandidates', res),
           );
           return;
         }
@@ -519,6 +590,9 @@ class SignalingClient {
               .timeout(_longPollTimeout);
         } on TimeoutException {
           continue;
+        } on http.ClientException {
+          await Future<void>.delayed(const Duration(milliseconds: 500));
+          continue;
         }
         if (isStopped()) {
           return;
@@ -528,10 +602,7 @@ class SignalingClient {
         }
         if (res.statusCode != 200) {
           controller.addError(
-            SignalingException(
-              'messages failed: ${res.body}',
-              statusCode: res.statusCode,
-            ),
+            SignalingException.fromResponse('messages', res),
           );
           return;
         }

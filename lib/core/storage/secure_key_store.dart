@@ -103,5 +103,14 @@ class SecureKeyStore {
 /// Tests can override this with `ProviderScope(overrides: [...])` to swap
 /// in an in-memory store without touching the controllers themselves.
 final secureKeyStoreProvider = Provider<SecureKeyStore>(
-  (ref) => SecureKeyStore(),
+  (ref) => SecureKeyStore(
+    storage: defaultTargetPlatform == TargetPlatform.android ||
+            defaultTargetPlatform == TargetPlatform.iOS
+        ? const FlutterSecureStorage(
+            aOptions: AndroidOptions(
+              encryptedSharedPreferences: true,
+            ),
+          )
+        : null,
+  ),
 );

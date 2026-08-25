@@ -33,7 +33,14 @@ class ConnectionsRepository {
     final out = <Connection>[];
     for (final id in ids) {
       final json = await _keyStore.readJson('$_entryPrefix$id');
-      if (json != null) out.add(Connection.fromJson(json));
+      if (json != null) {
+        var connection = Connection.fromJson(json);
+        if (connection.transportClientId == null) {
+          connection = connection.copyWith(transportClientId: _uuid.v4());
+          await _writeEntry(connection);
+        }
+        out.add(connection);
+      }
     }
     return out;
   }
@@ -47,6 +54,7 @@ class ConnectionsRepository {
     PermissionFlags permissions = const PermissionFlags(),
     String? bleAddressToken,
     String? signalingToken,
+    String? transportClientId,
   }) async {
     final connection = Connection(
       id: id ?? _uuid.v4(),
@@ -58,6 +66,7 @@ class ConnectionsRepository {
       createdAt: DateTime.now(),
       bleAddressToken: bleAddressToken,
       signalingToken: signalingToken,
+      transportClientId: transportClientId ?? _uuid.v4(),
     );
     await _writeEntry(connection);
     await _appendIndex(connection.id);

@@ -75,12 +75,14 @@ class PulseHeader extends StatelessWidget {
   const PulseHeader({
     super.key,
     required this.title,
+    this.titleKey,
     this.leading,
     this.trailing,
     this.onBack,
   });
 
   final String title;
+  final Key? titleKey;
   final Widget? leading;
   final Widget? trailing;
   final VoidCallback? onBack;
@@ -89,30 +91,35 @@ class PulseHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return SizedBox(
       height: 52,
-      child: Stack(
-        alignment: Alignment.center,
+      child: Row(
         children: [
-          Positioned(
-            left: 0,
-            child: leading ??
-                PulseRoundButton(
-                  icon: Icons.arrow_back_rounded,
-                  onTap: onBack ?? () => Navigator.of(context).maybePop(),
-                  subtle: true,
-                ),
-          ),
-          Text(
-            title,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: AppColors.textPrimary,
-              fontSize: 18,
-              height: 1,
-              fontWeight: FontWeight.w600,
-              letterSpacing: -0.2,
+          leading ??
+              PulseRoundButton(
+                icon: Icons.arrow_back_rounded,
+                onTap: onBack ?? () => Navigator.of(context).maybePop(),
+                subtle: true,
+              ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              title,
+              key: titleKey,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 18,
+                height: 1,
+                fontWeight: FontWeight.w600,
+                letterSpacing: -0.2,
+              ),
             ),
           ),
-          if (trailing != null) Positioned(right: 0, child: trailing!),
+          if (trailing != null) ...[
+            const SizedBox(width: 12),
+            trailing!,
+          ],
         ],
       ),
     );

@@ -105,6 +105,25 @@ void main() {
       );
     });
 
+    test('reads Retry-After from a rate-limit response', () async {
+      final SignalingClient client = SignalingClient(
+        httpClient: MockClient((http.Request _) async => http.Response(
+              'slow down',
+              429,
+              headers: <String, String>{'retry-after': '17'},
+            )),
+        baseUrl: 'https://example.test',
+      );
+
+      try {
+        await client.createSession('1234');
+        fail('expected SignalingException');
+      } on SignalingException catch (error) {
+        expect(error.statusCode, 429);
+        expect(error.retryAfter, const Duration(seconds: 17));
+      }
+    });
+
     test('getOffer returns null for a 204 response', () async {
       final MockClient mock = MockClient(
         (http.Request _) async => http.Response('', 204),

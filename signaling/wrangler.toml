@@ -3,9 +3,7 @@ main = "src/index.ts"
 compatibility_date = "2026-05-20"
 compatibility_flags = ["nodejs_compat"]
 
-# Replace this with the real Cloudflare account_id before the first deploy.
-# `wrangler whoami` will print it once you have logged in via `wrangler login`.
-account_id = "REPLACE_ME_ACCOUNT_ID"
+account_id = "75377a196e8fd601606b3fcf2a458356"
 
 # Workers Logs (free tier) — keeps stdout/stderr visible in the dashboard.
 [observability]
@@ -20,13 +18,20 @@ enabled = true
 # then paste the returned ids below.
 [[kv_namespaces]]
 binding = "SIGNALING_SESSIONS"
-id = "REPLACE_ME_KV_NAMESPACE_ID"
-preview_id = "REPLACE_ME_KV_NAMESPACE_PREVIEW_ID"
+id = "5ce59310fd32480faa890a8d77b3186d"
+
+[[d1_databases]]
+binding = "SIGNALING_DB"
+database_name = "pulse-signaling-db"
+database_id = "a50f3a29-1bd0-4ba0-9a6e-101771d5f5a8"
+migrations_dir = "migrations"
 
 # WORKER_SECRET is the HMAC key used to sign per-session bearer tokens.
 # Set it for real deployments with:
 #
 #   wrangler secret put WORKER_SECRET
+#   wrangler secret put TURN_KEY_ID
+#   wrangler secret put TURN_KEY_API_TOKEN
 #
 # For local `wrangler dev` runs put a value into `.dev.vars` (gitignored) or
 # export WORKER_SECRET in the shell.

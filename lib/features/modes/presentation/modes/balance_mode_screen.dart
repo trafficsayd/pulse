@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/theme/app_colors.dart';
@@ -60,12 +61,16 @@ class _BalanceModeViewState extends ConsumerState<_BalanceModeView> {
   Offset _localBall = Offset.zero;
   Offset _partnerBall = const Offset(999, 999); // off-screen initially
   Size _canvasSize = Size.zero;
+  DateTime? _lastSentAt;
+  bool _wasBothCentered = false;
 
   @override
   void initState() {
     super.initState();
     _sub = widget.accelerometer.events.listen(_onAccel);
-    _partnerSub = ref.read(modeEventBusProvider).incoming
+    _partnerSub = ref
+        .read(modeEventBusProvider)
+        .incoming
         .where((e) => e.type == 'balance_ball')
         .listen(_onPartnerBall);
   }
@@ -81,21 +86,44 @@ class _BalanceModeViewState extends ConsumerState<_BalanceModeView> {
     final newOffset = Offset(newX, newY);
     if ((newOffset - _localBall).distance < 2) return; // throttle
     setState(() => _localBall = newOffset);
+    _updateCenteredFeedback();
     // Send to partner.
-    ref.read(modeEventBusProvider).send(ModeEvent(
-      type: 'balance_ball',
-      data: {
-        'x': newX / _canvasSize.width,
-        'y': newY / _canvasSize.height,
-      },
-    ));
+    if (_lastSentAt == null ||
+        sample.timestamp.difference(_lastSentAt!) >=
+            const Duration(milliseconds: 50)) {
+      _lastSentAt = sample.timestamp;
+      unawaited(ref.read(modeEventBusProvider).send(ModeEvent(
+            type: 'balance_ball',
+            data: {
+              'x': newX / _canvasSize.width,
+              'y': newY / _canvasSize.height,
+            },
+          )));
+    }
   }
 
   void _onPartnerBall(ModeEvent event) {
     if (!mounted || _canvasSize == Size.zero) return;
     final x = (event.data['x'] as num?)?.toDouble() ?? 0.5;
     final y = (event.data['y'] as num?)?.toDouble() ?? 0.5;
-    setState(() => _partnerBall = Offset(x * _canvasSize.width, y * _canvasSize.height));
+    setState(() =>
+        _partnerBall = Offset(x * _canvasSize.width, y * _canvasSize.height));
+    _updateCenteredFeedback();
+  }
+
+  Offset get _effectiveLocalBall => _localBall == Offset.zero
+      ? Offset(_canvasSize.width / 2, _canvasSize.height / 2)
+      : _localBall;
+
+  void _updateCenteredFeedback() {
+    if (_canvasSize == Size.zero) return;
+    final center = Offset(_canvasSize.width / 2, _canvasSize.height / 2);
+    final centered = (_effectiveLocalBall - center).distance < 40 &&
+        (_partnerBall - center).distance < 40;
+    if (centered && !_wasBothCentered) {
+      HapticFeedback.mediumImpact();
+    }
+    _wasBothCentered = centered;
   }
 
   @override
@@ -114,9 +142,10 @@ class _BalanceModeViewState extends ConsumerState<_BalanceModeView> {
         child: LayoutBuilder(
           builder: (context, constraints) {
             _canvasSize = Size(constraints.maxWidth, constraints.maxHeight);
-            final center = Offset(_canvasSize.width / 2, _canvasSize.height / 2);
-            final bothInCenter =
-                (_localBall - center).distance < 40 &&
+            final center =
+                Offset(_canvasSize.width / 2, _canvasSize.height / 2);
+            final localBall = _effectiveLocalBall;
+            final bothInCenter = (localBall - center).distance < 40 &&
                 (_partnerBall - center).distance < 40;
             return Stack(
               children: [
@@ -128,19 +157,28 @@ class _BalanceModeViewState extends ConsumerState<_BalanceModeView> {
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: AppColors.pulse.withValues(alpha: bothInCenter ? 0.8 : 0.3),
+                        color: AppColors.pulse
+                            .withValues(alpha: bothInCenter ? 0.8 : 0.3),
                         width: 2,
                       ),
                       boxShadow: bothInCenter
-                          ? [BoxShadow(color: AppColors.pulse.withValues(alpha: 0.5), blurRadius: 30)]
+                          ? [
+                              BoxShadow(
+                                  color: AppColors.pulse.withValues(alpha: 0.5),
+                                  blurRadius: 30)
+                            ]
                           : null,
                     ),
                   ),
                 ),
                 // Partner ball (faint).
-                _Ball(position: _partnerBall, color: AppColors.heart, radius: 14, faint: true),
+                _Ball(
+                    position: _partnerBall,
+                    color: AppColors.heart,
+                    radius: 14,
+                    faint: true),
                 // Local ball.
-                _Ball(position: _localBall, color: AppColors.pulse, radius: 16),
+                _Ball(position: localBall, color: AppColors.pulse, radius: 16),
                 Positioned(
                   top: 14,
                   left: 0,
@@ -200,7 +238,9 @@ class _Ball extends StatelessWidget {
           color: color.withValues(alpha: faint ? 0.4 : 0.9),
           boxShadow: faint
               ? null
-              : [BoxShadow(color: color.withValues(alpha: 0.5), blurRadius: 20)],
+              : [
+                  BoxShadow(color: color.withValues(alpha: 0.5), blurRadius: 20)
+                ],
         ),
       ),
     );

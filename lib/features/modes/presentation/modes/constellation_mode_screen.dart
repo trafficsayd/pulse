@@ -53,8 +53,10 @@ class _ConstellationModeScreenState
   Timer? _idleTimer;
 
   final List<Offset> _localStars = [];
+  final List<Offset> _pendingRemoteStars = [];
   Size _canvasSize = Size.zero;
   bool _showConnections = false;
+  bool _remoteFlushScheduled = false;
 
   static const Color _localStarColor = Color(0xFFB39CFF);
   static const Color _remoteStarColor = Color(0xFFE07CFF);
@@ -68,22 +70,59 @@ class _ConstellationModeScreenState
       vsync: this,
       duration: const Duration(milliseconds: 900),
     );
-    _partnerSub = ref.read(modeEventBusProvider).incoming
+    _partnerSub = ref
+        .read(modeEventBusProvider)
+        .incoming
         .where((e) => e.type == 'star')
         .listen(_onPartnerStar);
   }
 
   void _onPartnerStar(ModeEvent event) {
-    if (!mounted || _canvasSize == Size.zero) return;
+    if (!mounted) return;
     final x = (event.data['x'] as num?)?.toDouble() ?? 0.5;
     final y = (event.data['y'] as num?)?.toDouble() ?? 0.5;
+    final normalized = Offset(x, y);
+    if (_canvasSize == Size.zero || _canvasKey.currentState == null) {
+      _pendingRemoteStars.add(normalized);
+      return;
+    }
+    _applyPartnerStar(normalized);
+  }
+
+  void _applyPartnerStar(Offset normalized) {
+    final point = Offset(
+      normalized.dx * _canvasSize.width,
+      normalized.dy * _canvasSize.height,
+    );
+    setState(() {
+      // Connections use the shared arrival order, so both local and remote
+      // stars become one constellation instead of two unrelated drawings.
+      _localStars.add(point);
+      _showConnections = false;
+    });
+    _connector.reset();
     _canvasKey.currentState?.pushRemoteStroke(
       PaintStroke(
         color: _remoteStarColor.withValues(alpha: 0.45),
         strokeWidth: 10,
-        points: [PaintPoint(Offset(x * _canvasSize.width, y * _canvasSize.height))],
+        points: [PaintPoint(point)],
       ),
     );
+    _resetIdleTimer();
+  }
+
+  void _scheduleRemoteFlush() {
+    if (_remoteFlushScheduled || _pendingRemoteStars.isEmpty) return;
+    _remoteFlushScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _remoteFlushScheduled = false;
+      if (!mounted || _canvasSize == Size.zero) return;
+      final pending = List<Offset>.of(_pendingRemoteStars);
+      _pendingRemoteStars.clear();
+      for (final normalized in pending) {
+        _applyPartnerStar(normalized);
+      }
+    });
   }
 
   @override
@@ -150,6 +189,7 @@ class _ConstellationModeScreenState
                 builder: (context, constraints) {
                   _canvasSize =
                       Size(constraints.maxWidth, constraints.maxHeight);
+                  _scheduleRemoteFlush();
                   return RepaintBoundary(
                     child: Stack(
                       children: [

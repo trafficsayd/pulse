@@ -9,7 +9,7 @@ enum TransportKind {
   /// BLE or Wi-Fi Direct / Multipeer Connectivity. Lowest latency, no relay.
   direct,
 
-  /// mDNS/Bonjour discovery on the same Wi-Fi LAN. No internet involved.
+  /// Authenticated UDP discovery + TCP on the same Wi-Fi LAN. No internet.
   localNetwork,
 
   /// WebRTC over the public internet, brokered by a STUN/TURN signaling server.

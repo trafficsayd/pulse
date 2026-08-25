@@ -20,6 +20,15 @@ describe('POST /session', () => {
     expect(second.body.sessionId).toBe(first.body.sessionId);
   });
 
+  it('preserves initiator role for the same client across reconnects', async () => {
+    const first = await callCreateSession('stable-role', TEST_IP, 'client-a');
+    const peer = await callCreateSession('stable-role', TEST_IP, 'client-b');
+    const retry = await callCreateSession('stable-role', TEST_IP, 'client-a');
+    expect(first.body.isInitiator).toBe(true);
+    expect(peer.body.isInitiator).toBe(false);
+    expect(retry.body.isInitiator).toBe(true);
+  });
+
   it('rejects a missing pairingCode', async () => {
     const response = await SELF.fetch('https://signaling.test/session', {
       method: 'POST',

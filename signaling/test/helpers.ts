@@ -18,6 +18,7 @@ export function authHeaders(token: string, extra: Record<string, string> = {}): 
 export async function callCreateSession(
   pairingCode: string,
   ip: string = TEST_IP,
+  clientId?: string,
 ): Promise<{ status: number; body: CreateSessionResponse }> {
   const response = await SELF.fetch('https://signaling.test/session', {
     method: 'POST',
@@ -25,7 +26,7 @@ export async function callCreateSession(
       'content-type': 'application/json',
       'cf-connecting-ip': ip,
     },
-    body: JSON.stringify({ pairingCode }),
+    body: JSON.stringify({ pairingCode, ...(clientId ? { clientId } : {}) }),
   });
   const body = (await response.json()) as CreateSessionResponse;
   return { status: response.status, body };

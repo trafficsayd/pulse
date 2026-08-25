@@ -107,6 +107,27 @@ class NonceCounter {
     return newValue;
   }
 
+  /// Persist [value] as the last successfully observed counter.
+  ///
+  /// The inbound channel uses this when a transport handover loses one or
+  /// more packets. The newer packet is still AES-GCM authenticated, so it is
+  /// safe to advance to its embedded counter while continuing to reject
+  /// replays. Outbound callers must keep using [next] so a nonce is never
+  /// minted twice.
+  Future<void> advanceTo(int value) async {
+    if (value < 0) {
+      throw ArgumentError.value(value, 'value', 'must be non-negative');
+    }
+    await restore();
+    if (value < _lastUsed) {
+      throw StateError('Nonce counter cannot move backwards');
+    }
+    if (value == _lastUsed) return;
+    await _storage.writeString(_hwmKey, value.toString());
+    await _storage.writeString(_storageKey, value.toString());
+    _lastUsed = value;
+  }
+
   /// Force the counter back to zero and persist. Intended for the
   /// explicit "wipe pair" flow (§6 of the spec — паническое стирание).
   Future<void> resetToZero() async {

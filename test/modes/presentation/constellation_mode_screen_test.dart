@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -6,6 +7,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulse/features/modes/presentation/modes/constellation_mode_screen.dart';
 import 'package:pulse/features/modes/primitives/painting_canvas.dart';
+import 'package:pulse/features/session/application/mode_event.dart';
+import 'package:pulse/features/session/application/mode_event_bus.dart';
 import 'package:pulse/l10n/app_localizations.dart';
 
 void main() {
@@ -66,11 +69,45 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets('partner star joins the shared constellation', (tester) async {
+    final key = GlobalKey<PaintingCanvasState>();
+    final source = StreamController<ModeEvent>.broadcast(sync: true);
+    final bus = ModeEventBus.testing(source.stream);
+    addTearDown(bus.dispose);
+    addTearDown(source.close);
+
+    await _pump(
+      tester,
+      ConstellationModeScreen(
+        canvasKey: key,
+        idleBeforeConnect: const Duration(milliseconds: 100),
+      ),
+      overrides: <Override>[
+        modeEventBusProvider.overrideWithValue(bus),
+      ],
+    );
+
+    source.add(const ModeEvent(type: 'star', data: {'x': 0.25, 'y': 0.4}));
+    await tester.pump(const Duration(milliseconds: 150));
+    expect(key.currentState!.strokes.length, 1);
+
+    await tester.tapAt(const Offset(240, 280));
+    await tester.pump(const Duration(milliseconds: 150));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(key.currentState!.strokes.length, 2);
+    expect(tester.takeException(), isNull);
+  });
 }
 
-Future<void> _pump(WidgetTester tester, Widget child) async {
+Future<void> _pump(
+  WidgetTester tester,
+  Widget child, {
+  List<Override> overrides = const <Override>[],
+}) async {
   await tester.pumpWidget(
     ProviderScope(
+      overrides: overrides,
       child: MaterialApp(
         localizationsDelegates: const [
           AppLocalizations.delegate,

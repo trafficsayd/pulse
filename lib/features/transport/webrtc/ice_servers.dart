@@ -40,6 +40,25 @@ class IceServer {
     this.credential,
   });
 
+  factory IceServer.fromJson(Map<String, Object?> json) {
+    final Object? rawUrls = json['urls'];
+    final List<String> urls = switch (rawUrls) {
+      String value => <String>[value],
+      List<Object?> values =>
+        values.whereType<String>().toList(growable: false),
+      _ => const <String>[],
+    };
+    if (urls.isEmpty) {
+      throw const FormatException('ICE server must contain at least one URL');
+    }
+    return IceServer(
+      urls: urls,
+      username: json['username'] is String ? json['username']! as String : null,
+      credential:
+          json['credential'] is String ? json['credential']! as String : null,
+    );
+  }
+
   /// One or more URLs (`stun:` / `turn:` / `turns:`).
   final List<String> urls;
 
@@ -87,3 +106,19 @@ const List<IceServer> kIceServers = <IceServer>[
 /// currently capable of falling back through TURN.
 bool get hasTurnCredentials =>
     _kTurnUsername.isNotEmpty && _kTurnCredential.isNotEmpty;
+
+/// Builds the per-session ICE configuration. Cloudflare credentials are
+/// minted by the signaling Worker and take precedence over the optional
+/// compile-time development relay.
+List<IceServer> iceServersForSession(List<IceServer> shortLivedServers) {
+  final List<IceServer> result = <IceServer>[
+    kIceServers[0],
+    kIceServers[1],
+  ];
+  result.addAll(shortLivedServers.where((server) => server.urls
+      .any((url) => url.startsWith('turn:') || url.startsWith('turns:'))));
+  if (shortLivedServers.isEmpty && hasTurnCredentials) {
+    result.add(kIceServers[2]);
+  }
+  return List<IceServer>.unmodifiable(result);
+}

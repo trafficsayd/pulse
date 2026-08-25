@@ -25,6 +25,8 @@ class _HalfHeartModeScreenState extends ConsumerState<HalfHeartModeScreen>
   bool _localHeld = false;
   bool _partnerHeld = false;
   StreamSubscription<ModeEvent>? _partnerSub;
+  Timer? _localKeepAlive;
+  Timer? _partnerExpiry;
 
   late final AnimationController _pulse;
 
@@ -35,21 +37,30 @@ class _HalfHeartModeScreenState extends ConsumerState<HalfHeartModeScreen>
       vsync: this,
       duration: const Duration(milliseconds: 900),
     )..repeat(reverse: true);
-    _partnerSub = ref.read(modeEventBusProvider).incoming
+    _partnerSub = ref
+        .read(modeEventBusProvider)
+        .incoming
         .where((e) => e.type == 'hold_start' || e.type == 'hold_end')
         .listen(_onPartnerHold);
   }
 
   void _onPartnerHold(ModeEvent event) {
     if (!mounted) return;
-    setState(() {
-      _partnerHeld = event.type == 'hold_start';
-    });
+    final held = event.type == 'hold_start';
+    _partnerExpiry?.cancel();
+    if (held) {
+      _partnerExpiry = Timer(const Duration(milliseconds: 1300), () {
+        if (mounted) setState(() => _partnerHeld = false);
+      });
+    }
+    setState(() => _partnerHeld = held);
   }
 
   @override
   void dispose() {
     _partnerSub?.cancel();
+    _localKeepAlive?.cancel();
+    _partnerExpiry?.cancel();
     _pulse.dispose();
     super.dispose();
   }
@@ -60,7 +71,14 @@ class _HalfHeartModeScreenState extends ConsumerState<HalfHeartModeScreen>
     if (held) HapticFeedback.lightImpact();
     // Send hold event to partner.
     final bus = ref.read(modeEventBusProvider);
-    bus.send(ModeEvent(type: held ? 'hold_start' : 'hold_end'));
+    unawaited(bus.send(ModeEvent(type: held ? 'hold_start' : 'hold_end')));
+    _localKeepAlive?.cancel();
+    if (held) {
+      _localKeepAlive = Timer.periodic(
+        const Duration(milliseconds: 500),
+        (_) => unawaited(bus.send(const ModeEvent(type: 'hold_start'))),
+      );
+    }
   }
 
   @override

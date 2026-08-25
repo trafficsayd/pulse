@@ -32,13 +32,16 @@ class ConnectionsState {
 class ConnectionsController extends Notifier<ConnectionsState> {
   late final ConnectionsRepository _repo;
   late final Uuid _uuid;
+  late final Future<void> _loaded;
+
+  Future<void> get loaded => _loaded;
 
   @override
   ConnectionsState build() {
     final store = ref.read(secureKeyStoreProvider);
     _uuid = ref.read(uuidProvider);
     _repo = ConnectionsRepository(keyStore: store, uuid: _uuid);
-    _bootstrap();
+    _loaded = _bootstrap();
     return const ConnectionsState();
   }
 

@@ -86,15 +86,32 @@ class TransportManager {
 
   /// Send via the highest-priority connected transport.
   ///
-  /// If none is connected, the packet is dropped — Pulse never queues mode
-  /// events; missed beats simply don't arrive. (Sneak In delivery is
+  /// If a transport reports connected but rejects the write, immediately try
+  /// the next connected transport. This closes the small handover window in
+  /// which a radio can still look connected while its socket has already
+  /// failed. If none is connected, the packet is dropped — Pulse never queues
+  /// mode events; missed beats simply don't arrive. (Sneak In delivery is
   /// handled separately on the shadow channel.)
   Future<void> send(TransportPacket packet) async {
+    Object? lastError;
+    StackTrace? lastStackTrace;
     for (final t in _transports) {
       if (t.isConnected) {
-        await t.send(packet);
-        return;
+        try {
+          await t.send(packet);
+          if (_current != t.kind) {
+            _current = t.kind;
+            if (!_state.isClosed) _state.add(_current);
+          }
+          return;
+        } catch (error, stackTrace) {
+          lastError = error;
+          lastStackTrace = stackTrace;
+        }
       }
+    }
+    if (lastError != null) {
+      Error.throwWithStackTrace(lastError, lastStackTrace!);
     }
   }
 

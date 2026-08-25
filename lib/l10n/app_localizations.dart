@@ -281,7 +281,7 @@ abstract class AppLocalizations {
   /// No description provided for @transportRelayWebrtc.
   ///
   /// In en, this message translates to:
-  /// **'Internet relay (WebRTC)'**
+  /// **'WebRTC (P2P / TURN)'**
   String get transportRelayWebrtc;
 
   /// No description provided for @peopleTitle.
@@ -836,6 +836,12 @@ abstract class AppLocalizations {
   /// **'Draw live or send a finished card'**
   String get sketchHint;
 
+  /// No description provided for @sketchCanvas.
+  ///
+  /// In en, this message translates to:
+  /// **'Canvas'**
+  String get sketchCanvas;
+
   /// No description provided for @whisperHint.
   ///
   /// In en, this message translates to:
@@ -871,6 +877,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Blow to extinguish'**
   String get candleBlowHint;
+
+  /// No description provided for @candleClassic.
+  ///
+  /// In en, this message translates to:
+  /// **'Classic'**
+  String get candleClassic;
+
+  /// No description provided for @candleGlass.
+  ///
+  /// In en, this message translates to:
+  /// **'Glass'**
+  String get candleGlass;
+
+  /// No description provided for @candleViolet.
+  ///
+  /// In en, this message translates to:
+  /// **'Violet'**
+  String get candleViolet;
+
+  /// No description provided for @breathInhale.
+  ///
+  /// In en, this message translates to:
+  /// **'inhale'**
+  String get breathInhale;
+
+  /// No description provided for @breathExhale.
+  ///
+  /// In en, this message translates to:
+  /// **'exhale'**
+  String get breathExhale;
 
   /// No description provided for @modesUnsupportedTitle.
   ///

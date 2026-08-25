@@ -210,5 +210,20 @@ void main() {
       expect(await other.peek(), 2);
       expect(await counter.peek(), 3);
     });
+
+    test('advanceTo skips a lost inbound range but never moves backwards',
+        () async {
+      await counter.advanceTo(7);
+      expect(counter.lastUsed, 7);
+      expect(await counter.peek(), 8);
+      await expectLater(counter.advanceTo(6), throwsStateError);
+
+      final reloaded = NonceCounter(
+        storage: store,
+        storageKey: 'test::out',
+      );
+      await reloaded.restore();
+      expect(reloaded.lastUsed, 7);
+    });
   });
 }

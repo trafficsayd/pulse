@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:cryptography/cryptography.dart';
@@ -112,6 +113,28 @@ class _TransportChannel implements RawByteChannel {
   Future<void> close() => transport.disconnect();
 }
 
+class _MemoryRawChannel implements RawByteChannel {
+  final StreamController<Uint8List> _incoming =
+      StreamController<Uint8List>.broadcast();
+  _MemoryRawChannel? peer;
+  bool dropNext = false;
+
+  @override
+  Stream<Uint8List> get incoming => _incoming.stream;
+
+  @override
+  Future<void> send(Uint8List bytes) async {
+    if (dropNext) {
+      dropNext = false;
+      return;
+    }
+    peer?._incoming.add(Uint8List.fromList(bytes));
+  }
+
+  @override
+  Future<void> close() => _incoming.close();
+}
+
 void main() {
   test('PairChannel sends encrypted bytes over two local transports', () async {
     final hostTransport = LocalNetworkTransport();
@@ -155,6 +178,52 @@ void main() {
     final packet = await received;
     expect(packet.payload, [7, 8, 9]);
     expect(packet.nonceCounter, 1);
+  });
+
+  test('PairChannel recovers when a packet is lost during handover', () async {
+    final hostRaw = _MemoryRawChannel();
+    final guestRaw = _MemoryRawChannel();
+    hostRaw.peer = guestRaw;
+    guestRaw.peer = hostRaw;
+    final key = SecretKey(List<int>.generate(32, (i) => i));
+    final hostStore = SecureKeyStore(storage: _MemoryStorage());
+    final guestStore = SecureKeyStore(storage: _MemoryStorage());
+    final host = PairChannel(
+      transport: hostRaw,
+      key: key,
+      outboundCounter: NonceCounter(
+        storage: hostStore,
+        storageKey: 'gap.host.out',
+      ),
+      inboundCounter: NonceCounter(
+        storage: hostStore,
+        storageKey: 'gap.host.in',
+      ),
+    );
+    final guest = PairChannel(
+      transport: guestRaw,
+      key: key,
+      outboundCounter: NonceCounter(
+        storage: guestStore,
+        storageKey: 'gap.guest.out',
+      ),
+      inboundCounter: NonceCounter(
+        storage: guestStore,
+        storageKey: 'gap.guest.in',
+      ),
+    );
+    addTearDown(host.close);
+    addTearDown(guest.close);
+    await Future.wait(<Future<void>>[host.start(), guest.start()]);
+
+    hostRaw.dropNext = true;
+    await host.send(Uint8List.fromList(<int>[1]));
+    final received = guest.incoming.first.timeout(const Duration(seconds: 2));
+    await host.send(Uint8List.fromList(<int>[2]));
+
+    final packet = await received;
+    expect(packet.payload, <int>[2]);
+    expect(packet.nonceCounter, 2);
   });
 }
 

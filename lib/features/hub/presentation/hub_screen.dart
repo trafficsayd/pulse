@@ -28,7 +28,8 @@ class HubScreen extends ConsumerWidget {
     final connections = ref.watch(connectionsControllerProvider);
     final activeConnection = connections.active;
     final sessionAsync = ref.watch(sessionProvider);
-    final transportKind = sessionAsync.valueOrNull?.currentTransport ??
+    final transportKind = ref.watch(transportStateProvider).valueOrNull ??
+        sessionAsync.valueOrNull?.currentTransport ??
         TransportKind.searching;
     final transportLabel = _transportLabel(transportKind, t);
 
@@ -319,7 +320,7 @@ class _PositionedModeTile extends ConsumerWidget {
             context.go(Routes.subscription);
             return;
           }
-          context.go(Routes.modePath(descriptor.id.name));
+          context.push(Routes.modePath(descriptor.id.name));
         },
       ),
     );
@@ -503,7 +504,8 @@ class _CenterDisc extends StatelessWidget {
 }
 
 /// Maps a [TransportKind] to its localized display label.
-String _transportLabel(TransportKind kind, AppLocalizations t) => switch (kind) {
+String _transportLabel(TransportKind kind, AppLocalizations t) =>
+    switch (kind) {
       TransportKind.direct => t.transportDirectBle,
       TransportKind.localNetwork => t.transportLocalWifi,
       TransportKind.relay => t.transportRelayWebrtc,

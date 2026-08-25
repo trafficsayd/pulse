@@ -42,6 +42,13 @@ class _RaySketchModeScreenState extends ConsumerState<RaySketchModeScreen> {
     Color(0xFF111827),
   ];
   static const List<double> _brushSizes = [3, 6, 10, 16, 24];
+  static const List<Color> _canvasPalette = [
+    Color(0xFF120D1D),
+    Color(0xFF24113D),
+    Color(0xFF101B35),
+    Color(0xFF321827),
+    Color(0xFFF3ECFF),
+  ];
 
   List<_Stroke> _strokes = [];
   _Stroke? _activeStroke;
@@ -50,14 +57,23 @@ class _RaySketchModeScreenState extends ConsumerState<RaySketchModeScreen> {
   Color _selectedColor = _palette[1];
   double _selectedWidth = _brushSizes[2];
   _BrushEffect _selectedEffect = _BrushEffect.neon;
+  Color _canvasColor = _canvasPalette.first;
   bool _liveMode = true;
   int _revision = 0;
 
   @override
   void initState() {
     super.initState();
-    _partnerSub = ref.read(modeEventBusProvider).incoming
-        .where((e) => e.type == 'ray_point' || e.type == 'ray_end')
+    _partnerSub = ref
+        .read(modeEventBusProvider)
+        .incoming
+        .where((e) => {
+              'ray_point',
+              'ray_end',
+              'ray_clear',
+              'ray_canvas',
+              'ray_card',
+            }.contains(e.type))
         .listen(_onPartnerEvent);
   }
 
@@ -70,13 +86,23 @@ class _RaySketchModeScreenState extends ConsumerState<RaySketchModeScreen> {
       final y = (event.data['y'] as num?)?.toDouble() ?? 0.5;
       final size = context.size;
       if (size == null) return;
+      final color = Color(
+        (event.data['color'] as num?)?.toInt() ?? _partnerColor.toARGB32(),
+      );
+      final width =
+          ((event.data['width'] as num?)?.toDouble() ?? 10).clamp(1.0, 32.0);
+      final effectIndex = (event.data['effect'] as num?)?.toInt() ?? 1;
+      final effect =
+          effectIndex >= 0 && effectIndex < _BrushEffect.values.length
+              ? _BrushEffect.values[effectIndex]
+              : _BrushEffect.neon;
       setState(() {
         if (_partnerStroke == null) {
           _partnerStroke = _Stroke(
             points: [Offset(x * size.width, y * size.height)],
-            color: _partnerColor,
-            width: _selectedWidth,
-            effect: _selectedEffect,
+            color: color,
+            width: width,
+            effect: effect,
           );
         } else {
           _partnerStroke = _partnerStroke!.copyWith(
@@ -89,8 +115,64 @@ class _RaySketchModeScreenState extends ConsumerState<RaySketchModeScreen> {
         _revision++;
       });
     } else if (event.type == 'ray_end') {
-      setState(() => _partnerStroke = null);
+      final finished = _partnerStroke;
+      setState(() {
+        if (finished != null) _strokes = [..._strokes, finished];
+        _partnerStroke = null;
+        _revision++;
+      });
+    } else if (event.type == 'ray_clear') {
+      setState(() {
+        _strokes = [];
+        _partnerStroke = null;
+        _revision++;
+      });
+    } else if (event.type == 'ray_canvas') {
+      final value = (event.data['color'] as num?)?.toInt();
+      if (value != null) setState(() => _canvasColor = Color(value));
+    } else if (event.type == 'ray_card') {
+      _applyPartnerCard(event);
     }
+  }
+
+  void _applyPartnerCard(ModeEvent event) {
+    final size = context.size;
+    final rawStrokes = event.data['strokes'];
+    if (size == null || rawStrokes is! List) return;
+    final received = <_Stroke>[];
+    for (final raw in rawStrokes.take(16)) {
+      if (raw is! Map) continue;
+      final rawPoints = raw['points'];
+      if (rawPoints is! List) continue;
+      final points = <Offset>[];
+      for (final rawPoint in rawPoints.take(80)) {
+        if (rawPoint is List && rawPoint.length >= 2) {
+          final x = (rawPoint[0] as num?)?.toDouble();
+          final y = (rawPoint[1] as num?)?.toDouble();
+          if (x != null && y != null) {
+            points.add(Offset(x * size.width, y * size.height));
+          }
+        }
+      }
+      if (points.isEmpty) continue;
+      final effectIndex = (raw['effect'] as num?)?.toInt() ?? 1;
+      received.add(_Stroke(
+        points: points,
+        color:
+            Color((raw['color'] as num?)?.toInt() ?? _partnerColor.toARGB32()),
+        width: ((raw['width'] as num?)?.toDouble() ?? 10).clamp(1, 32),
+        effect: effectIndex >= 0 && effectIndex < _BrushEffect.values.length
+            ? _BrushEffect.values[effectIndex]
+            : _BrushEffect.neon,
+      ));
+    }
+    setState(() {
+      _strokes = received;
+      _partnerStroke = null;
+      final canvas = (event.data['canvas'] as num?)?.toInt();
+      if (canvas != null) _canvasColor = Color(canvas);
+      _revision++;
+    });
   }
 
   @override
@@ -112,6 +194,7 @@ class _RaySketchModeScreenState extends ConsumerState<RaySketchModeScreen> {
       _revision++;
     });
     HapticFeedback.selectionClick();
+    if (_liveMode) _sendPoint(details.localPosition);
   }
 
   void _extendStroke(DragUpdateDetails details) {
@@ -129,23 +212,31 @@ class _RaySketchModeScreenState extends ConsumerState<RaySketchModeScreen> {
       _revision++;
     });
     // Send drawing point to partner.
+    if (_liveMode) _sendPoint(details.localPosition);
+  }
+
+  void _sendPoint(Offset point) {
     final size = context.size;
-    if (size != null) {
-      ref.read(modeEventBusProvider).send(ModeEvent(
-            type: 'ray_point',
-            data: {
-              'x': details.localPosition.dx / size.width,
-              'y': details.localPosition.dy / size.height,
-            },
-          ));
-    }
+    if (size == null) return;
+    unawaited(ref.read(modeEventBusProvider).send(ModeEvent(
+          type: 'ray_point',
+          data: {
+            'x': point.dx / size.width,
+            'y': point.dy / size.height,
+            'color': _selectedColor.toARGB32(),
+            'width': _selectedWidth,
+            'effect': _selectedEffect.index,
+          },
+        )));
   }
 
   void _endStroke() {
     if (_activeStroke == null) return;
     setState(() => _activeStroke = null);
     HapticFeedback.lightImpact();
-    ref.read(modeEventBusProvider).send(const ModeEvent(type: 'ray_end'));
+    if (_liveMode) {
+      ref.read(modeEventBusProvider).send(const ModeEvent(type: 'ray_end'));
+    }
   }
 
   void _clear() {
@@ -155,9 +246,33 @@ class _RaySketchModeScreenState extends ConsumerState<RaySketchModeScreen> {
       _revision++;
     });
     HapticFeedback.mediumImpact();
+    unawaited(
+      ref.read(modeEventBusProvider).send(const ModeEvent(type: 'ray_clear')),
+    );
   }
 
-  void _sendPostcard() {
+  Future<void> _sendPostcard() async {
+    final size = context.size;
+    if (size == null) return;
+    final encoded = _strokes.take(16).map((stroke) {
+      final step = (stroke.points.length / 80).ceil().clamp(1, 1000);
+      final points = <List<double>>[];
+      for (var i = 0; i < stroke.points.length; i += step) {
+        final point = stroke.points[i];
+        points.add([point.dx / size.width, point.dy / size.height]);
+      }
+      return {
+        'color': stroke.color.toARGB32(),
+        'width': stroke.width,
+        'effect': stroke.effect.index,
+        'points': points,
+      };
+    }).toList(growable: false);
+    await ref.read(modeEventBusProvider).send(ModeEvent(
+          type: 'ray_card',
+          data: {'canvas': _canvasColor.toARGB32(), 'strokes': encoded},
+        ));
+    if (!mounted) return;
     HapticFeedback.mediumImpact();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(AppLocalizations.of(context)!.sketchSendReady)),
@@ -176,17 +291,21 @@ class _RaySketchModeScreenState extends ConsumerState<RaySketchModeScreen> {
             child: Stack(
               children: [
                 Positioned.fill(
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onPanStart: _startStroke,
-                    onPanUpdate: _extendStroke,
-                    onPanEnd: (_) => _endStroke(),
-                    onPanCancel: _endStroke,
-                    child: CustomPaint(
-                      painter: _SketchPainter(
-                        strokes: _strokes,
-                        partnerStroke: _partnerStroke,
-                        revision: _revision,
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 260),
+                    color: _canvasColor,
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onPanStart: _startStroke,
+                      onPanUpdate: _extendStroke,
+                      onPanEnd: (_) => _endStroke(),
+                      onPanCancel: _endStroke,
+                      child: CustomPaint(
+                        painter: _SketchPainter(
+                          strokes: _strokes,
+                          partnerStroke: _partnerStroke,
+                          revision: _revision,
+                        ),
                       ),
                     ),
                   ),
@@ -231,10 +350,12 @@ class _RaySketchModeScreenState extends ConsumerState<RaySketchModeScreen> {
                   bottom: 16,
                   child: _SketchToolbar(
                     palette: _palette,
+                    canvasPalette: _canvasPalette,
                     brushSizes: _brushSizes,
                     selectedColor: _selectedColor,
                     selectedWidth: _selectedWidth,
                     selectedEffect: _selectedEffect,
+                    selectedCanvasColor: _canvasColor,
                     liveMode: _liveMode,
                     onColorSelected: (color) {
                       setState(() => _selectedColor = color);
@@ -247,6 +368,14 @@ class _RaySketchModeScreenState extends ConsumerState<RaySketchModeScreen> {
                     onEffectSelected: (effect) {
                       setState(() => _selectedEffect = effect);
                       HapticFeedback.selectionClick();
+                    },
+                    onCanvasSelected: (color) {
+                      setState(() => _canvasColor = color);
+                      HapticFeedback.selectionClick();
+                      unawaited(ref.read(modeEventBusProvider).send(ModeEvent(
+                            type: 'ray_canvas',
+                            data: {'color': color.toARGB32()},
+                          )));
                     },
                     onModeChanged: (live) {
                       setState(() => _liveMode = live);
@@ -268,28 +397,34 @@ class _RaySketchModeScreenState extends ConsumerState<RaySketchModeScreen> {
 class _SketchToolbar extends StatelessWidget {
   const _SketchToolbar({
     required this.palette,
+    required this.canvasPalette,
     required this.brushSizes,
     required this.selectedColor,
     required this.selectedWidth,
     required this.selectedEffect,
+    required this.selectedCanvasColor,
     required this.liveMode,
     required this.onColorSelected,
     required this.onWidthSelected,
     required this.onEffectSelected,
+    required this.onCanvasSelected,
     required this.onModeChanged,
     required this.onClear,
     required this.onSend,
   });
 
   final List<Color> palette;
+  final List<Color> canvasPalette;
   final List<double> brushSizes;
   final Color selectedColor;
   final double selectedWidth;
   final _BrushEffect selectedEffect;
+  final Color selectedCanvasColor;
   final bool liveMode;
   final ValueChanged<Color> onColorSelected;
   final ValueChanged<double> onWidthSelected;
   final ValueChanged<_BrushEffect> onEffectSelected;
+  final ValueChanged<Color> onCanvasSelected;
   final ValueChanged<bool> onModeChanged;
   final VoidCallback onClear;
   final VoidCallback onSend;
@@ -360,30 +495,51 @@ class _SketchToolbar extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 14),
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: [
-                    for (final width in brushSizes) ...[
-                      _BrushSizeDot(
-                        width: width,
-                        selected: width == selectedWidth,
-                        onTap: () => onWidthSelected(width),
-                      ),
-                      const SizedBox(width: 10),
-                    ],
-                    const SizedBox(width: 16),
-                    for (final effect in _BrushEffect.values) ...[
-                      _EffectButton(
-                        effect: effect,
-                        label: _effectLabel(t, effect),
-                        selected: effect == selectedEffect,
-                        onTap: () => onEffectSelected(effect),
-                      ),
-                      const SizedBox(width: 8),
-                    ],
+              Row(
+                children: [
+                  Text(
+                    t.sketchCanvas,
+                    style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  for (final color in canvasPalette) ...[
+                    _ColorDot(
+                      color: color,
+                      selected: color == selectedCanvasColor,
+                      onTap: () => onCanvasSelected(color),
+                    ),
+                    const SizedBox(width: 6),
                   ],
-                ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  for (final width in brushSizes)
+                    _BrushSizeDot(
+                      width: width,
+                      selected: width == selectedWidth,
+                      onTap: () => onWidthSelected(width),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  for (final effect in _BrushEffect.values)
+                    _EffectButton(
+                      effect: effect,
+                      label: _effectLabel(t, effect),
+                      selected: effect == selectedEffect,
+                      onTap: () => onEffectSelected(effect),
+                    ),
+                ],
               ),
             ],
           ),

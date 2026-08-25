@@ -16,6 +16,7 @@ export default defineWorkersConfig({
             ICE_LONG_POLL_INTERVAL_MS: '50',
             RATE_LIMIT_PER_MINUTE: '30',
             SESSION_TTL_SECONDS: '600',
+            USE_KV_FOR_TESTS: 'true',
           },
         },
       },

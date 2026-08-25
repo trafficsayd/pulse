@@ -102,6 +102,12 @@ function asIceCandidate(value: unknown): IceCandidate | null {
   if (v['usernameFragment'] === null || typeof v['usernameFragment'] === 'string') {
     out.usernameFragment = v['usernameFragment'] as string | null;
   }
+  if (typeof v['senderId'] === 'string') {
+    out.senderId = v['senderId'];
+  }
+  if (typeof v['negotiationId'] === 'string') {
+    out.negotiationId = v['negotiationId'];
+  }
   return out;
 }
 
@@ -180,17 +186,25 @@ async function handleCreateSession(ctx: RouteContext): Promise<Response> {
   if (typeof body !== 'object' || body === null) {
     return errorJson(400, 'bad_body', 'expected JSON object');
   }
-  const { pairingCode } = body as Partial<CreateSessionRequest>;
+  const { pairingCode, clientId } = body as Partial<CreateSessionRequest>;
   if (!isString(pairingCode) || pairingCode.length === 0 || pairingCode.length > 64) {
     return errorJson(400, 'bad_pairing_code', '`pairingCode` must be a 1..64 char string');
   }
+  if (
+    clientId !== undefined &&
+    (!isString(clientId) || clientId.length === 0 || clientId.length > 64)
+  ) {
+    return errorJson(400, 'bad_client_id', '`clientId` must be a 1..64 char string');
+  }
 
-  const session = await createSession(ctx.env, pairingCode, ctx.nowMs);
+  const joined = await createSession(ctx.env, pairingCode, clientId, ctx.nowMs);
+  const session = joined.session;
   const token = await signToken(ctx.env.WORKER_SECRET, session.sessionId, session.expiresAt);
   const response: CreateSessionResponse = {
     sessionId: session.sessionId,
     token,
     expiresAt: session.expiresAt,
+    isInitiator: joined.isInitiator,
   };
   return json(response, { status: 201 });
 }
@@ -214,7 +228,12 @@ async function handlePostOffer(ctx: RouteContext, sessionId: string): Promise<Re
   if (typeof body !== 'object' || body === null) {
     return errorJson(400, 'bad_body', 'expected JSON object');
   }
-  const { sdp, ice } = body as { sdp?: unknown; ice?: unknown };
+  const { sdp, ice, senderId, negotiationId } = body as {
+    sdp?: unknown;
+    ice?: unknown;
+    senderId?: unknown;
+    negotiationId?: unknown;
+  };
   if (!isString(sdp) || sdp.length === 0) {
     return errorJson(400, 'bad_sdp', '`sdp` must be a non-empty string');
   }
@@ -230,6 +249,8 @@ async function handlePostOffer(ctx: RouteContext, sessionId: string): Promise<Re
     type: 'offer',
     sdp,
     storedAt: ctx.nowMs,
+    ...(isString(senderId) ? { senderId } : {}),
+    ...(isString(negotiationId) ? { negotiationId } : {}),
     ...(parsedIce ? { ice: parsedIce } : {}),
   };
   await storeOffer(ctx.env, sessionId, payload);
@@ -271,7 +292,12 @@ async function handlePostAnswer(ctx: RouteContext, sessionId: string): Promise<R
   if (typeof body !== 'object' || body === null) {
     return errorJson(400, 'bad_body', 'expected JSON object');
   }
-  const { sdp, ice } = body as { sdp?: unknown; ice?: unknown };
+  const { sdp, ice, senderId, negotiationId } = body as {
+    sdp?: unknown;
+    ice?: unknown;
+    senderId?: unknown;
+    negotiationId?: unknown;
+  };
   if (!isString(sdp) || sdp.length === 0) {
     return errorJson(400, 'bad_sdp', '`sdp` must be a non-empty string');
   }
@@ -287,6 +313,8 @@ async function handlePostAnswer(ctx: RouteContext, sessionId: string): Promise<R
     type: 'answer',
     sdp,
     storedAt: ctx.nowMs,
+    ...(isString(senderId) ? { senderId } : {}),
+    ...(isString(negotiationId) ? { negotiationId } : {}),
     ...(parsedIce ? { ice: parsedIce } : {}),
   };
   await storeAnswer(ctx.env, sessionId, payload);
@@ -357,6 +385,38 @@ async function handleGetIce(ctx: RouteContext, sessionId: string): Promise<Respo
     return new Response(null, { status: 204 });
   }
   return json(payload, { status: 200 });
+}
+
+async function handleGetTurnCredentials(ctx: RouteContext, sessionId: string): Promise<Response> {
+  const authFailure = await requireAuth(ctx.env, ctx.request, sessionId, ctx.nowMs);
+  if (authFailure) return authFailure;
+  if (!(await getSession(ctx.env, sessionId))) {
+    return errorJson(404, 'session_not_found', 'session does not exist or has expired');
+  }
+  const keyId = ctx.env.TURN_KEY_ID;
+  const apiToken = ctx.env.TURN_KEY_API_TOKEN;
+  if (!keyId || !apiToken) {
+    return new Response(null, { status: 204 });
+  }
+  const upstream = await fetch(
+    `https://rtc.live.cloudflare.com/v1/turn/keys/${encodeURIComponent(keyId)}/credentials/generate-ice-servers`,
+    {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${apiToken}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ ttl: 86_400 }),
+    },
+  );
+  if (!upstream.ok) {
+    console.error('TURN credential generation failed', upstream.status, await upstream.text());
+    return errorJson(503, 'turn_unavailable', 'TURN credentials are temporarily unavailable');
+  }
+  return new Response(upstream.body, {
+    status: 200,
+    headers: JSON_HEADERS,
+  });
 }
 
 async function handlePostMessage(ctx: RouteContext, sessionId: string): Promise<Response> {
@@ -437,8 +497,8 @@ interface RouteMatch {
 }
 
 function matchSessionRoute(method: string, pathname: string): RouteMatch | null {
-  // /session/:id/(offer|answer|ice|messages)
-  const match = /^\/session\/([0-9a-fA-F]{6,64})\/(offer|answer|ice|messages)$/.exec(pathname);
+  // /session/:id/(offer|answer|ice|turn|messages)
+  const match = /^\/session\/([0-9a-fA-F]{6,64})\/(offer|answer|ice|turn|messages)$/.exec(pathname);
   if (!match) {
     return null;
   }
@@ -462,6 +522,9 @@ function matchSessionRoute(method: string, pathname: string): RouteMatch | null 
   if (sub === 'ice' && method === 'GET') {
     return { handler: handleGetIce, sessionId };
   }
+  if (sub === 'turn' && method === 'GET') {
+    return { handler: handleGetTurnCredentials, sessionId };
+  }
   if (sub === 'messages' && method === 'POST') {
     return { handler: handlePostMessage, sessionId };
   }
@@ -484,7 +547,13 @@ async function handle(request: Request, env: Env): Promise<Response> {
   // bypass the per-IP cap.
   const decision = await checkAndIncrementRateLimit(env, request, nowMs);
   if (!decision.allowed) {
-    return errorJson(429, 'rate_limited', `over ${decision.limit} req/min for this IP`);
+    const response = errorJson(
+      429,
+      'rate_limited',
+      `over ${decision.limit} req/min for this IP`,
+    );
+    response.headers.set('retry-after', String(decision.retryAfterSeconds));
+    return response;
   }
 
   if (url.pathname === '/session' && request.method === 'POST') {

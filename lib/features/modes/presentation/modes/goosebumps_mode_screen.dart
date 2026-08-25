@@ -37,7 +37,9 @@ class _GoosebumpsModeScreenState extends ConsumerState<GoosebumpsModeScreen>
   void initState() {
     super.initState();
     _player = HapticPatternPlayer(ref.read(hapticEngineProvider));
-    _partnerSub = ref.read(modeEventBusProvider).incoming
+    _partnerSub = ref
+        .read(modeEventBusProvider)
+        .incoming
         .where((e) => e.type == 'goosebumps_wave')
         .listen(_onPartnerWave);
   }
@@ -46,18 +48,17 @@ class _GoosebumpsModeScreenState extends ConsumerState<GoosebumpsModeScreen>
     if (!mounted) return;
     final x = (event.data['x'] as num?)?.toDouble() ?? 0.5;
     final y = (event.data['y'] as num?)?.toDouble() ?? 0.5;
-    final size = context.size;
-    if (size == null) return;
-    _addWave(Offset(x * size.width, y * size.height), isLocal: false);
+    _addWave(Offset(x, y), isLocal: false);
     unawaited(_player.play(HapticPatterns.wave));
   }
 
-  void _addWave(Offset position, {required bool isLocal}) {
+  void _addWave(Offset normalizedPosition, {required bool isLocal}) {
     final controller = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1400),
     );
-    final wave = _Wave(position: position, controller: controller, isLocal: isLocal);
+    final wave = _Wave(
+        position: normalizedPosition, controller: controller, isLocal: isLocal);
     setState(() => _waves.add(wave));
     controller.forward().whenComplete(() {
       if (!mounted) return;
@@ -67,18 +68,22 @@ class _GoosebumpsModeScreenState extends ConsumerState<GoosebumpsModeScreen>
   }
 
   Future<void> _onTap(TapDownDetails details) async {
-    _addWave(details.localPosition, isLocal: true);
-    HapticFeedback.selectionClick();
-    unawaited(_player.play(HapticPatterns.wave));
     final size = context.size;
     if (size == null) return;
+    final normalized = Offset(
+      details.localPosition.dx / size.width,
+      details.localPosition.dy / size.height,
+    );
+    _addWave(normalized, isLocal: true);
+    HapticFeedback.selectionClick();
+    unawaited(_player.play(HapticPatterns.wave));
     await ref.read(modeEventBusProvider).send(ModeEvent(
-      type: 'goosebumps_wave',
-      data: {
-        'x': details.localPosition.dx / size.width,
-        'y': details.localPosition.dy / size.height,
-      },
-    ));
+          type: 'goosebumps_wave',
+          data: {
+            'x': normalized.dx,
+            'y': normalized.dy,
+          },
+        ));
   }
 
   @override
@@ -141,19 +146,31 @@ class _GoosebumpsModeScreenState extends ConsumerState<GoosebumpsModeScreen>
 }
 
 class _Wave {
-  _Wave({required this.position, required this.controller, required this.isLocal});
+  _Wave(
+      {required this.position,
+      required this.controller,
+      required this.isLocal});
   final Offset position;
   final AnimationController controller;
   final bool isLocal;
 }
 
 class _GoosebumpsPainter extends CustomPainter {
-  _GoosebumpsPainter({required this.waves});
+  _GoosebumpsPainter({required this.waves})
+      : super(
+          repaint: Listenable.merge(
+            waves.map((wave) => wave.controller).toList(growable: false),
+          ),
+        );
   final List<_Wave> waves;
 
   @override
   void paint(Canvas canvas, Size size) {
     for (final wave in waves) {
+      final position = Offset(
+        wave.position.dx * size.width,
+        wave.position.dy * size.height,
+      );
       final progress = wave.controller.value;
       final maxRadius = size.shortestSide * 0.7;
       // Three concentric rings expanding outward.
@@ -170,14 +187,16 @@ class _GoosebumpsPainter extends CustomPainter {
           ..strokeWidth = 3 - ringProgress * 2
           ..color = color
           ..isAntiAlias = true;
-        canvas.drawCircle(wave.position, radius, paint);
+        canvas.drawCircle(position, radius, paint);
         // Tiny "bumps" along the ring for texture.
         const bumpCount = 24;
-        final bumpPaint = Paint()..color = color..style = PaintingStyle.fill;
+        final bumpPaint = Paint()
+          ..color = color
+          ..style = PaintingStyle.fill;
         for (var i = 0; i < bumpCount; i++) {
           final theta = (i / bumpCount) * 2 * math.pi;
           final bumpR = radius + math.sin(ringProgress * 20 + i) * 3;
-          final p = wave.position + Offset(math.cos(theta), math.sin(theta)) * bumpR;
+          final p = position + Offset(math.cos(theta), math.sin(theta)) * bumpR;
           canvas.drawCircle(p, 2.5 * (1 - ringProgress), bumpPaint);
         }
       }

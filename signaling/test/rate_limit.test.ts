@@ -18,6 +18,14 @@ async function hit(ip: string): Promise<number> {
   return r.status;
 }
 
+async function hitResponse(ip: string): Promise<Response> {
+  return SELF.fetch('https://signaling.test/session', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'cf-connecting-ip': ip },
+    body: JSON.stringify({ pairingCode: 'abcd' }),
+  });
+}
+
 describe('rate limit', () => {
   it('allows ~30 requests per minute and then rate-limits the IP', async () => {
     // KV is eventually consistent (it is in production too), so we do not
@@ -67,5 +75,16 @@ describe('rate limit', () => {
       }
     }
     expect(lastStatus).toBe(429);
+  });
+
+  it('tells clients how long to back off after a 429', async () => {
+    const ip = '198.51.100.100';
+    let response: Response | undefined;
+    for (let i = 0; i < 80; i++) {
+      response = await hitResponse(ip);
+      if (response.status === 429) break;
+    }
+    expect(response?.status).toBe(429);
+    expect(Number(response?.headers.get('retry-after'))).toBeGreaterThan(0);
   });
 });

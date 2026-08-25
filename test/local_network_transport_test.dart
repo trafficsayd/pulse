@@ -77,6 +77,43 @@ void main() {
       expect(packet.kind, 'ping');
       expect(packet.payload, [4, 5, 6]);
     });
+
+    test('listener accepts the peer again after a connection loss', () async {
+      final listener = LocalNetworkTransport();
+      final peer = LocalNetworkTransport();
+      addTearDown(listener.disconnect);
+      addTearDown(peer.disconnect);
+
+      final token = 'local-reconnect-${DateTime.now().microsecondsSinceEpoch}';
+      await listener.connect(reconnectTokens: {
+        'signalingToken': token,
+        'transportClientId': 'a-listener',
+      });
+      await peer.connect(reconnectTokens: {
+        'signalingToken': token,
+        'transportClientId': 'z-peer',
+      });
+      await Future.wait([_waitConnected(listener), _waitConnected(peer)]);
+
+      final listenerSearching = listener.state.firstWhere(
+        (state) => state == TransportKind.searching,
+      );
+      await peer.disconnect();
+      await listenerSearching.timeout(const Duration(seconds: 3));
+
+      await peer.connect(reconnectTokens: {
+        'signalingToken': token,
+        'transportClientId': 'z-peer',
+      });
+      await Future.wait([_waitConnected(listener), _waitConnected(peer)]);
+
+      final inbound = peer.incoming.first.timeout(const Duration(seconds: 3));
+      await listener.send(TransportPacket(
+        kind: 'reconnected',
+        payload: Uint8List.fromList([9, 8, 7]),
+      ));
+      expect((await inbound).payload, [9, 8, 7]);
+    });
   });
 }
 

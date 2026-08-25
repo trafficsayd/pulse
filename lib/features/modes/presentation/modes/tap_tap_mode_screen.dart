@@ -36,7 +36,9 @@ class _TapTapModeScreenState extends ConsumerState<TapTapModeScreen>
       duration: const Duration(seconds: 3),
     )..repeat();
     // Listen for partner tap events.
-    _partnerSub = ref.read(modeEventBusProvider).incoming
+    _partnerSub = ref
+        .read(modeEventBusProvider)
+        .incoming
         .where((e) => e.type == 'tap')
         .listen(_onPartnerTap);
   }
@@ -73,14 +75,18 @@ class _TapTapModeScreenState extends ConsumerState<TapTapModeScreen>
   }
 
   Future<void> _onTap(TapDownDetails details, Size size) async {
-    _addRing(details.localPosition, isLocal: true);
+    await _sendTap(details.localPosition, size);
+  }
+
+  Future<void> _sendTap(Offset position, Size size) async {
+    _addRing(position, isLocal: true);
     HapticFeedback.lightImpact();
 
     // Send tap event to partner.
     final bus = ref.read(modeEventBusProvider);
     await bus.send(ModeEvent(type: 'tap', data: {
-      'x': details.localPosition.dx / size.width,
-      'y': details.localPosition.dy / size.height,
+      'x': position.dx / size.width,
+      'y': position.dy / size.height,
     }));
   }
 
@@ -179,19 +185,23 @@ class _TapTapModeScreenState extends ConsumerState<TapTapModeScreen>
                 left: 24,
                 right: 24,
                 bottom: 34,
-                child: PulsePanel(
-                  radius: 24,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 18,
-                    vertical: 12,
-                  ),
-                  child: Text(
-                    t.tapTapHint,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: AppColors.textSecondary,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => _sendTap(center, size),
+                  child: PulsePanel(
+                    radius: 24,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 18,
+                      vertical: 12,
+                    ),
+                    child: Text(
+                      t.tapTapHint,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
                 ),

@@ -279,7 +279,7 @@ class _ModeTile extends ConsumerWidget {
         );
       return;
     }
-    context.go(Routes.modePath(mode.id.name));
+    context.push(Routes.modePath(mode.id.name));
   }
 
   String _label(BuildContext context, PulseModeDescriptor mode) {

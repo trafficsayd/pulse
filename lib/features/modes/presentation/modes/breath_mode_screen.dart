@@ -63,8 +63,10 @@ class _BreathModeViewState extends ConsumerState<_BreathModeView>
   late final AnimationController _breath;
   StreamSubscription<MicLevel>? _micSub;
   StreamSubscription<ModeEvent>? _partnerSub;
+  Timer? _partnerLevelDecay;
   double _localLevel = 0;
   double _partnerLevel = 0;
+  DateTime? _lastLevelSentAt;
   late final HapticPatternPlayer _player;
 
   @override
@@ -79,17 +81,30 @@ class _BreathModeViewState extends ConsumerState<_BreathModeView>
     _micSub = widget.mic.levels.listen((sample) {
       if (!mounted) return;
       setState(() => _localLevel = sample.level01);
-      ref.read(modeEventBusProvider).send(ModeEvent(
-        type: 'breath_level',
-        data: {'level': sample.level01},
-      ));
+      if (_lastLevelSentAt == null ||
+          sample.timestamp.difference(_lastLevelSentAt!) >=
+              const Duration(milliseconds: 100)) {
+        _lastLevelSentAt = sample.timestamp;
+        unawaited(ref.read(modeEventBusProvider).send(ModeEvent(
+              type: 'breath_level',
+              data: {'level': sample.level01},
+            )));
+      }
     });
-    _partnerSub = ref.read(modeEventBusProvider).incoming
+    _partnerSub = ref
+        .read(modeEventBusProvider)
+        .incoming
         .where((e) => e.type == 'breath_level')
         .listen((e) {
       if (mounted) {
         final level = (e.data['level'] as num?)?.toDouble() ?? 0;
         setState(() => _partnerLevel = level);
+        _partnerLevelDecay?.cancel();
+        if (level > 0) {
+          _partnerLevelDecay = Timer(const Duration(milliseconds: 450), () {
+            if (mounted) setState(() => _partnerLevel = 0);
+          });
+        }
       }
     });
   }
@@ -98,6 +113,7 @@ class _BreathModeViewState extends ConsumerState<_BreathModeView>
   void dispose() {
     _micSub?.cancel();
     _partnerSub?.cancel();
+    _partnerLevelDecay?.cancel();
     _breath.dispose();
     unawaited(_player.stop());
     super.dispose();
@@ -117,7 +133,10 @@ class _BreathModeViewState extends ConsumerState<_BreathModeView>
                   animation: _breath,
                   builder: (context, _) {
                     // Inhale = first half (expanding), exhale = second half.
-                    final phase = _breath.value;
+                    // Align both phones to the same wall-clock cycle instead
+                    // of starting a private cycle when each screen opens.
+                    final phase =
+                        (DateTime.now().millisecondsSinceEpoch % 8000) / 8000;
                     final isExhale = phase > 0.5;
                     final expand = isExhale ? 1 - (phase - 0.5) * 2 : phase * 2;
                     return CustomPaint(
@@ -126,6 +145,8 @@ class _BreathModeViewState extends ConsumerState<_BreathModeView>
                         localLevel: _localLevel,
                         partnerLevel: _partnerLevel,
                         isExhale: isExhale,
+                        inhaleLabel: t.breathInhale,
+                        exhaleLabel: t.breathExhale,
                       ),
                     );
                   },
@@ -170,12 +191,16 @@ class _BreathPainter extends CustomPainter {
     required this.localLevel,
     required this.partnerLevel,
     required this.isExhale,
+    required this.inhaleLabel,
+    required this.exhaleLabel,
   });
 
   final double expand; // 0..1
   final double localLevel;
   final double partnerLevel;
   final bool isExhale;
+  final String inhaleLabel;
+  final String exhaleLabel;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -221,7 +246,7 @@ class _BreathPainter extends CustomPainter {
     // Phase label.
     final textPaint = TextPainter(
       text: TextSpan(
-        text: isExhale ? ' exhale ' : ' inhale ',
+        text: isExhale ? exhaleLabel : inhaleLabel,
         style: const TextStyle(
           color: AppColors.textSecondary,
           fontSize: 14,
@@ -241,5 +266,7 @@ class _BreathPainter extends CustomPainter {
       old.expand != expand ||
       old.localLevel != localLevel ||
       old.partnerLevel != partnerLevel ||
+      old.inhaleLabel != inhaleLabel ||
+      old.exhaleLabel != exhaleLabel ||
       old.isExhale != isExhale;
 }

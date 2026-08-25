@@ -1,12 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import 'core/locale/locale_controller.dart';
 import 'core/routing/app_router.dart';
+import 'core/routing/routes.dart';
 import 'core/theme/app_colors.dart';
 import 'core/theme/app_theme.dart';
 import 'core/widgets/session_error_banner.dart';
 import 'features/subscription/application/subscription_controller.dart';
+import 'features/connections/application/connections_controller.dart';
+import 'features/modes/application/mode_registry.dart';
+import 'features/modes/domain/pulse_mode.dart';
+import 'features/session/application/mode_event.dart';
+import 'features/session/application/mode_event_bus.dart';
 import 'l10n/app_localizations.dart';
 
 /// Root [MaterialApp.router] for Pulse.
@@ -24,6 +32,10 @@ class PulseApp extends ConsumerStatefulWidget {
 
 class _PulseAppState extends ConsumerState<PulseApp> {
   late final _router = buildRouter();
+  final _messengerKey = GlobalKey<ScaffoldMessengerState>();
+  bool _didRestoreInitialRoute = false;
+  PulseModeId? _lastIncomingMode;
+  DateTime? _lastIncomingAt;
 
   @override
   void initState() {
@@ -38,7 +50,13 @@ class _PulseAppState extends ConsumerState<PulseApp> {
   @override
   Widget build(BuildContext context) {
     final locale = ref.watch(localeControllerProvider);
+    ref.listen<AsyncValue<ModeEvent>>(incomingModeEventProvider, (_, next) {
+      final event = next.valueOrNull;
+      if (event != null) _showIncomingMode(event);
+    });
+    _restoreInitialRoute();
     return MaterialApp.router(
+      scaffoldMessengerKey: _messengerKey,
       onGenerateTitle: (context) =>
           AppLocalizations.of(context)?.appTitle ?? 'Pulse',
       theme: buildPulseTheme(),
@@ -63,5 +81,84 @@ class _PulseAppState extends ConsumerState<PulseApp> {
       },
       routerConfig: _router,
     );
+  }
+
+  void _showIncomingMode(ModeEvent event) {
+    final modeId = modeForEventType(event.type);
+    if (modeId == null) return;
+    final path = Routes.modePath(modeId.name);
+    if (_isCurrentPath(path)) return;
+    final now = DateTime.now();
+    if (_lastIncomingMode == modeId &&
+        _lastIncomingAt != null &&
+        now.difference(_lastIncomingAt!) < const Duration(seconds: 5)) {
+      return;
+    }
+    _lastIncomingMode = modeId;
+    _lastIncomingAt = now;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Navigation and an incoming event can complete in the same frame.
+      // Re-check here so a banner scheduled on the hub cannot cover the
+      // controls after the matching mode has already opened.
+      if (!mounted || _isCurrentPath(path)) return;
+      final messenger = _messengerKey.currentState;
+      final messengerContext = _messengerKey.currentContext;
+      if (messenger == null || messengerContext == null) return;
+      final l10n = AppLocalizations.of(messengerContext);
+      final descriptor = findMode(modeId);
+      final title = descriptor != null && l10n != null
+          ? localizedModeTitle(descriptor, l10n)
+          : modeId.name;
+      HapticFeedback.mediumImpact();
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(
+          content: Text('${l10n?.appTitle ?? 'Pulse'} · $title'),
+          action: SnackBarAction(
+            label: Localizations.localeOf(messengerContext).languageCode == 'ru'
+                ? 'Открыть'
+                : 'Open',
+            onPressed: () {
+              messenger.hideCurrentSnackBar();
+              _router.push(path);
+            },
+          ),
+        ));
+    });
+  }
+
+  bool _isCurrentPath(String path) {
+    final displayedPath = _router.routeInformationProvider.value.uri.path;
+    final configuration = _router.routerDelegate.currentConfiguration;
+    if (displayedPath == path || configuration.uri.path == path) return true;
+
+    // GoRouter.push creates an ImperativeRouteMatch. Its visible page is in
+    // `matches`, while both URI values intentionally remain at the underlying
+    // route (usually /hub). Inspect the real navigation stack so incoming
+    // events cannot show a redundant banner over an already-open mode.
+    bool containsPath(List<RouteMatchBase> matches) {
+      for (final match in matches) {
+        if (match.matchedLocation == path) return true;
+        if (match is ShellRouteMatch && containsPath(match.matches)) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    return containsPath(configuration.matches);
+  }
+
+  void _restoreInitialRoute() {
+    if (_didRestoreInitialRoute) return;
+    _didRestoreInitialRoute = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await ref.read(connectionsControllerProvider.notifier).loaded;
+      if (!mounted) return;
+      final state = ref.read(connectionsControllerProvider);
+      if (state.connections.isNotEmpty) {
+        _router.go(Routes.hub);
+      }
+    });
   }
 }

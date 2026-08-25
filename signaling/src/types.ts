@@ -15,8 +15,16 @@
  */
 export interface Env {
   SIGNALING_SESSIONS: KVNamespace;
+  /** Primary signaling store. D1 replaces the much smaller KV write quota. */
+  SIGNALING_DB?: D1Database;
+  /** Test-only escape hatch so isolated Vitest cases keep using ephemeral KV. */
+  USE_KV_FOR_TESTS?: string;
   /** HMAC-SHA-256 key used to sign per-session bearer tokens. */
   WORKER_SECRET: string;
+  /** Cloudflare Realtime TURN key id (server-side only). */
+  TURN_KEY_ID?: string;
+  /** Secret API token belonging to TURN_KEY_ID (server-side only). */
+  TURN_KEY_API_TOKEN?: string;
   /** Maximum time `GET /session/:id/ice` will block waiting for new ICE. */
   ICE_LONG_POLL_TIMEOUT_MS?: string;
   /** Poll interval used inside the long-poll loop. */
@@ -43,6 +51,8 @@ export interface SignalingSession {
   createdAt: number;
   /** Millisecond epoch at which the session and its token expire. */
   expiresAt: number;
+  /** Stable app-instance id that owns the offer role across reconnects. */
+  initiatorClientId?: string;
 }
 
 /**
@@ -56,6 +66,8 @@ export interface OfferPayload {
   type: 'offer';
   /** Raw SDP. */
   sdp: string;
+  senderId?: string;
+  negotiationId?: string;
   /** Optional trickle-ICE candidates included with the offer. */
   ice?: IceCandidate[];
   /** Millisecond epoch at which the offer was stored. */
@@ -68,6 +80,8 @@ export interface OfferPayload {
 export interface AnswerPayload {
   type: 'answer';
   sdp: string;
+  senderId?: string;
+  negotiationId?: string;
   ice?: IceCandidate[];
   storedAt: number;
 }
@@ -84,6 +98,9 @@ export interface IceCandidate {
   sdpMLineIndex?: number | null;
   /** Optional username fragment for ICE restart. */
   usernameFragment?: string | null;
+  /** Random per-app-instance id used to ignore reflected candidates. */
+  senderId?: string;
+  negotiationId?: string;
 }
 
 /**
@@ -131,6 +148,8 @@ export interface CreateSessionResponse {
   sessionId: string;
   token: string;
   expiresAt: number;
+  /** First peer creates the offer; the joining peer creates the answer. */
+  isInitiator: boolean;
 }
 
 /**
@@ -138,6 +157,8 @@ export interface CreateSessionResponse {
  */
 export interface CreateSessionRequest {
   pairingCode: string;
+  /** Stable for the lifetime of one app process; used to preserve SDP role. */
+  clientId?: string;
 }
 
 /** Result of verifying a bearer token. */

@@ -96,10 +96,18 @@ class _MemoryStorage implements FlutterSecureStorage {
 }
 
 class _RendezvousServer {
+  _RendezvousServer({
+    this.answerReadFailuresRemaining = 0,
+    this.answerReadFailureStatus = 503,
+  });
+
+  int answerReadFailuresRemaining;
+  final int answerReadFailureStatus;
   final Map<String, String> _pairingToSession = <String, String>{};
   final Map<String, String> _offerBySession = <String, String>{};
   final Map<String, String> _answerBySession = <String, String>{};
   int _next = 0;
+  int answerReadRequests = 0;
 
   late final MockClient client = MockClient(_handle);
 
@@ -139,6 +147,14 @@ class _RendezvousServer {
     }
 
     if (request.method == 'GET') {
+      if (kind == 'answer') answerReadRequests++;
+      if (kind == 'answer' && answerReadFailuresRemaining > 0) {
+        answerReadFailuresRemaining--;
+        return http.Response(
+          'temporary edge failure',
+          answerReadFailureStatus,
+        );
+      }
       final sdp = kind == 'offer'
           ? _offerBySession[sessionId]
           : _answerBySession[sessionId];
@@ -190,6 +206,96 @@ void main() {
     final guestKeys = await guestController.confirmAndPersist();
     expect(hostKeys?.connectionId, guestKeys?.connectionId);
     expect(hostKeys?.symmetricKey, guestKeys?.symmetricKey);
+  });
+
+  test('host survives a transient answer poll failure', () async {
+    final server = _RendezvousServer(answerReadFailuresRemaining: 1);
+    final host = _container(server);
+    final guest = _container(server);
+    addTearDown(host.dispose);
+    addTearDown(guest.dispose);
+
+    final hostController = host.read(pairingControllerProvider.notifier);
+    final guestController = guest.read(pairingControllerProvider.notifier);
+    final hostFuture = hostController.startHostHandshake(
+      timeout: const Duration(seconds: 5),
+    );
+
+    await _waitFor(host, (state) => state.pairingCode != null);
+    final code = host.read(pairingControllerProvider).pairingCode!;
+    await guestController.joinHandshake(
+      code,
+      timeout: const Duration(seconds: 5),
+    );
+    await hostFuture;
+
+    expect(
+      host.read(pairingControllerProvider).phase,
+      PairingPhase.awaitingConfirmation,
+    );
+    expect(
+      host.read(pairingControllerProvider).sasCode,
+      guest.read(pairingControllerProvider).sasCode,
+    );
+  });
+
+  test('host survives a fresh-session 404 from an eventual edge', () async {
+    final server = _RendezvousServer(
+      answerReadFailuresRemaining: 1,
+      answerReadFailureStatus: 404,
+    );
+    final host = _container(server);
+    final guest = _container(server);
+    addTearDown(host.dispose);
+    addTearDown(guest.dispose);
+
+    final hostController = host.read(pairingControllerProvider.notifier);
+    final guestController = guest.read(pairingControllerProvider.notifier);
+    final hostFuture = hostController.startHostHandshake(
+      timeout: const Duration(seconds: 5),
+    );
+
+    await _waitFor(host, (state) => state.pairingCode != null);
+    final code = host.read(pairingControllerProvider).pairingCode!;
+    await guestController.joinHandshake(
+      code,
+      timeout: const Duration(seconds: 5),
+    );
+    await hostFuture;
+
+    expect(
+      host.read(pairingControllerProvider).phase,
+      PairingPhase.awaitingConfirmation,
+    );
+    expect(
+      host.read(pairingControllerProvider).sasCode,
+      guest.read(pairingControllerProvider).sasCode,
+    );
+  });
+
+  test('reset cancels an in-flight host poll', () async {
+    final server = _RendezvousServer();
+    final host = _container(server);
+    addTearDown(host.dispose);
+
+    final controller = host.read(pairingControllerProvider.notifier);
+    final handshake = controller.startHostHandshake(
+      timeout: const Duration(seconds: 5),
+    );
+    final deadline = DateTime.now().add(const Duration(seconds: 2));
+    while (
+        server.answerReadRequests == 0 && DateTime.now().isBefore(deadline)) {
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+    }
+    expect(server.answerReadRequests, greaterThan(0));
+
+    controller.reset();
+    await handshake.timeout(const Duration(seconds: 1));
+    final readsAfterReset = server.answerReadRequests;
+    await Future<void>.delayed(const Duration(milliseconds: 600));
+
+    expect(host.read(pairingControllerProvider).phase, PairingPhase.idle);
+    expect(server.answerReadRequests, readsAfterReset);
   });
 }
 

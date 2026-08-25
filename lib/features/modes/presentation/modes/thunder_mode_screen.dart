@@ -19,9 +19,7 @@ import 'unsupported_mode_screen.dart';
 /// "Thunder" — tap to strike lightning. A jagged bolt flashes across both
 /// screens, the torch pulses, and a deep rumble vibration plays.
 ///
-/// Requires [DeviceCapability.flashlight] and [DeviceCapability.microphone]
-/// (the latter for a thunder rumble audio cue in a future iteration; for
-/// now the haptic rumble carries the effect).
+/// Requires [DeviceCapability.flashlight].
 class ThunderModeScreen extends ConsumerWidget {
   const ThunderModeScreen({super.key});
 
@@ -51,7 +49,8 @@ class ThunderModeScreen extends ConsumerWidget {
 }
 
 class _ThunderModeView extends ConsumerStatefulWidget {
-  const _ThunderModeView({required this.flashlight, required this.hapticEngine});
+  const _ThunderModeView(
+      {required this.flashlight, required this.hapticEngine});
 
   final FlashlightController flashlight;
   final HapticEngine hapticEngine;
@@ -75,7 +74,9 @@ class _ThunderModeViewState extends ConsumerState<_ThunderModeView>
       vsync: this,
       duration: const Duration(milliseconds: 400),
     );
-    _partnerSub = ref.read(modeEventBusProvider).incoming
+    _partnerSub = ref
+        .read(modeEventBusProvider)
+        .incoming
         .where((e) => e.type == 'thunder_strike')
         .listen(_onPartnerStrike);
   }
@@ -85,15 +86,17 @@ class _ThunderModeViewState extends ConsumerState<_ThunderModeView>
     final startX = (event.data['x'] as num?)?.toDouble() ?? 0.5;
     final size = context.size;
     if (size == null) return;
-    _strike(Offset(startX * size.width, 0));
+    _strike(Offset(startX * size.width, 0), notifyPartner: false);
   }
 
-  Future<void> _strike(Offset start) async {
+  Future<void> _strike(Offset start, {bool notifyPartner = true}) async {
     final size = context.size ?? const Size(400, 800);
     setState(() {
       _currentBolt = _generateBolt(start, size);
     });
-    _bolt..reset()..forward();
+    _bolt
+      ..reset()
+      ..forward();
     HapticFeedback.heavyImpact();
     // Flash the torch briefly.
     unawaited(widget.flashlight.pulse(
@@ -102,10 +105,12 @@ class _ThunderModeViewState extends ConsumerState<_ThunderModeView>
       2,
     ));
     unawaited(_player.play(HapticPatterns.rumble));
-    await ref.read(modeEventBusProvider).send(ModeEvent(
-      type: 'thunder_strike',
-      data: {'x': start.dx / size.width},
-    ));
+    if (notifyPartner) {
+      await ref.read(modeEventBusProvider).send(ModeEvent(
+            type: 'thunder_strike',
+            data: {'x': start.dx / size.width},
+          ));
+    }
   }
 
   /// Generate a jagged lightning bolt from [start] downward.

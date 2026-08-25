@@ -12,6 +12,7 @@ import '../../../core/widgets/section_header.dart';
 import '../../connections/application/connections_controller.dart';
 import '../../connections/domain/connection.dart';
 import '../../connections/domain/connection_status.dart';
+import '../../pairing/application/pairing_controller.dart';
 
 /// "My People" — saved connections list with status, transport hint, and
 /// per-row affordances.
@@ -47,7 +48,15 @@ class PeopleScreen extends ConsumerWidget {
                   ),
                   trailing: PulseRoundButton(
                     icon: Icons.person_add_alt_1_rounded,
-                    onTap: () => context.go(Routes.pairing),
+                    onTap: () {
+                      // A completed PairingController intentionally survives
+                      // the connecting route so both peers can persist the
+                      // same keys. Starting another pair must discard that
+                      // one-shot handshake first; otherwise the pairing page
+                      // can expose an expired code and mismatched peer keys.
+                      ref.read(pairingControllerProvider.notifier).reset();
+                      context.go(Routes.pairing);
+                    },
                     color: AppColors.pulse,
                     subtle: true,
                   ),

@@ -12,6 +12,7 @@ import '../../crypto/nonce_counter.dart';
 import '../../crypto/pair_channel.dart';
 import '../../crypto/pair_keys.dart';
 import '../../transport/transport_byte_adapter.dart';
+import '../../transport/transport.dart';
 import '../../transport/transport_manager.dart';
 import 'pulse_session.dart';
 
@@ -88,6 +89,7 @@ class SessionNotifier extends AsyncNotifier<PulseSession?> {
         'bleAddressToken': c.bleAddressToken ?? '',
         'signalingToken': c.signalingToken ?? '',
         'connectionId': c.id,
+        'transportClientId': c.transportClientId ?? '',
       };
 }
 
@@ -95,3 +97,15 @@ class SessionNotifier extends AsyncNotifier<PulseSession?> {
 final sessionProvider = AsyncNotifierProvider<SessionNotifier, PulseSession?>(
   SessionNotifier.new,
 );
+
+/// Reactive transport tier for UI surfaces. Reading `currentTransport` alone
+/// only captures the value at session creation and misses later failovers.
+final transportStateProvider = StreamProvider<TransportKind>((ref) async* {
+  final session = await ref.watch(sessionProvider.future);
+  if (session == null) {
+    yield TransportKind.searching;
+    return;
+  }
+  yield session.currentTransport;
+  yield* session.transportState;
+});

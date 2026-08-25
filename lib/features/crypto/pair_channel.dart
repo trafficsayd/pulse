@@ -91,16 +91,26 @@ class PairChannel {
   Future<void> _processPacket(Uint8List bytes) async {
     try {
       final expected = await _inbound.peek();
+      if (bytes.length < AesGcmSealer.nonceLength + AesGcmSealer.macLength) {
+        throw const FormatException('AES-GCM packet too short');
+      }
+      final packetCounter = AesGcmSealer.counterFromNonce(
+        Uint8List.sublistView(bytes, 0, AesGcmSealer.nonceLength),
+      );
+      if (packetCounter < expected) {
+        throw StateError('AES-GCM replayed or stale nonce counter');
+      }
       final plain = await _sealer.open(
         bytes,
         key: _key,
-        expectedNonceCounter: expected,
+        expectedNonceCounter: packetCounter,
       );
-      // Advance the inbound counter only after a successful open so a
-      // tampered packet cannot push us out of sync with the peer.
-      await _inbound.next();
+      // Advance only after successful authentication. A forward gap means a
+      // transient mode event was lost during transport handover; mode events
+      // are intentionally ephemeral, so the secure channel must continue.
+      await _inbound.advanceTo(packetCounter);
       _controller.add(
-        PulsePacket(payload: plain, nonceCounter: expected),
+        PulsePacket(payload: plain, nonceCounter: packetCounter),
       );
     } catch (e) {
       _errors.add(e);

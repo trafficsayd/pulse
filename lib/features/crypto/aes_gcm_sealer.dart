@@ -112,6 +112,23 @@ class AesGcmSealer {
     return out;
   }
 
+  /// Decode the low 64-bit counter embedded by [nonceFromCounter].
+  /// Rejects non-zero reserved bytes so alternate nonce domains cannot be
+  /// confused with Pulse's monotonic counter domain.
+  static int counterFromNonce(List<int> nonce) {
+    if (nonce.length != nonceLength) {
+      throw ArgumentError.value(nonce.length, 'nonce', 'must be 12 bytes');
+    }
+    if (nonce[0] != 0 || nonce[1] != 0 || nonce[2] != 0 || nonce[3] != 0) {
+      throw const FormatException('AES-GCM reserved nonce bytes must be zero');
+    }
+    var value = 0;
+    for (var i = 4; i < nonceLength; i++) {
+      value = value * 256 + nonce[i];
+    }
+    return value;
+  }
+
   static bool _constantTimeEquals(List<int> a, List<int> b) {
     if (a.length != b.length) return false;
     var diff = 0;

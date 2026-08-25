@@ -78,8 +78,7 @@ class WhisperModeScreen extends ConsumerWidget {
       );
     }
     return _WhisperModeView(
-      micLevelStream:
-          micLevelStream ?? ref.watch(micLevelStreamProvider),
+      micLevelStream: micLevelStream ?? ref.watch(micLevelStreamProvider),
       hapticEngine: hapticEngine ?? ref.watch(hapticEngineProvider),
       threshold: threshold,
       requiredConsecutive: requiredConsecutive,
@@ -113,8 +112,12 @@ class _WhisperModeViewState extends ConsumerState<_WhisperModeView>
   late final AnimationController _ambient;
 
   double _level = 0.0;
+  double _partnerLevel = 0.0;
   StreamSubscription<ModeEvent>? _partnerSub;
+  Timer? _partnerLevelDecay;
   int _ticksOverThreshold = 0;
+  int _partnerTicksOverThreshold = 0;
+  DateTime? _lastLevelSentAt;
   bool _ownsMic = false;
   bool _ownsEngine = false;
 
@@ -139,11 +142,31 @@ class _WhisperModeViewState extends ConsumerState<_WhisperModeView>
       duration: const Duration(seconds: 3),
     )..repeat();
     _sub = _mic.levels.listen(_onLevel);
-    _partnerSub = ref.read(modeEventBusProvider).incoming
+    _partnerSub = ref
+        .read(modeEventBusProvider)
+        .incoming
         .where((e) => e.type == 'whisper_level')
         .listen((e) {
       if (mounted) {
-        setState(() {});
+        final partnerLevel =
+            ((e.data['level'] as num?)?.toDouble() ?? 0).clamp(0.0, 1.0);
+        setState(() => _partnerLevel = partnerLevel);
+        _partnerLevelDecay?.cancel();
+        if (partnerLevel > 0) {
+          _partnerLevelDecay = Timer(const Duration(milliseconds: 450), () {
+            if (!mounted) return;
+            setState(() => _partnerLevel = 0);
+            _partnerTicksOverThreshold = 0;
+          });
+        }
+        if (partnerLevel > widget.threshold) {
+          _partnerTicksOverThreshold++;
+          if (_partnerTicksOverThreshold == widget.requiredConsecutive) {
+            unawaited(_player.play(HapticPatterns.whisper));
+          }
+        } else {
+          _partnerTicksOverThreshold = 0;
+        }
       }
     });
   }
@@ -152,9 +175,14 @@ class _WhisperModeViewState extends ConsumerState<_WhisperModeView>
     if (!mounted) return;
     setState(() => _level = sample.level01);
     // Send mic level to partner.
-    ref.read(modeEventBusProvider).send(
-          ModeEvent(type: 'whisper_level', data: {'level': sample.level01}),
-        );
+    if (_lastLevelSentAt == null ||
+        sample.timestamp.difference(_lastLevelSentAt!) >=
+            const Duration(milliseconds: 100)) {
+      _lastLevelSentAt = sample.timestamp;
+      unawaited(ref.read(modeEventBusProvider).send(
+            ModeEvent(type: 'whisper_level', data: {'level': sample.level01}),
+          ));
+    }
     if (sample.level01 > widget.threshold) {
       _ticksOverThreshold++;
       if (_ticksOverThreshold == widget.requiredConsecutive) {
@@ -171,6 +199,7 @@ class _WhisperModeViewState extends ConsumerState<_WhisperModeView>
   void dispose() {
     _sub?.cancel();
     _partnerSub?.cancel();
+    _partnerLevelDecay?.cancel();
     _ambient.dispose();
     unawaited(_player.stop());
     if (_ownsMic) {
@@ -198,6 +227,7 @@ class _WhisperModeViewState extends ConsumerState<_WhisperModeView>
                     return CustomPaint(
                       painter: _RadialWaveformPainter(
                         level01: _level,
+                        partnerLevel01: _partnerLevel,
                         ambient: _ambient.value,
                       ),
                     );
@@ -238,9 +268,14 @@ class _WhisperModeViewState extends ConsumerState<_WhisperModeView>
 }
 
 class _RadialWaveformPainter extends CustomPainter {
-  _RadialWaveformPainter({required this.level01, required this.ambient});
+  _RadialWaveformPainter({
+    required this.level01,
+    required this.partnerLevel01,
+    required this.ambient,
+  });
 
   final double level01;
+  final double partnerLevel01;
   final double ambient;
 
   @override
@@ -289,9 +324,28 @@ class _RadialWaveformPainter extends CustomPainter {
       ..strokeWidth = 2.0
       ..isAntiAlias = true;
     canvas.drawCircle(center, baseRadius, inner);
+
+    // The partner breathes as a second, warm ring. Keeping the two signals
+    // visually distinct makes the mode feel shared instead of mirrored.
+    if (partnerLevel01 > 0.01) {
+      final partnerRadius =
+          baseRadius + partnerLevel01.clamp(0.0, 1.0) * shortest * 0.28;
+      canvas.drawCircle(
+        center,
+        partnerRadius,
+        Paint()
+          ..color = AppColors.heart.withValues(
+            alpha: 0.28 + partnerLevel01 * 0.5,
+          )
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2.4,
+      );
+    }
   }
 
   @override
   bool shouldRepaint(covariant _RadialWaveformPainter old) =>
-      old.level01 != level01 || old.ambient != ambient;
+      old.level01 != level01 ||
+      old.partnerLevel01 != partnerLevel01 ||
+      old.ambient != ambient;
 }

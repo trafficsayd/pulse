@@ -26,6 +26,8 @@ class _SandboxModeScreenState extends ConsumerState<SandboxModeScreen>
   late final AnimationController _physics;
   static final _random = math.Random();
   Size _canvasSize = Size.zero;
+  DateTime? _lastEmissionAt;
+  final List<(Offset, int)> _pendingPartnerBursts = [];
 
   static const _palette = [
     Color(0xFF9747FF),
@@ -43,7 +45,9 @@ class _SandboxModeScreenState extends ConsumerState<SandboxModeScreen>
       duration: const Duration(seconds: 1),
     )..repeat();
     _physics.addListener(_tick);
-    _partnerSub = ref.read(modeEventBusProvider).incoming
+    _partnerSub = ref
+        .read(modeEventBusProvider)
+        .incoming
         .where((e) => e.type == 'sandbox_particle')
         .listen(_onPartnerParticle);
   }
@@ -64,6 +68,7 @@ class _SandboxModeScreenState extends ConsumerState<SandboxModeScreen>
         }
         // Slow horizontal drift.
         p.vx *= 0.99;
+        p.life -= 0.004;
       }
       // Remove faded particles.
       _particles.removeWhere((p) => p.life <= 0);
@@ -71,37 +76,66 @@ class _SandboxModeScreenState extends ConsumerState<SandboxModeScreen>
   }
 
   void _onPartnerParticle(ModeEvent event) {
-    if (!mounted || _canvasSize == Size.zero) return;
+    if (!mounted) return;
     final x = (event.data['x'] as num?)?.toDouble() ?? 0.5;
     final y = (event.data['y'] as num?)?.toDouble() ?? 0.5;
-    _spawn(Offset(x * _canvasSize.width, y * _canvasSize.height), isLocal: false);
+    final seed =
+        (event.data['seed'] as num?)?.toInt() ?? _random.nextInt(0x7fffffff);
+    if (_canvasSize == Size.zero) {
+      _pendingPartnerBursts.add((Offset(x, y), seed));
+      if (_pendingPartnerBursts.length > 100) {
+        _pendingPartnerBursts.removeAt(0);
+      }
+      return;
+    }
+    setState(() {
+      _spawn(
+        Offset(x * _canvasSize.width, y * _canvasSize.height),
+        isLocal: false,
+        seed: seed,
+      );
+    });
   }
 
-  void _spawn(Offset pos, {required bool isLocal}) {
+  void _spawn(Offset pos, {required bool isLocal, required int seed}) {
+    final random = math.Random(seed);
     for (var i = 0; i < 3; i++) {
       _particles.add(_Particle(
         x: pos.dx,
         y: pos.dy,
-        vx: (_random.nextDouble() - 0.5) * 4,
-        vy: -_random.nextDouble() * 3,
-        color: _palette[_random.nextInt(_palette.length)],
-        radius: 3 + _random.nextDouble() * 3,
+        vx: (random.nextDouble() - 0.5) * 4,
+        vy: -random.nextDouble() * 3,
+        color: _palette[random.nextInt(_palette.length)],
+        radius: 3 + random.nextDouble() * 3,
         life: 1.0,
         isLocal: isLocal,
       ));
     }
+    if (_particles.length > 600) {
+      _particles.removeRange(0, _particles.length - 600);
+    }
   }
 
   void _onPanUpdate(DragUpdateDetails details) {
-    _spawn(details.localPosition, isLocal: true);
+    final now = DateTime.now();
+    if (_lastEmissionAt != null &&
+        now.difference(_lastEmissionAt!) < const Duration(milliseconds: 40)) {
+      return;
+    }
+    _lastEmissionAt = now;
+    final seed = _random.nextInt(0x7fffffff);
+    setState(() {
+      _spawn(details.localPosition, isLocal: true, seed: seed);
+    });
     if (_canvasSize == Size.zero) return;
     ref.read(modeEventBusProvider).send(ModeEvent(
-      type: 'sandbox_particle',
-      data: {
-        'x': details.localPosition.dx / _canvasSize.width,
-        'y': details.localPosition.dy / _canvasSize.height,
-      },
-    ));
+          type: 'sandbox_particle',
+          data: {
+            'x': details.localPosition.dx / _canvasSize.width,
+            'y': details.localPosition.dy / _canvasSize.height,
+            'seed': seed,
+          },
+        ));
   }
 
   @override
@@ -121,6 +155,19 @@ class _SandboxModeScreenState extends ConsumerState<SandboxModeScreen>
         child: LayoutBuilder(
           builder: (context, constraints) {
             _canvasSize = Size(constraints.maxWidth, constraints.maxHeight);
+            if (_pendingPartnerBursts.isNotEmpty) {
+              for (final (normalized, seed) in _pendingPartnerBursts) {
+                _spawn(
+                  Offset(
+                    normalized.dx * _canvasSize.width,
+                    normalized.dy * _canvasSize.height,
+                  ),
+                  isLocal: false,
+                  seed: seed,
+                );
+              }
+              _pendingPartnerBursts.clear();
+            }
             return Stack(
               children: [
                 Positioned.fill(

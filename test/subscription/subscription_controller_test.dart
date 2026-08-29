@@ -10,6 +10,7 @@ import 'package:pulse/features/subscription/data/iap_diagnostics.dart';
 import 'package:pulse/features/subscription/data/iap_product_ids.dart';
 import 'package:pulse/features/subscription/data/iap_service.dart';
 import 'package:pulse/features/subscription/domain/entitlements.dart';
+import 'package:pulse/features/modes/domain/pulse_mode.dart';
 
 /// In-memory [SecureKeyStore] used by the controller round-trip tests.
 class _MemorySecureKeyStore extends SecureKeyStore {
@@ -156,6 +157,19 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('SubscriptionController', () {
+    test('testing build exposes every mode and removes usage limits', () {
+      final store = _MemorySecureKeyStore();
+      final adapter = _FakeAdapter();
+      final container = _container(store: store, adapter: adapter);
+      final controller =
+          container.read(subscriptionControllerProvider.notifier);
+
+      expect(controller.isModeUnlocked(PulseModeId.fireworks), isTrue);
+      expect(controller.isModeUnlocked(PulseModeId.sync), isTrue);
+      expect(controller.maxConnections, 10);
+      expect(controller.sneakInPerDayPerContact, 1000);
+    });
+
     test('boot path lands on a trial when no entitlement is persisted',
         () async {
       final store = _MemorySecureKeyStore();

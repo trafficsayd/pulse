@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/config/app_features.dart';
 import '../../../core/storage/secure_key_store.dart';
 import '../../modes/domain/pulse_mode.dart';
 import '../data/iap_diagnostics.dart';
@@ -229,6 +230,10 @@ class SubscriptionController extends Notifier<Entitlements> {
 
   /// True if [mode] is reachable on the current tier.
   bool isModeUnlocked(PulseModeId mode) {
+    // During product QA the downloadable APK must expose the complete app.
+    // This is a compile-time product switch, so enabling subscriptions later
+    // restores the real tier rules without migrating any stored entitlement.
+    if (AppFeatures.unrestrictedTestingAccess) return true;
     // Enables exhaustive emulator QA without touching persisted
     // entitlements or weakening release builds. `kDebugMode` stays false in
     // profile/release even if somebody accidentally passes the dart define.
@@ -241,11 +246,14 @@ class SubscriptionController extends Notifier<Entitlements> {
   }
 
   /// Hard cap on saved connections for the current tier.
-  int get maxConnections => state.maxConnections;
+  int get maxConnections =>
+      AppFeatures.unrestrictedTestingAccess ? 10 : state.maxConnections;
 
   /// Per-day-per-contact Sneak In quota.
   int get sneakInPerDayPerContact =>
-      kDebugMode && _qaUnlockAllModes ? 1000 : state.sneakInPerDayPerContact;
+      AppFeatures.unrestrictedTestingAccess || (kDebugMode && _qaUnlockAllModes)
+          ? 1000
+          : state.sneakInPerDayPerContact;
 
   /// Legacy debug helper used by the foundation PR before IAP wiring
   /// landed. Kept so the existing «Try free» button can still flip the

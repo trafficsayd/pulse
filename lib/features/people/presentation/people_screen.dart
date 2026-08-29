@@ -43,7 +43,7 @@ class PeopleScreen extends ConsumerWidget {
                   title: t.peopleTitle,
                   leading: PulseRoundButton(
                     icon: Icons.settings_rounded,
-                    onTap: () => context.go(Routes.settings),
+                    onTap: () => context.push(Routes.settings),
                     subtle: true,
                   ),
                   trailing: PulseRoundButton(
@@ -166,7 +166,8 @@ class _PersonRow extends ConsumerWidget {
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(26),
-          onTap: () => context.go(Routes.connectionSettingsPath(connection.id)),
+          onTap: () =>
+              context.push(Routes.connectionSettingsPath(connection.id)),
           onLongPress: () => _showActions(context, ref),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(14, 14, 12, 14),
@@ -273,7 +274,7 @@ class _PersonRow extends ConsumerWidget {
                 title: Text(t.peopleSneakIn),
                 onTap: () {
                   Navigator.of(sheetContext).pop();
-                  context.go(Routes.sneakIn);
+                  context.push(Routes.sneakIn);
                 },
               ),
               ListTile(
@@ -281,7 +282,7 @@ class _PersonRow extends ConsumerWidget {
                 title: Text(t.peoplePermissions),
                 onTap: () {
                   Navigator.of(sheetContext).pop();
-                  context.go(Routes.connectionSettingsPath(connection.id));
+                  context.push(Routes.connectionSettingsPath(connection.id));
                 },
               ),
               ListTile(
@@ -344,7 +345,7 @@ class _TrailingAction extends ConsumerWidget {
         );
       case ConnectionStatus.paused:
         return IconButton(
-          onPressed: () => context.go(Routes.sneakIn),
+          onPressed: () => context.push(Routes.sneakIn),
           icon: const Icon(
             Icons.notifications_active_outlined,
             color: AppColors.textSecondary,

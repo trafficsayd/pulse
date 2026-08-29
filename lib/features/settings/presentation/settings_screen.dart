@@ -106,7 +106,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context)!;
     final locale = ref.watch(localeControllerProvider);
-    final code = locale?.languageCode ?? 'ru';
+    final code =
+        locale?.languageCode ?? Localizations.localeOf(context).languageCode;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -182,7 +183,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       icon: Icons.science_outlined,
                       label: t.settingsDiagnostics,
                       subtitle: t.settingsDiagnosticsHint,
-                      onTap: () => context.go(Routes.diagnostics),
+                      onTap: () => context.push(Routes.diagnostics),
                     ),
                     _NavTile(
                       icon: Icons.info_outline_rounded,

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/capability_detector.dart';
@@ -22,6 +23,16 @@ final capabilityDetectorProvider = Provider<CapabilityDetector>((ref) {
 final deviceCapabilitiesProvider = FutureProvider<DeviceCapabilities>((
   ref,
 ) async {
+  const qaForceCapabilities = bool.fromEnvironment(
+    'PULSE_QA_FORCE_CAPABILITIES',
+  );
+  // Desktop Android emulators do not expose a real vibrator, torch, or
+  // microphone input. This debug-only override lets the complete mode UI and
+  // network protocol be exercised there; release builds always use the real
+  // detector below.
+  if (kDebugMode && qaForceCapabilities) {
+    return DeviceCapabilities(DeviceCapability.values.toSet());
+  }
   final detector = ref.watch(capabilityDetectorProvider);
   return detector.probe();
 });

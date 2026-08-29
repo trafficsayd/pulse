@@ -142,7 +142,7 @@ class _EmptyConnection extends StatelessWidget {
             child: GradientButton(
               label: t.peopleTitle,
               icon: Icons.people_alt_rounded,
-              onPressed: () => context.go(Routes.people),
+              onPressed: () => context.push(Routes.people),
             ),
           ),
         ],

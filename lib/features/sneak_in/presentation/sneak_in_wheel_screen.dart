@@ -14,6 +14,8 @@ import '../../../core/widgets/pulse_mockup.dart';
 import '../../connections/application/connections_controller.dart';
 import '../../connections/domain/connection.dart';
 import '../../connections/domain/connection_status.dart';
+import '../../session/application/mode_event.dart';
+import '../../session/application/mode_event_bus.dart';
 import '../application/sneak_in_controller.dart';
 
 /// 8-emoji selector wheel. Tap to highlight a sound, swipe up (or tap the
@@ -134,6 +136,19 @@ class _SneakInWheelScreenState extends ConsumerState<SneakInWheelScreen> {
     if (targets.isEmpty) return;
     final t = AppLocalizations.of(context)!;
     final target = targets.first;
+    final bus = ref.read(modeEventBusProvider);
+    if (!bus.isConnected) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            Localizations.localeOf(context).languageCode == 'ru'
+                ? 'Связь восстанавливается. Попробуйте ещё раз.'
+                : 'Reconnecting. Please try again.',
+          ),
+        ),
+      );
+      return;
+    }
     final ok = await ref
         .read(sneakInControllerProvider.notifier)
         .tryRecordSneakIn(target.id);
@@ -144,10 +159,24 @@ class _SneakInWheelScreenState extends ConsumerState<SneakInWheelScreen> {
       );
       return;
     }
+    final selectedSignal = _emojis[_selected].emoji;
+    await bus.send(
+      ModeEvent(
+        type: 'sneak_in',
+        data: {'signal': selectedSignal},
+      ),
+    );
     HapticFeedback.mediumImpact();
     if (!mounted) return;
-    context.go(
-      '${Routes.sneakInIncoming}?connectionId=${target.id}',
+    context.go(Routes.hub);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          Localizations.localeOf(context).languageCode == 'ru'
+              ? '$selectedSignal Сигнал отправлен'
+              : '$selectedSignal Signal sent',
+        ),
+      ),
     );
   }
 }

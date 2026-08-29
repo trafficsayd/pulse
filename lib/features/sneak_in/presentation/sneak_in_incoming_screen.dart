@@ -14,15 +14,21 @@ import '../../connections/domain/connection.dart';
 /// "Sneak In!" — full-screen overlay shown when an inbound short signal
 /// arrives. Pull down to reply, tap "Ignore" to dismiss.
 class SneakInIncomingScreen extends ConsumerWidget {
-  const SneakInIncomingScreen({required this.connectionId, super.key});
+  const SneakInIncomingScreen({
+    required this.connectionId,
+    this.signalEmoji = '✨',
+    super.key,
+  });
 
   final String connectionId;
+  final String signalEmoji;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = AppLocalizations.of(context)!;
     final state = ref.watch(connectionsControllerProvider);
     final connection = _findById(state.connections, connectionId);
+    final compact = MediaQuery.sizeOf(context).height < 720;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -53,55 +59,64 @@ class SneakInIncomingScreen extends ConsumerWidget {
                       subtle: true,
                     ),
                   ),
-                  const SizedBox(height: 42),
+                  SizedBox(height: compact ? 12 : 42),
                   Text(
                     t.sneakInIncomingTitle,
                     textAlign: TextAlign.center,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppColors.heart,
-                      fontSize: 38,
+                      fontSize: compact ? 32 : 38,
                       fontWeight: FontWeight.w800,
                       letterSpacing: -0.4,
                     ),
                   ),
-                  const SizedBox(height: 34),
+                  SizedBox(height: compact ? 12 : 34),
                   Center(
                     child: PulseGlowCircle(
-                      size: 236,
+                      size: compact ? 170 : 236,
                       color: AppColors.pulse,
                       blur: 54,
                       fill: AppColors.surface.withValues(alpha: 0.72),
                       borderWidth: 1.4,
-                      child: connection == null
-                          ? const Icon(
-                              Icons.notifications_active_rounded,
-                              size: 70,
-                              color: AppColors.pulse,
-                            )
-                          : ConnectionAvatar(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            signalEmoji,
+                            style: TextStyle(
+                              fontSize: compact ? 58 : 76,
+                              height: 1,
+                            ),
+                          ),
+                          if (connection != null) ...[
+                            SizedBox(height: compact ? 7 : 12),
+                            ConnectionAvatar(
                               emoji: connection.emoji,
                               colorIndex: connection.colorIndex,
-                              size: 146,
-                              fontSize: 84,
+                              size: compact ? 40 : 56,
+                              fontSize: compact ? 22 : 30,
                               showRing: false,
                               glow: true,
                             ),
+                          ],
+                        ],
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 26),
+                  SizedBox(height: compact ? 12 : 26),
                   if (connection != null)
                     Center(
                       child: Text(
                         connection.nickname,
-                        style: const TextStyle(
+                        style: TextStyle(
                           color: AppColors.textPrimary,
-                          fontSize: 24,
+                          fontSize: compact ? 20 : 24,
                           height: 1,
                           fontWeight: FontWeight.w800,
                         ),
                       ),
                     ),
-                  const SizedBox(height: 10),
+                  SizedBox(height: compact ? 4 : 10),
                   Center(
                     child: Text(
                       t.sneakInIncomingSubtitle,
@@ -141,16 +156,16 @@ class SneakInIncomingScreen extends ConsumerWidget {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  SizedBox(height: compact ? 8 : 16),
                   SizedBox(
-                    height: 56,
+                    height: compact ? 48 : 56,
                     child: GradientButton(
                       label: t.sneakInPullDownToReply,
                       icon: Icons.reply_rounded,
                       onPressed: () => context.go(Routes.sneakIn),
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  SizedBox(height: compact ? 0 : 8),
                   TextButton(
                     onPressed: () => context.go(Routes.hub),
                     child: Text(t.sneakInIgnore),

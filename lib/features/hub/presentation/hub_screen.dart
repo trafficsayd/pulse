@@ -105,14 +105,14 @@ class _HubHeader extends StatelessWidget {
       children: [
         PulseRoundButton(
           icon: Icons.tune_rounded,
-          onTap: () => context.go(Routes.settings),
+          onTap: () => context.push(Routes.settings),
           subtle: true,
         ),
         const SizedBox(width: 10),
         Expanded(
           child: Center(
             child: GestureDetector(
-              onTap: () => context.go(Routes.connectionStatus),
+              onTap: () => context.push(Routes.connectionStatus),
               child:
                   _TransportBadge(kind: transportKind, label: transportLabel),
             ),
@@ -124,7 +124,7 @@ class _HubHeader extends StatelessWidget {
         else
           PulseRoundButton(
             icon: Icons.person_add_alt_1_rounded,
-            onTap: () => context.go(Routes.people),
+            onTap: () => context.push(Routes.people),
             subtle: true,
           ),
       ],
@@ -140,7 +140,7 @@ class _ActiveAvatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () => context.go(Routes.connectionSettingsPath(connection.id)),
+      onTap: () => context.push(Routes.connectionSettingsPath(connection.id)),
       child: ConnectionAvatar(
         emoji: connection.emoji,
         colorIndex: connection.colorIndex,
@@ -248,7 +248,7 @@ class _CircularModeLayout extends StatelessWidget {
                 ),
                 _CenterDisc(
                   onTap: () {
-                    if (activeConnection == null) context.go(Routes.people);
+                    if (activeConnection == null) context.push(Routes.people);
                   },
                 ),
                 for (var i = 0; i < modes.length; i++)
@@ -263,7 +263,7 @@ class _CircularModeLayout extends StatelessWidget {
                   index: modes.length,
                   total: modes.length + 1,
                   radius: radius,
-                  onTap: () => context.go(Routes.modesCatalog),
+                  onTap: () => context.push(Routes.modesCatalog),
                 ),
               ],
             ),
@@ -302,22 +302,22 @@ class _PositionedModeTile extends ConsumerWidget {
         locked: !unlocked,
         onTap: () {
           if (activeConnection == null) {
-            context.go(Routes.people);
+            context.push(Routes.people);
             return;
           }
           if (!unlocked) {
-            context.go(Routes.subscription);
+            context.push(Routes.subscription);
             return;
           }
           HapticFeedback.selectionClick();
         },
         onLongPress: () {
           if (activeConnection == null) {
-            context.go(Routes.people);
+            context.push(Routes.people);
             return;
           }
           if (!unlocked) {
-            context.go(Routes.subscription);
+            context.push(Routes.subscription);
             return;
           }
           context.push(Routes.modePath(descriptor.id.name));

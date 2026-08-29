@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/storage/secure_key_store.dart';
@@ -53,6 +54,9 @@ enum SubscriptionFlowResult {
 ///     expiry).
 class SubscriptionController extends Notifier<Entitlements> {
   static const _storageKey = 'entitlements.v1';
+  static const _qaUnlockAllModes = bool.fromEnvironment(
+    'PULSE_QA_UNLOCK_ALL_MODES',
+  );
 
   /// Delay before the silent boot-time restore kicks in so the splash
   /// frame is not contested.
@@ -225,6 +229,10 @@ class SubscriptionController extends Notifier<Entitlements> {
 
   /// True if [mode] is reachable on the current tier.
   bool isModeUnlocked(PulseModeId mode) {
+    // Enables exhaustive emulator QA without touching persisted
+    // entitlements or weakening release builds. `kDebugMode` stays false in
+    // profile/release even if somebody accidentally passes the dart define.
+    if (kDebugMode && _qaUnlockAllModes) return true;
     return switch (state.tier) {
       SubscriptionTier.subscribed => true,
       SubscriptionTier.trial => _isStarter(mode),
@@ -236,7 +244,8 @@ class SubscriptionController extends Notifier<Entitlements> {
   int get maxConnections => state.maxConnections;
 
   /// Per-day-per-contact Sneak In quota.
-  int get sneakInPerDayPerContact => state.sneakInPerDayPerContact;
+  int get sneakInPerDayPerContact =>
+      kDebugMode && _qaUnlockAllModes ? 1000 : state.sneakInPerDayPerContact;
 
   /// Legacy debug helper used by the foundation PR before IAP wiring
   /// landed. Kept so the existing «Try free» button can still flip the

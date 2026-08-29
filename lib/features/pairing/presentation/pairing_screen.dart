@@ -290,7 +290,8 @@ class _LanguageSwitcherState extends ConsumerState<_LanguageSwitcher> {
   @override
   Widget build(BuildContext context) {
     final current = ref.watch(localeControllerProvider);
-    final code = current?.languageCode ?? 'ru';
+    final code =
+        current?.languageCode ?? Localizations.localeOf(context).languageCode;
     final isRu = code == 'ru';
     return AnimatedToggle(
       leftLabel: 'RU',

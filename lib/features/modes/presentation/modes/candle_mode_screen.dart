@@ -98,6 +98,7 @@ class _CandleModeViewState extends ConsumerState<_CandleModeView>
   double _localWind = 0;
   double _partnerWind = 0;
   DateTime? _lastWindSentAt;
+  double _lastWindSentLevel = 0;
   CandleStyle _style = CandleStyle.classic;
 
   @override
@@ -177,6 +178,11 @@ class _CandleModeViewState extends ConsumerState<_CandleModeView>
     required DateTime at,
     bool force = false,
   }) {
+    // A quiet microphone produces an endless stream of zero-value PCM
+    // chunks. Send one transition back to zero after real breath, then stay
+    // silent so the transport and the partner's notification layer do not
+    // get flooded while the candle is simply burning.
+    if (!force && level <= 0.02 && _lastWindSentLevel <= 0.02) return;
     // Microphone chunks can arrive dozens of times per second. Ten updates
     // per second are enough for a fluid flame and protect the data channel.
     if (!force &&
@@ -185,6 +191,7 @@ class _CandleModeViewState extends ConsumerState<_CandleModeView>
       return;
     }
     _lastWindSentAt = at;
+    _lastWindSentLevel = level;
     unawaited(ref.read(modeEventBusProvider).send(ModeEvent(
           type: 'candle_blow',
           data: {'level': level, 'extinguished': extinguished},

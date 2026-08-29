@@ -52,7 +52,12 @@ class _PulseAppState extends ConsumerState<PulseApp> {
     final locale = ref.watch(localeControllerProvider);
     ref.listen<AsyncValue<ModeEvent>>(incomingModeEventProvider, (_, next) {
       final event = next.valueOrNull;
-      if (event != null) _showIncomingMode(event);
+      if (event == null) return;
+      if (event.type == 'sneak_in') {
+        _showIncomingSneakIn(event);
+      } else {
+        _showIncomingMode(event);
+      }
     });
     _restoreInitialRoute();
     return MaterialApp.router(
@@ -84,6 +89,13 @@ class _PulseAppState extends ConsumerState<PulseApp> {
   }
 
   void _showIncomingMode(ModeEvent event) {
+    // Level-stream modes emit continuously while their screen is open. A
+    // silent sample is transport housekeeping, not a human interaction, and
+    // must not keep replacing notifications from newer modes.
+    if ((event.type == 'whisper_level' || event.type == 'breath_level') &&
+        ((event.data['level'] as num?)?.toDouble() ?? 0) <= 0.05) {
+      return;
+    }
     final modeId = modeForEventType(event.type);
     if (modeId == null) return;
     final path = Routes.modePath(modeId.name);
@@ -91,7 +103,7 @@ class _PulseAppState extends ConsumerState<PulseApp> {
     final now = DateTime.now();
     if (_lastIncomingMode == modeId &&
         _lastIncomingAt != null &&
-        now.difference(_lastIncomingAt!) < const Duration(seconds: 5)) {
+        now.difference(_lastIncomingAt!) < const Duration(seconds: 30)) {
       return;
     }
     _lastIncomingMode = modeId;
@@ -124,6 +136,26 @@ class _PulseAppState extends ConsumerState<PulseApp> {
             },
           ),
         ));
+    });
+  }
+
+  void _showIncomingSneakIn(ModeEvent event) {
+    final active = ref.read(connectionsControllerProvider).active;
+    if (active == null) return;
+    final signal = event.data['signal'] as String? ?? '✨';
+    final location = Uri(
+      path: Routes.sneakInIncoming,
+      queryParameters: {
+        'connectionId': active.id,
+        'signal': signal,
+      },
+    ).toString();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _messengerKey.currentState?.hideCurrentSnackBar();
+      HapticFeedback.heavyImpact();
+      SystemSound.play(SystemSoundType.alert);
+      _router.go(location);
     });
   }
 

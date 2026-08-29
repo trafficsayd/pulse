@@ -118,6 +118,7 @@ class _WhisperModeViewState extends ConsumerState<_WhisperModeView>
   int _ticksOverThreshold = 0;
   int _partnerTicksOverThreshold = 0;
   DateTime? _lastLevelSentAt;
+  double _lastLevelSent = 0;
   bool _ownsMic = false;
   bool _ownsEngine = false;
 
@@ -175,10 +176,13 @@ class _WhisperModeViewState extends ConsumerState<_WhisperModeView>
     if (!mounted) return;
     setState(() => _level = sample.level01);
     // Send mic level to partner.
-    if (_lastLevelSentAt == null ||
-        sample.timestamp.difference(_lastLevelSentAt!) >=
-            const Duration(milliseconds: 100)) {
+    final shouldTransmit = sample.level01 > 0.02 || _lastLevelSent > 0.02;
+    if (shouldTransmit &&
+        (_lastLevelSentAt == null ||
+            sample.timestamp.difference(_lastLevelSentAt!) >=
+                const Duration(milliseconds: 100))) {
       _lastLevelSentAt = sample.timestamp;
+      _lastLevelSent = sample.level01;
       unawaited(ref.read(modeEventBusProvider).send(
             ModeEvent(type: 'whisper_level', data: {'level': sample.level01}),
           ));

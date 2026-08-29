@@ -51,7 +51,11 @@ GoRouter buildRouter() {
         path: Routes.sneakInIncoming,
         builder: (context, state) {
           final connectionId = state.uri.queryParameters['connectionId'] ?? '';
-          return SneakInIncomingScreen(connectionId: connectionId);
+          final signal = state.uri.queryParameters['signal'] ?? '✨';
+          return SneakInIncomingScreen(
+            connectionId: connectionId,
+            signalEmoji: signal,
+          );
         },
       ),
       GoRoute(

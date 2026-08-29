@@ -99,8 +99,18 @@ class _HalfHeartModeScreenState extends ConsumerState<HalfHeartModeScreen>
                     isHeld: _localHeld,
                     bothHeld: bothHeld,
                     pulse: _pulse,
+                    semanticsLabel: t.halfHeartHint,
                     onPointerDown: () => _setLocal(true),
                     onPointerUp: () => _setLocal(false),
+                    onSemanticTap: () {
+                      _setLocal(true);
+                      unawaited(Future<void>.delayed(
+                        const Duration(milliseconds: 650),
+                        () {
+                          if (mounted) _setLocal(false);
+                        },
+                      ));
+                    },
                   ),
                 ),
                 Expanded(
@@ -109,10 +119,12 @@ class _HalfHeartModeScreenState extends ConsumerState<HalfHeartModeScreen>
                     isHeld: _partnerHeld,
                     bothHeld: bothHeld,
                     pulse: _pulse,
+                    semanticsLabel: null,
                     // Right half mirrors the partner. No direct touch on this
                     // device — only the inbound stream toggles it.
                     onPointerDown: null,
                     onPointerUp: null,
+                    onSemanticTap: null,
                   ),
                 ),
               ],
@@ -154,53 +166,62 @@ class _Half extends StatelessWidget {
     required this.isHeld,
     required this.bothHeld,
     required this.pulse,
+    required this.semanticsLabel,
     required this.onPointerDown,
     required this.onPointerUp,
+    required this.onSemanticTap,
   });
 
   final bool isLeft;
   final bool isHeld;
   final bool bothHeld;
   final Animation<double> pulse;
+  final String? semanticsLabel;
   final VoidCallback? onPointerDown;
   final VoidCallback? onPointerUp;
+  final VoidCallback? onSemanticTap;
 
   @override
   Widget build(BuildContext context) {
-    return Listener(
-      onPointerDown: onPointerDown == null ? null : (_) => onPointerDown!(),
-      onPointerUp: onPointerUp == null ? null : (_) => onPointerUp!(),
-      onPointerCancel: onPointerUp == null ? null : (_) => onPointerUp!(),
-      behavior: HitTestBehavior.opaque,
-      child: AnimatedBuilder(
-        animation: pulse,
-        builder: (context, _) {
-          final intensity =
-              bothHeld ? (0.6 + 0.4 * pulse.value) : (isHeld ? 0.5 : 0.18);
-          return Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: isLeft ? Alignment.centerLeft : Alignment.centerRight,
-                end: isLeft ? Alignment.centerRight : Alignment.centerLeft,
-                colors: [
-                  AppColors.pulse.withValues(alpha: intensity),
-                  AppColors.background,
-                ],
-              ),
-            ),
-            child: Center(
-              child: Icon(
-                isLeft
-                    ? Icons.favorite_border_rounded
-                    : Icons.favorite_border_rounded,
-                size: 96,
-                color: AppColors.pulse.withValues(
-                  alpha: bothHeld ? 1.0 : (isHeld ? 0.7 : 0.25),
+    return Semantics(
+      label: semanticsLabel,
+      button: onSemanticTap != null,
+      onTap: onSemanticTap,
+      child: Listener(
+        onPointerDown: onPointerDown == null ? null : (_) => onPointerDown!(),
+        onPointerUp: onPointerUp == null ? null : (_) => onPointerUp!(),
+        onPointerCancel: onPointerUp == null ? null : (_) => onPointerUp!(),
+        behavior: HitTestBehavior.opaque,
+        child: AnimatedBuilder(
+          animation: pulse,
+          builder: (context, _) {
+            final intensity =
+                bothHeld ? (0.6 + 0.4 * pulse.value) : (isHeld ? 0.5 : 0.18);
+            return Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: isLeft ? Alignment.centerLeft : Alignment.centerRight,
+                  end: isLeft ? Alignment.centerRight : Alignment.centerLeft,
+                  colors: [
+                    AppColors.pulse.withValues(alpha: intensity),
+                    AppColors.background,
+                  ],
                 ),
               ),
-            ),
-          );
-        },
+              child: Center(
+                child: Icon(
+                  isLeft
+                      ? Icons.favorite_border_rounded
+                      : Icons.favorite_border_rounded,
+                  size: 96,
+                  color: AppColors.pulse.withValues(
+                    alpha: bothHeld ? 1.0 : (isHeld ? 0.7 : 0.25),
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
       ),
     );
   }

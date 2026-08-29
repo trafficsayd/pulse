@@ -8,6 +8,11 @@ import android.bluetooth.le.AdvertiseData
 import android.bluetooth.le.AdvertiseSettings
 import android.content.Context
 import android.content.pm.PackageManager
+import android.hardware.camera2.CameraCharacteristics
+import android.hardware.camera2.CameraManager
+import android.media.AudioFormat
+import android.media.AudioRecord
+import android.media.MediaRecorder
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
@@ -15,11 +20,18 @@ import android.os.ParcelUuid
 import android.util.Log
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
+import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
 import java.util.UUID
 
 private const val TAG = "PulseBlePeripheral"
 private const val CHANNEL_NAME = "app.pulse.ble/peripheral"
+private const val MIC_METHOD_CHANNEL = "app.pulse.audio/mic"
+private const val MIC_EVENT_CHANNEL = "app.pulse.audio/micStream"
+private const val TORCH_CHANNEL = "app.pulse.audio/torch"
+private const val MIC_PERMISSION_REQUEST = 4242
+private const val CAMERA_PERMISSION_REQUEST = 4243
+private const val MIC_SAMPLE_RATE = 22_050
 
 // GATT UUIDs — must match lib/features/transport/ble/ble_uuids.dart exactly.
 // These are part of the public over-the-air contract; never rename.
@@ -48,6 +60,12 @@ class MainActivity : FlutterActivity() {
     private val mainHandler = Handler(Looper.getMainLooper())
 
     private var methodChannel: MethodChannel? = null
+    private var micEventSink: EventChannel.EventSink? = null
+    @Volatile private var micRecording = false
+    @Volatile private var audioRecord: AudioRecord? = null
+    private var micThread: Thread? = null
+    private var pendingTorchResult: MethodChannel.Result? = null
+    private var torchCameraId: String? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -63,6 +81,220 @@ class MainActivity : FlutterActivity() {
                     result.success(null)
                 }
                 else -> result.notImplemented()
+            }
+        }
+
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, MIC_METHOD_CHANNEL)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "startMic" -> {
+                        startMicOrRequestPermission()
+                        result.success(null)
+                    }
+                    "stopMic" -> {
+                        stopMic()
+                        result.success(null)
+                    }
+                    else -> result.notImplemented()
+                }
+            }
+
+        EventChannel(flutterEngine.dartExecutor.binaryMessenger, MIC_EVENT_CHANNEL)
+            .setStreamHandler(object : EventChannel.StreamHandler {
+                override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
+                    micEventSink = events
+                    startMicOrRequestPermission()
+                }
+
+                override fun onCancel(arguments: Any?) {
+                    stopMic()
+                    micEventSink = null
+                }
+            })
+
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, TORCH_CHANNEL)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "hasTorch" -> result.success(findTorchCameraId() != null)
+                    "startTorch" -> startTorchOrRequestPermission(result)
+                    "stopTorch" -> {
+                        setTorch(false)
+                        result.success(null)
+                    }
+                    else -> result.notImplemented()
+                }
+            }
+    }
+
+    private fun startMicOrRequestPermission() {
+        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) !=
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            requestPermissions(
+                arrayOf(Manifest.permission.RECORD_AUDIO),
+                MIC_PERMISSION_REQUEST,
+            )
+            return
+        }
+        startMic()
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun startMic() {
+        if (micRecording) return
+        val minBuffer = AudioRecord.getMinBufferSize(
+            MIC_SAMPLE_RATE,
+            AudioFormat.CHANNEL_IN_MONO,
+            AudioFormat.ENCODING_PCM_16BIT,
+        )
+        if (minBuffer <= 0) {
+            micEventSink?.error("mic_unavailable", "Invalid audio buffer size", null)
+            return
+        }
+        val bufferSize = maxOf(minBuffer, 4096)
+        val recorder = AudioRecord(
+            MediaRecorder.AudioSource.MIC,
+            MIC_SAMPLE_RATE,
+            AudioFormat.CHANNEL_IN_MONO,
+            AudioFormat.ENCODING_PCM_16BIT,
+            bufferSize,
+        )
+        if (recorder.state != AudioRecord.STATE_INITIALIZED) {
+            recorder.release()
+            micEventSink?.error("mic_unavailable", "AudioRecord failed to initialise", null)
+            return
+        }
+
+        try {
+            recorder.startRecording()
+        } catch (error: RuntimeException) {
+            recorder.release()
+            micEventSink?.error("mic_start_failed", error.message, null)
+            return
+        }
+
+        audioRecord = recorder
+        micRecording = true
+        micThread = Thread({
+            val buffer = ByteArray(bufferSize)
+            while (micRecording) {
+                val count = recorder.read(buffer, 0, buffer.size)
+                if (count > 0) {
+                    val chunk = buffer.copyOf(count)
+                    mainHandler.post {
+                        if (micRecording) micEventSink?.success(chunk)
+                    }
+                } else if (count == AudioRecord.ERROR_DEAD_OBJECT) {
+                    break
+                }
+            }
+        }, "PulseMicRecorder").also { it.start() }
+    }
+
+    private fun stopMic() {
+        micRecording = false
+        val recorder = audioRecord
+        audioRecord = null
+        try {
+            recorder?.stop()
+        } catch (_: IllegalStateException) {
+            // The recorder may already have stopped after an audio-route change.
+        }
+        recorder?.release()
+        val thread = micThread
+        micThread = null
+        if (thread != null && thread !== Thread.currentThread()) {
+            try {
+                thread.join(250)
+            } catch (_: InterruptedException) {
+                Thread.currentThread().interrupt()
+            }
+        }
+    }
+
+    private fun findTorchCameraId(): String? {
+        torchCameraId?.let { return it }
+        return try {
+            val manager = getSystemService(Context.CAMERA_SERVICE) as CameraManager
+            val candidates = manager.cameraIdList.filter { id ->
+                manager.getCameraCharacteristics(id)
+                    .get(CameraCharacteristics.FLASH_INFO_AVAILABLE) == true
+            }
+            val backCamera = candidates.firstOrNull { id ->
+                manager.getCameraCharacteristics(id)
+                    .get(CameraCharacteristics.LENS_FACING) ==
+                    CameraCharacteristics.LENS_FACING_BACK
+            }
+            (backCamera ?: candidates.firstOrNull()).also { torchCameraId = it }
+        } catch (error: Exception) {
+            Log.w(TAG, "Torch probe failed", error)
+            null
+        }
+    }
+
+    private fun startTorchOrRequestPermission(result: MethodChannel.Result) {
+        if (checkSelfPermission(Manifest.permission.CAMERA) !=
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            pendingTorchResult?.error(
+                "torch_request_replaced",
+                "A newer torch request replaced this one",
+                null,
+            )
+            pendingTorchResult = result
+            requestPermissions(
+                arrayOf(Manifest.permission.CAMERA),
+                CAMERA_PERMISSION_REQUEST,
+            )
+            return
+        }
+        setTorch(true)
+        result.success(null)
+    }
+
+    private fun setTorch(enabled: Boolean) {
+        val cameraId = findTorchCameraId() ?: return
+        try {
+            val manager = getSystemService(Context.CAMERA_SERVICE) as CameraManager
+            manager.setTorchMode(cameraId, enabled)
+        } catch (error: Exception) {
+            Log.w(TAG, "Unable to set torch=$enabled", error)
+        }
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray,
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        val granted = grantResults.isNotEmpty() &&
+            grantResults[0] == PackageManager.PERMISSION_GRANTED
+        when (requestCode) {
+            MIC_PERMISSION_REQUEST -> {
+                if (granted) {
+                    startMic()
+                } else {
+                    micEventSink?.error(
+                        "mic_permission_denied",
+                        "Microphone permission was denied",
+                        null,
+                    )
+                }
+            }
+            CAMERA_PERMISSION_REQUEST -> {
+                val result = pendingTorchResult
+                pendingTorchResult = null
+                if (granted) {
+                    setTorch(true)
+                    result?.success(null)
+                } else {
+                    result?.error(
+                        "camera_permission_denied",
+                        "Camera permission is required for the torch",
+                        null,
+                    )
+                }
             }
         }
     }
@@ -269,6 +501,10 @@ class MainActivity : FlutterActivity() {
     }
 
     override fun onDestroy() {
+        stopMic()
+        setTorch(false)
+        pendingTorchResult?.error("activity_destroyed", "Activity destroyed", null)
+        pendingTorchResult = null
         stopAdvertising()
         super.onDestroy()
     }

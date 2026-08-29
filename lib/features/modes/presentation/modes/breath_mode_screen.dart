@@ -67,6 +67,7 @@ class _BreathModeViewState extends ConsumerState<_BreathModeView>
   double _localLevel = 0;
   double _partnerLevel = 0;
   DateTime? _lastLevelSentAt;
+  double _lastLevelSent = 0;
   late final HapticPatternPlayer _player;
 
   @override
@@ -81,10 +82,13 @@ class _BreathModeViewState extends ConsumerState<_BreathModeView>
     _micSub = widget.mic.levels.listen((sample) {
       if (!mounted) return;
       setState(() => _localLevel = sample.level01);
-      if (_lastLevelSentAt == null ||
-          sample.timestamp.difference(_lastLevelSentAt!) >=
-              const Duration(milliseconds: 100)) {
+      final shouldTransmit = sample.level01 > 0.02 || _lastLevelSent > 0.02;
+      if (shouldTransmit &&
+          (_lastLevelSentAt == null ||
+              sample.timestamp.difference(_lastLevelSentAt!) >=
+                  const Duration(milliseconds: 100))) {
         _lastLevelSentAt = sample.timestamp;
+        _lastLevelSent = sample.level01;
         unawaited(ref.read(modeEventBusProvider).send(ModeEvent(
               type: 'breath_level',
               data: {'level': sample.level01},

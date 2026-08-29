@@ -211,6 +211,21 @@ void main() {
       expect(await counter.peek(), 3);
     });
 
+    test('reserved ranges skip unused nonces after a process restart',
+        () async {
+      expect(await counter.next(reservationSize: 4), 1);
+      expect(await counter.next(reservationSize: 4), 2);
+      expect(await counter.peek(), 3);
+
+      final restarted = NonceCounter(
+        storage: store,
+        storageKey: 'test::out',
+      );
+      // Values 3 and 4 were durably reserved before value 1 was emitted. A
+      // restart skips them, guaranteeing they can never be reused.
+      expect(await restarted.next(), 5);
+    });
+
     test('advanceTo skips a lost inbound range but never moves backwards',
         () async {
       await counter.advanceTo(7);
@@ -224,6 +239,21 @@ void main() {
       );
       await reloaded.restore();
       expect(reloaded.lastUsed, 7);
+    });
+
+    test('advanceTo can durably reserve an inbound replay window', () async {
+      await counter.advanceTo(10, reservationSize: 4);
+      expect(counter.lastUsed, 10);
+      await counter.advanceTo(11, reservationSize: 4);
+      expect(counter.lastUsed, 11);
+
+      final restarted = NonceCounter(
+        storage: store,
+        storageKey: 'test::out',
+      );
+      await restarted.restore();
+      expect(restarted.lastUsed, 13);
+      await expectLater(restarted.advanceTo(12), throwsStateError);
     });
   });
 }

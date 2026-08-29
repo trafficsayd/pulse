@@ -65,6 +65,7 @@ class PairChannel {
   StreamSubscription<Uint8List>? _sub;
   bool _started = false;
   Future<void> _packetQueue = Future<void>.value();
+  Future<void> _sendQueue = Future<void>.value();
 
   /// Decrypted, authenticated packets in arrival order.
   Stream<PulsePacket> get incoming => _controller.stream;
@@ -108,7 +109,7 @@ class PairChannel {
       // Advance only after successful authentication. A forward gap means a
       // transient mode event was lost during transport handover; mode events
       // are intentionally ephemeral, so the secure channel must continue.
-      await _inbound.advanceTo(packetCounter);
+      await _inbound.advanceTo(packetCounter, reservationSize: 64);
       _controller.add(
         PulsePacket(payload: plain, nonceCounter: packetCounter),
       );
@@ -119,8 +120,25 @@ class PairChannel {
 
   /// Seal [plaintext] with the next outbound counter and hand it to the
   /// transport.
-  Future<void> send(Uint8List plaintext) async {
-    final counter = await _outbound.next();
+  ///
+  /// Gesture modes can enqueue dozens of points in one frame. Serialize the
+  /// whole counter → seal → transport sequence so concurrent, intentionally
+  /// unawaited sends can never mint the same AES-GCM nonce or overtake each
+  /// other on the wire.
+  Future<void> send(Uint8List plaintext) {
+    final operation = _sendQueue.then((_) => _sendNow(plaintext));
+    _sendQueue = operation.then<void>(
+      (_) {},
+      onError: (Object _, StackTrace __) {},
+    );
+    return operation;
+  }
+
+  Future<void> _sendNow(Uint8List plaintext) async {
+    // Reserve a small nonce block durably, then serve high-frequency gesture
+    // packets from memory. A crash skips unused values instead of ever
+    // reusing one; the receiver already supports authenticated forward gaps.
+    final counter = await _outbound.next(reservationSize: 64);
     final packet = await _sealer.seal(
       plaintext,
       key: _key,

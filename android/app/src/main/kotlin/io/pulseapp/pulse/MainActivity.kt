@@ -7,6 +7,7 @@ import android.bluetooth.le.AdvertiseCallback
 import android.bluetooth.le.AdvertiseData
 import android.bluetooth.le.AdvertiseSettings
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
@@ -29,8 +30,10 @@ private const val CHANNEL_NAME = "app.pulse.ble/peripheral"
 private const val MIC_METHOD_CHANNEL = "app.pulse.audio/mic"
 private const val MIC_EVENT_CHANNEL = "app.pulse.audio/micStream"
 private const val TORCH_CHANNEL = "app.pulse.audio/torch"
+private const val LOCKSCREEN_RAY_CHANNEL = "app.pulse.lockscreen/ray"
 private const val MIC_PERMISSION_REQUEST = 4242
 private const val CAMERA_PERMISSION_REQUEST = 4243
+private const val NOTIFICATION_PERMISSION_REQUEST = 4244
 private const val MIC_SAMPLE_RATE = 22_050
 
 // GATT UUIDs — must match lib/features/transport/ble/ble_uuids.dart exactly.
@@ -65,7 +68,9 @@ class MainActivity : FlutterActivity() {
     @Volatile private var audioRecord: AudioRecord? = null
     private var micThread: Thread? = null
     private var pendingTorchResult: MethodChannel.Result? = null
+    private var pendingNotificationResult: MethodChannel.Result? = null
     private var torchCameraId: String? = null
+    private var activityResumed = false
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -124,6 +129,82 @@ class MainActivity : FlutterActivity() {
                     else -> result.notImplemented()
                 }
             }
+
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, LOCKSCREEN_RAY_CHANNEL)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "rayEvent" -> {
+                        val arguments = call.arguments as? Map<*, *>
+                        val type = arguments?.get("type") as? String
+                        val data = arguments?.get("data") as? Map<*, *>
+                        val languageCode = arguments?.get("languageCode") as? String
+                        if (type == null || data == null) {
+                            result.error(
+                                "invalid_ray_event",
+                                "Ray event requires type and data",
+                                null,
+                            )
+                        } else {
+                            LockscreenRayController.handleEvent(
+                                context = this,
+                                eventType = type,
+                                data = data,
+                                appResumed = activityResumed,
+                                languageCode = languageCode,
+                            )
+                            result.success(null)
+                        }
+                    }
+                    "notificationsEnabled" -> {
+                        result.success(LockscreenRayNotifier.notificationsEnabled(this))
+                    }
+                    "requestNotifications" -> requestNotificationPermission(result)
+                    "setConnectionKeepAlive" -> {
+                        val enabled = call.arguments as? Boolean ?: false
+                        setConnectionKeepAlive(enabled)
+                        result.success(null)
+                    }
+                    "dismiss" -> {
+                        LockscreenRayController.dismiss(this)
+                        result.success(null)
+                    }
+                    else -> result.notImplemented()
+                }
+            }
+    }
+
+    private fun setConnectionKeepAlive(enabled: Boolean) {
+        val intent = Intent(this, PulseConnectionService::class.java)
+        if (!enabled) {
+            stopService(intent)
+            return
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(intent)
+        } else {
+            startService(intent)
+        }
+    }
+
+    private fun requestNotificationPermission(result: MethodChannel.Result) {
+        if (LockscreenRayNotifier.notificationsEnabled(this)) {
+            result.success(true)
+            return
+        }
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+            result.success(true)
+            return
+        }
+        pendingNotificationResult?.error(
+            "notification_request_replaced",
+            "A newer notification request replaced this one",
+            null,
+        )
+        pendingNotificationResult = result
+        requestPermissions(
+            arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+            NOTIFICATION_PERMISSION_REQUEST,
+        )
     }
 
     private fun startMicOrRequestPermission() {
@@ -296,7 +377,22 @@ class MainActivity : FlutterActivity() {
                     )
                 }
             }
+            NOTIFICATION_PERMISSION_REQUEST -> {
+                val result = pendingNotificationResult
+                pendingNotificationResult = null
+                result?.success(granted && LockscreenRayNotifier.notificationsEnabled(this))
+            }
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        activityResumed = true
+    }
+
+    override fun onPause() {
+        activityResumed = false
+        super.onPause()
     }
 
     @SuppressLint("MissingPermission")
@@ -505,6 +601,12 @@ class MainActivity : FlutterActivity() {
         setTorch(false)
         pendingTorchResult?.error("activity_destroyed", "Activity destroyed", null)
         pendingTorchResult = null
+        pendingNotificationResult?.error(
+            "activity_destroyed",
+            "Activity destroyed",
+            null,
+        )
+        pendingNotificationResult = null
         stopAdvertising()
         super.onDestroy()
     }

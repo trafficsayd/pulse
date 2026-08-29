@@ -10,6 +10,7 @@ import '../../../core/locale/locale_controller.dart';
 import '../../../core/routing/routes.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/pulse_mockup.dart';
+import '../../lockscreen/application/lockscreen_ray_bridge.dart';
 
 /// App-wide settings — language, notifications, permissions, about,
 /// support, crash reports.
@@ -21,13 +22,31 @@ class SettingsScreen extends ConsumerStatefulWidget {
 }
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
-  bool _notifications = true;
+  bool _notifications = false;
   bool _crashReports = false;
 
   @override
   void initState() {
     super.initState();
     _checkPermissions();
+    _loadNotificationStatus();
+  }
+
+  Future<void> _loadNotificationStatus() async {
+    final enabled = await LockscreenRayBridge.notificationsEnabled();
+    if (mounted) setState(() => _notifications = enabled);
+  }
+
+  Future<void> _changeNotifications(bool enabled) async {
+    if (!enabled) {
+      // Android does not allow an app to revoke its own notification grant.
+      // Open the system page where the user can make that privacy choice.
+      await openAppSettings();
+      await _loadNotificationStatus();
+      return;
+    }
+    final granted = await LockscreenRayBridge.requestNotifications();
+    if (mounted) setState(() => _notifications = granted);
   }
 
   // Real permission status map: true = granted.
@@ -130,7 +149,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   icon: Icons.notifications_active_rounded,
                   label: t.settingsNotifications,
                   value: _notifications,
-                  onChanged: (v) => setState(() => _notifications = v),
+                  onChanged: _changeNotifications,
                 ),
               ),
               const SizedBox(height: 12),

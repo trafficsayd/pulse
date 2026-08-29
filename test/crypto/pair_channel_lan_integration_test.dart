@@ -225,6 +225,59 @@ void main() {
     expect(packet.payload, <int>[2]);
     expect(packet.nonceCounter, 2);
   });
+
+  test('PairChannel serializes a burst of concurrent gesture packets',
+      () async {
+    final hostRaw = _MemoryRawChannel();
+    final guestRaw = _MemoryRawChannel();
+    hostRaw.peer = guestRaw;
+    guestRaw.peer = hostRaw;
+    final key = SecretKey(List<int>.generate(32, (i) => i));
+    final hostStore = SecureKeyStore(storage: _MemoryStorage());
+    final guestStore = SecureKeyStore(storage: _MemoryStorage());
+    final host = PairChannel(
+      transport: hostRaw,
+      key: key,
+      outboundCounter: NonceCounter(
+        storage: hostStore,
+        storageKey: 'burst.host.out',
+      ),
+      inboundCounter: NonceCounter(
+        storage: hostStore,
+        storageKey: 'burst.host.in',
+      ),
+    );
+    final guest = PairChannel(
+      transport: guestRaw,
+      key: key,
+      outboundCounter: NonceCounter(
+        storage: guestStore,
+        storageKey: 'burst.guest.out',
+      ),
+      inboundCounter: NonceCounter(
+        storage: guestStore,
+        storageKey: 'burst.guest.in',
+      ),
+    );
+    addTearDown(host.close);
+    addTearDown(guest.close);
+    await Future.wait(<Future<void>>[host.start(), guest.start()]);
+
+    const packetCount = 40;
+    final received = guest.incoming.take(packetCount).toList();
+    await Future.wait(
+      List<Future<void>>.generate(
+        packetCount,
+        (index) => host.send(Uint8List.fromList(<int>[index])),
+      ),
+    );
+
+    final packets = await received.timeout(const Duration(seconds: 5));
+    expect(packets.map((packet) => packet.payload.single),
+        orderedEquals(List<int>.generate(packetCount, (index) => index)));
+    expect(packets.map((packet) => packet.nonceCounter),
+        orderedEquals(List<int>.generate(packetCount, (index) => index + 1)));
+  });
 }
 
 Future<void> _waitConnected(LocalNetworkTransport transport) async {

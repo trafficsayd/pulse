@@ -61,6 +61,7 @@ class NonceCounter {
   final String _hwmKey;
 
   int _lastUsed = 0;
+  int _reservedThrough = 0;
   bool _loaded = false;
 
   /// Re-read the counter from secure storage. Must be called before the
@@ -84,6 +85,7 @@ class NonceCounter {
       );
     }
     _lastUsed = main;
+    _reservedThrough = main;
     _loaded = true;
   }
 
@@ -94,17 +96,34 @@ class NonceCounter {
     return _lastUsed + 1;
   }
 
-  /// Increment the counter, persist the new value plus the high-water
-  /// mark, and return it.
-  Future<int> next() async {
+  /// Increment the counter and return it.
+  ///
+  /// [reservationSize] reserves a future range in secure storage before the
+  /// first value from that range is emitted. Unused values are deliberately
+  /// skipped after a process crash, which preserves nonce uniqueness while
+  /// avoiding two encrypted-storage writes for every live gesture point.
+  /// Callers that do not opt in retain the original persist-every-value
+  /// behaviour.
+  Future<int> next({int reservationSize = 1}) async {
+    if (reservationSize < 1) {
+      throw ArgumentError.value(
+        reservationSize,
+        'reservationSize',
+        'must be positive',
+      );
+    }
     await restore();
-    final newValue = _lastUsed + 1;
-    // High-water mark first: if the process is killed between writes,
-    // a subsequent restore will detect the rollback and bail.
-    await _storage.writeString(_hwmKey, newValue.toString());
-    await _storage.writeString(_storageKey, newValue.toString());
-    _lastUsed = newValue;
-    return newValue;
+    if (_lastUsed >= _reservedThrough) {
+      final reservationEnd = _lastUsed + reservationSize;
+      // High-water mark first: if the process is killed between writes,
+      // a subsequent restore detects the rollback and refuses to reuse the
+      // reserved nonces.
+      await _storage.writeString(_hwmKey, reservationEnd.toString());
+      await _storage.writeString(_storageKey, reservationEnd.toString());
+      _reservedThrough = reservationEnd;
+    }
+    _lastUsed += 1;
+    return _lastUsed;
   }
 
   /// Persist [value] as the last successfully observed counter.
@@ -114,17 +133,28 @@ class NonceCounter {
   /// safe to advance to its embedded counter while continuing to reject
   /// replays. Outbound callers must keep using [next] so a nonce is never
   /// minted twice.
-  Future<void> advanceTo(int value) async {
+  Future<void> advanceTo(int value, {int reservationSize = 1}) async {
     if (value < 0) {
       throw ArgumentError.value(value, 'value', 'must be non-negative');
+    }
+    if (reservationSize < 1) {
+      throw ArgumentError.value(
+        reservationSize,
+        'reservationSize',
+        'must be positive',
+      );
     }
     await restore();
     if (value < _lastUsed) {
       throw StateError('Nonce counter cannot move backwards');
     }
     if (value == _lastUsed) return;
-    await _storage.writeString(_hwmKey, value.toString());
-    await _storage.writeString(_storageKey, value.toString());
+    if (value > _reservedThrough) {
+      final reservationEnd = value + reservationSize - 1;
+      await _storage.writeString(_hwmKey, reservationEnd.toString());
+      await _storage.writeString(_storageKey, reservationEnd.toString());
+      _reservedThrough = reservationEnd;
+    }
     _lastUsed = value;
   }
 
@@ -132,6 +162,7 @@ class NonceCounter {
   /// explicit "wipe pair" flow (§6 of the spec — паническое стирание).
   Future<void> resetToZero() async {
     _lastUsed = 0;
+    _reservedThrough = 0;
     _loaded = true;
     await _storage.writeString(_hwmKey, '0');
     await _storage.writeString(_storageKey, '0');
@@ -141,6 +172,7 @@ class NonceCounter {
   /// secure storage. Pair this with [PairKeys] wiping during unpair.
   Future<void> wipe() async {
     _lastUsed = 0;
+    _reservedThrough = 0;
     _loaded = false;
     await _storage.delete(_storageKey);
     await _storage.delete(_hwmKey);

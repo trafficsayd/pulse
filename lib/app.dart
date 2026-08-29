@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -11,6 +13,7 @@ import 'core/theme/app_theme.dart';
 import 'core/widgets/session_error_banner.dart';
 import 'features/subscription/application/subscription_controller.dart';
 import 'features/connections/application/connections_controller.dart';
+import 'features/lockscreen/application/lockscreen_ray_bridge.dart';
 import 'features/modes/application/mode_registry.dart';
 import 'features/modes/domain/pulse_mode.dart';
 import 'features/session/application/mode_event.dart';
@@ -36,6 +39,7 @@ class _PulseAppState extends ConsumerState<PulseApp> {
   bool _didRestoreInitialRoute = false;
   PulseModeId? _lastIncomingMode;
   DateTime? _lastIncomingAt;
+  bool? _connectionKeepAliveEnabled;
 
   @override
   void initState() {
@@ -50,9 +54,22 @@ class _PulseAppState extends ConsumerState<PulseApp> {
   @override
   Widget build(BuildContext context) {
     final locale = ref.watch(localeControllerProvider);
+    final hasActiveConnection = ref.watch(
+      connectionsControllerProvider.select((state) => state.active != null),
+    );
+    _syncConnectionKeepAlive(hasActiveConnection);
     ref.listen<AsyncValue<ModeEvent>>(incomingModeEventProvider, (_, next) {
       final event = next.valueOrNull;
       if (event == null) return;
+      // Android renders Ray on a dedicated, keyguard-safe native canvas.
+      // Forward before showing the in-app banner so the first live point is
+      // not lost while the lock-screen activity is being created.
+      unawaited(
+        LockscreenRayBridge.handleIncoming(
+          event,
+          languageCode: locale?.languageCode,
+        ),
+      );
       if (event.type == 'sneak_in') {
         _showIncomingSneakIn(event);
       } else {
@@ -86,6 +103,15 @@ class _PulseAppState extends ConsumerState<PulseApp> {
       },
       routerConfig: _router,
     );
+  }
+
+  void _syncConnectionKeepAlive(bool enabled) {
+    if (_connectionKeepAliveEnabled == enabled) return;
+    _connectionKeepAliveEnabled = enabled;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _connectionKeepAliveEnabled != enabled) return;
+      unawaited(LockscreenRayBridge.setConnectionKeepAlive(enabled));
+    });
   }
 
   void _showIncomingMode(ModeEvent event) {

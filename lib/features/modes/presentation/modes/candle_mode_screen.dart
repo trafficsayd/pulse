@@ -6,13 +6,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/storage/secure_key_store.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../capabilities/application/capability_providers.dart';
 import '../../../capabilities/domain/device_capability.dart';
 import '../../application/candle_dynamics.dart';
+import '../../application/candle_memory_repository.dart';
 import '../../../session/application/mode_event.dart';
 import '../../../session/application/mode_event_bus.dart';
+import '../../../session/application/session_provider.dart';
 import '../../primitives/candle_sound_controller.dart';
 import '../../primitives/haptic_pattern_player.dart';
 import '../../primitives/mic_level_stream.dart';
@@ -100,6 +103,8 @@ class _CandleModeViewState extends ConsumerState<_CandleModeView>
   StreamSubscription<ModeEvent>? _partnerSub;
   Timer? _partnerWindDecay;
   Timer? _sharedGlowTimer;
+  Timer? _waxTimer;
+  Timer? _ignitionIntentTimer;
   bool _ownsMic = false;
   bool _ownsEngine = false;
 
@@ -115,11 +120,28 @@ class _CandleModeViewState extends ConsumerState<_CandleModeView>
   bool _calibrated = false;
   DateTime? _lastSoundUpdateAt;
   DateTime? _lastLocalLightAt;
+  DateTime? _lastPartnerLightAt;
   DateTime? _sharedGlowUntil;
   DateTime? _extinguishedAt;
+  DateTime? _lastWaxTick;
+  DateTime? _lastMemorySyncAt;
   CandleStyle _style = CandleStyle.classic;
+  CandleMemory _memory = CandleMemory.fresh(seed: 1);
+  CandleMemoryRepository? _memoryRepository;
+  bool _localShielded = false;
+  bool _partnerShielded = false;
+  bool _waitingForSharedIgnition = false;
+  bool _partnerWishSealed = false;
+  bool _localRevealRequested = false;
+  bool _partnerRevealRequested = false;
+  String? _partnerWish;
+  bool _portalRequested = false;
+  bool _partnerPortalRequested = false;
+  int? _partnerPortalToken;
+  late final int _portalToken;
   final Map<CandleStyle, ui.Image> _candleImages = {};
   ui.Image? _flameImage;
+  ui.FragmentShader? _gpuFlameShader;
 
   @override
   void initState() {
@@ -137,6 +159,9 @@ class _CandleModeViewState extends ConsumerState<_CandleModeView>
       _engine = widget.hapticEngine!;
     }
     _player = HapticPatternPlayer(_engine);
+    _portalToken =
+        (DateTime.now().microsecondsSinceEpoch ^ identityHashCode(this)) &
+            0x7fffffff;
     _breathAnalyzer = CandleBreathAnalyzer(
       calibrationDuration: widget.calibrationDuration,
     );
@@ -150,9 +175,84 @@ class _CandleModeViewState extends ConsumerState<_CandleModeView>
     _partnerSub = ref
         .read(modeEventBusProvider)
         .incoming
-        .where((e) => e.type == 'candle_light' || e.type == 'candle_blow')
+        .where((e) => e.type.startsWith('candle_'))
         .listen(_onPartnerEvent);
+    final session = ref.read(sessionProvider).asData?.value;
+    _memoryRepository = CandleMemoryRepository(
+      store: ref.read(secureKeyStoreProvider),
+      connectionId: session?.connectionId ?? 'local-preview',
+    );
+    unawaited(_loadMemory(_style));
+    unawaited(_loadGpuFlameShader());
+    _lastWaxTick = DateTime.now();
+    _waxTimer = Timer.periodic(const Duration(seconds: 1), (_) => _tickWax());
     unawaited(_loadCandleImages());
+  }
+
+  Future<void> _loadGpuFlameShader() async {
+    try {
+      final program =
+          await ui.FragmentProgram.fromAsset('shaders/candle_flame.frag');
+      final shader = program.fragmentShader();
+      if (!mounted) {
+        shader.dispose();
+        return;
+      }
+      setState(() => _gpuFlameShader = shader);
+    } on Object {
+      // CustomPainter's vector flame remains a complete fallback on devices
+      // whose GPU driver cannot compile runtime effects.
+    }
+  }
+
+  Future<void> _loadMemory(CandleStyle style) async {
+    final loaded = await _memoryRepository?.load(style);
+    if (!mounted || loaded == null || _style != style) return;
+    setState(() => _memory = loaded);
+    if (loaded.hasWish) {
+      unawaited(ref.read(modeEventBusProvider).send(const ModeEvent(
+            type: 'candle_wish',
+            data: {'sealed': true},
+          )));
+    }
+    _persistAndSyncMemory();
+  }
+
+  void _tickWax() {
+    final now = DateTime.now();
+    final previous = _lastWaxTick ?? now;
+    _lastWaxTick = now;
+    if (!_isLit) return;
+    final next = _memory.burn(
+      elapsed: now.difference(previous),
+      style: _style,
+      localBreath: _localWind,
+      partnerBreath: _partnerWind,
+    );
+    setState(() => _memory = next);
+    final lastSync = _lastMemorySyncAt;
+    if (lastSync == null ||
+        now.difference(lastSync) >= const Duration(seconds: 10)) {
+      _lastMemorySyncAt = now;
+      _persistAndSyncMemory();
+    }
+    if (next.isSpent && next.waxRemaining <= .081) {
+      _revealWishAfterBurnout();
+      _extinguishCandle();
+    }
+  }
+
+  void _persistAndSyncMemory() {
+    unawaited(_memoryRepository?.save(_style, _memory));
+    unawaited(ref.read(modeEventBusProvider).send(ModeEvent(
+          type: 'candle_memory',
+          data: {
+            'style': _style.index,
+            'wax': _memory.waxRemaining,
+            'sessions': _memory.sessions,
+            'smoke': _memory.smokeSignature,
+          },
+        )));
   }
 
   Future<void> _loadCandleImages() async {
@@ -214,21 +314,30 @@ class _CandleModeViewState extends ConsumerState<_CandleModeView>
       if (styleIndex != null &&
           styleIndex >= 0 &&
           styleIndex < CandleStyle.values.length) {
-        setState(() => _style = CandleStyle.values[styleIndex]);
+        final partnerStyle = CandleStyle.values[styleIndex];
+        if (_style != partnerStyle) {
+          setState(() => _style = partnerStyle);
+          unawaited(_loadMemory(partnerStyle));
+        }
       }
       final now = DateTime.now();
+      _lastPartnerLightAt = now;
+      final intent = event.data['intent'] as bool? ?? false;
+      final confirmed = event.data['confirmed'] as bool? ?? false;
+      if (_style.character.requiresSharedIgnition && !confirmed) {
+        if (intent &&
+            _waitingForSharedIgnition &&
+            _lastLocalLightAt != null &&
+            now.difference(_lastLocalLightAt!) < const Duration(seconds: 4)) {
+          _completeSharedIgnition(broadcast: true);
+        }
+        return;
+      }
       final shared = _isLit &&
           _lastLocalLightAt != null &&
           now.difference(_lastLocalLightAt!) < const Duration(seconds: 2);
       _lightCandle();
-      if (shared) {
-        setState(() => _sharedGlowUntil = now.add(const Duration(seconds: 2)));
-        _sharedGlowTimer?.cancel();
-        _sharedGlowTimer = Timer(const Duration(seconds: 2), () {
-          if (mounted) setState(() => _sharedGlowUntil = null);
-        });
-        unawaited(_player.play(HapticPatterns.candleTogether));
-      }
+      if (shared || confirmed) _celebrateSharedLight();
     } else if (event.type == 'candle_blow') {
       final level = (event.data['level'] as num?)?.toDouble() ?? 0;
       final extinguished =
@@ -255,7 +364,92 @@ class _CandleModeViewState extends ConsumerState<_CandleModeView>
         });
       }
       if (extinguished) _extinguishCandle();
+    } else if (event.type == 'candle_shield') {
+      final active = event.data['active'] as bool? ?? false;
+      setState(() => _partnerShielded = active);
+      if (active) unawaited(_player.play(HapticPatterns.candleShield));
+    } else if (event.type == 'candle_memory') {
+      final styleIndex = (event.data['style'] as num?)?.toInt();
+      if (styleIndex != _style.index) return;
+      final remoteWax =
+          ((event.data['wax'] as num?)?.toDouble() ?? 1).clamp(.08, 1.0);
+      final remoteSessions =
+          math.max(0, (event.data['sessions'] as num?)?.toInt() ?? 0);
+      final remoteSmoke =
+          ((event.data['smoke'] as num?)?.toInt() ?? 0).clamp(0, 2);
+      setState(() {
+        _memory = _memory.copyWith(
+          waxRemaining: math.min(_memory.waxRemaining, remoteWax),
+          sessions: math.max(_memory.sessions, remoteSessions),
+          smokeSignature: remoteSessions > _memory.sessions
+              ? remoteSmoke
+              : _memory.smokeSignature,
+        );
+      });
+      unawaited(_memoryRepository?.save(_style, _memory));
+    } else if (event.type == 'candle_wish') {
+      final sealed = event.data['sealed'] as bool? ?? false;
+      final revealRequest = event.data['revealRequest'] as bool? ?? false;
+      final revealedText = event.data['revealedText'] as String?;
+      setState(() {
+        if (sealed) _partnerWishSealed = true;
+        if (revealRequest) _partnerRevealRequested = true;
+        if (revealedText != null && revealedText.trim().isNotEmpty) {
+          _partnerWish = revealedText.trim();
+        }
+      });
+      if (_partnerRevealRequested && _localRevealRequested) {
+        _shareSealedWish();
+      }
+    } else if (event.type == 'candle_portal') {
+      setState(() {
+        _partnerPortalRequested = event.data['enabled'] as bool? ?? false;
+        _partnerPortalToken = (event.data['token'] as num?)?.toInt();
+      });
     }
+  }
+
+  void _celebrateSharedLight() {
+    final now = DateTime.now();
+    setState(() {
+      _waitingForSharedIgnition = false;
+      _sharedGlowUntil = now.add(const Duration(seconds: 2));
+    });
+    _sharedGlowTimer?.cancel();
+    _sharedGlowTimer = Timer(const Duration(seconds: 2), () {
+      if (mounted) setState(() => _sharedGlowUntil = null);
+    });
+    unawaited(_player.play(HapticPatterns.candleTogether));
+  }
+
+  void _completeSharedIgnition({required bool broadcast}) {
+    _ignitionIntentTimer?.cancel();
+    _lightCandle();
+    _celebrateSharedLight();
+    if (broadcast) {
+      unawaited(ref.read(modeEventBusProvider).send(ModeEvent(
+            type: 'candle_light',
+            data: {'style': _style.index, 'confirmed': true},
+          )));
+    }
+  }
+
+  void _shareSealedWish() {
+    final wish = _memory.sealedWish;
+    if (wish == null || wish.isEmpty || _memory.wishRevealed) return;
+    setState(() => _memory = _memory.copyWith(wishRevealed: true));
+    unawaited(_memoryRepository?.save(_style, _memory));
+    unawaited(ref.read(modeEventBusProvider).send(ModeEvent(
+          type: 'candle_wish',
+          data: {'revealedText': wish},
+        )));
+    unawaited(_player.play(HapticPatterns.candleWish));
+  }
+
+  void _revealWishAfterBurnout() {
+    _localRevealRequested = true;
+    _partnerRevealRequested = true;
+    _shareSealedWish();
   }
 
   void _onMicLevel(MicLevel sample) {
@@ -284,9 +478,15 @@ class _CandleModeViewState extends ConsumerState<_CandleModeView>
       at: sample.timestamp,
     );
     _updateSound(level, sample.timestamp);
+    final shieldCount = (_localShielded ? 1 : 0) + (_partnerShielded ? 1 : 0);
+    final shield = shieldCount == 0
+        ? 0.0
+        : (_style.character.shieldEfficiency + (shieldCount - 1) * .07)
+            .clamp(0.0, .96);
+    final effectiveLevel = level * (1 - shield);
     final threshold =
         widget.blowThreshold * _style.character.extinguishResistance;
-    if (level > threshold) {
+    if (effectiveLevel > threshold) {
       _blowSamplesOverThreshold++;
       if (_blowSamplesOverThreshold >= widget.requiredBlowSamples) {
         _extinguishCandle();
@@ -357,6 +557,7 @@ class _CandleModeViewState extends ConsumerState<_CandleModeView>
       _isLit = true;
       _extinguishedAt = null;
       _blowSamplesOverThreshold = 0;
+      _lastWaxTick = DateTime.now();
     });
     HapticFeedback.lightImpact();
     unawaited(_player.play(HapticPatterns.tap));
@@ -372,7 +573,9 @@ class _CandleModeViewState extends ConsumerState<_CandleModeView>
       _localWind = 0;
       _partnerWind = 0;
       _extinguishedAt = DateTime.now();
+      _memory = _memory.finishSession();
     });
+    _persistAndSyncMemory();
     HapticFeedback.mediumImpact();
     unawaited(_player.play(HapticPatterns.candleOut));
     if (_soundEnabled) unawaited(CandleSoundController.extinguish());
@@ -381,17 +584,115 @@ class _CandleModeViewState extends ConsumerState<_CandleModeView>
   void _onTap() {
     if (!_isLit) {
       _lastLocalLightAt = DateTime.now();
-      _lightCandle();
-      ref.read(modeEventBusProvider).send(ModeEvent(
-            type: 'candle_light',
-            data: {'style': _style.index},
-          ));
+      if (_style.character.requiresSharedIgnition) {
+        setState(() => _waitingForSharedIgnition = true);
+        unawaited(ref.read(modeEventBusProvider).send(ModeEvent(
+              type: 'candle_light',
+              data: {'style': _style.index, 'intent': true},
+            )));
+        final partnerAt = _lastPartnerLightAt;
+        if (partnerAt != null &&
+            DateTime.now().difference(partnerAt) < const Duration(seconds: 4)) {
+          _completeSharedIgnition(broadcast: true);
+          return;
+        }
+        _ignitionIntentTimer?.cancel();
+        _ignitionIntentTimer = Timer(const Duration(seconds: 4), () {
+          if (mounted) setState(() => _waitingForSharedIgnition = false);
+        });
+      } else {
+        _lightCandle();
+        unawaited(ref.read(modeEventBusProvider).send(ModeEvent(
+              type: 'candle_light',
+              data: {'style': _style.index},
+            )));
+      }
+    }
+  }
+
+  void _startShield(LongPressStartDetails _) {
+    if (!_isLit || _localShielded) return;
+    setState(() => _localShielded = true);
+    unawaited(_player.play(HapticPatterns.candleShield));
+    unawaited(ref.read(modeEventBusProvider).send(const ModeEvent(
+          type: 'candle_shield',
+          data: {'active': true},
+        )));
+  }
+
+  void _endShield(LongPressEndDetails _) {
+    if (!_localShielded) return;
+    setState(() => _localShielded = false);
+    unawaited(ref.read(modeEventBusProvider).send(const ModeEvent(
+          type: 'candle_shield',
+          data: {'active': false},
+        )));
+  }
+
+  void _togglePortal() {
+    setState(() => _portalRequested = !_portalRequested);
+    unawaited(_player.play(HapticPatterns.candlePortal));
+    unawaited(ref.read(modeEventBusProvider).send(ModeEvent(
+          type: 'candle_portal',
+          data: {'enabled': _portalRequested, 'token': _portalToken},
+        )));
+  }
+
+  bool get _portalActive =>
+      _portalRequested &&
+      _partnerPortalRequested &&
+      _partnerPortalToken != null;
+
+  int get _portalSide {
+    final partner = _partnerPortalToken;
+    if (!_portalActive || partner == null) return 0;
+    return _portalToken <= partner ? -1 : 1;
+  }
+
+  Future<void> _openWishSheet() async {
+    final result = await showModalBottomSheet<_CandleWishResult>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _CandleWishSheet(
+        memory: _memory,
+        partnerSealed: _partnerWishSealed,
+        partnerWish: _partnerWish,
+      ),
+    );
+    if (!mounted || result == null) return;
+    final wish = result.sealedWish?.trim();
+    if (wish != null && wish.isNotEmpty) {
+      setState(() => _memory = _memory.copyWith(sealedWish: wish));
+      unawaited(_memoryRepository?.save(_style, _memory));
+      unawaited(ref.read(modeEventBusProvider).send(const ModeEvent(
+            type: 'candle_wish',
+            data: {'sealed': true},
+          )));
+      unawaited(_player.play(HapticPatterns.candleWish));
+    }
+    if (result.requestReveal) {
+      setState(() => _localRevealRequested = true);
+      unawaited(ref.read(modeEventBusProvider).send(const ModeEvent(
+            type: 'candle_wish',
+            data: {'revealRequest': true},
+          )));
+      if (_partnerRevealRequested) _shareSealedWish();
     }
   }
 
   void _selectStyle(CandleStyle style) {
     if (_style == style) return;
-    setState(() => _style = style);
+    if (_isLit && style.character.requiresSharedIgnition) {
+      _extinguishCandle();
+    }
+    unawaited(_memoryRepository?.save(_style, _memory));
+    setState(() {
+      _style = style;
+      _waitingForSharedIgnition = false;
+      _memory = CandleMemory.fresh(seed: 1);
+    });
+    unawaited(_loadMemory(style));
     if (_isLit && _soundEnabled) {
       unawaited(CandleSoundController.start(
         style,
@@ -424,6 +725,9 @@ class _CandleModeViewState extends ConsumerState<_CandleModeView>
     _partnerSub?.cancel();
     _partnerWindDecay?.cancel();
     _sharedGlowTimer?.cancel();
+    _waxTimer?.cancel();
+    _ignitionIntentTimer?.cancel();
+    unawaited(_memoryRepository?.save(_style, _memory));
     _flicker.dispose();
     unawaited(_player.stop());
     if (_ownsMic) unawaited(_mic.dispose());
@@ -432,6 +736,7 @@ class _CandleModeViewState extends ConsumerState<_CandleModeView>
       image.dispose();
     }
     _flameImage?.dispose();
+    _gpuFlameShader?.dispose();
     unawaited(CandleSoundController.stop());
     super.dispose();
   }
@@ -448,6 +753,8 @@ class _CandleModeViewState extends ConsumerState<_CandleModeView>
               child: GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onTap: _onTap,
+                onLongPressStart: _startShield,
+                onLongPressEnd: _endShield,
                 child: AnimatedBuilder(
                   animation: _flicker,
                   builder: (context, _) {
@@ -462,6 +769,8 @@ class _CandleModeViewState extends ConsumerState<_CandleModeView>
                       localPressure: _localWind,
                       partnerPressure: _partnerWind,
                       style: _style,
+                      localShielded: _localShielded,
+                      partnerShielded: _partnerShielded,
                     );
                     final sharedUntil = _sharedGlowUntil;
                     final sharedGlow = sharedUntil == null
@@ -481,13 +790,61 @@ class _CandleModeViewState extends ConsumerState<_CandleModeView>
                         partnerWind: _partnerWind,
                         sharedGlow: sharedGlow,
                         smokeProgress: smokeProgress.clamp(0.0, 1.0),
+                        showSmokeMemory: extinguishedAt != null,
                         style: _style,
+                        memory: _memory,
+                        localShielded: _localShielded,
+                        partnerShielded: _partnerShielded,
+                        portalSide: _portalSide,
                         candleImage: _candleImages[_style],
                         flameImage: _flameImage,
+                        gpuFlameShader: _gpuFlameShader,
                       ),
                     );
                   },
                 ),
+              ),
+            ),
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 126,
+              child: Text(
+                t.candleMemory(_memory.sessions),
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: AppColors.textMuted,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: .4,
+                ),
+              ),
+            ),
+            Positioned(
+              left: 18,
+              right: 18,
+              bottom: 82,
+              child: Row(
+                children: [
+                  _CandleActionChip(
+                    key: const ValueKey('candle-wish'),
+                    icon: _memory.hasWish
+                        ? Icons.lock_rounded
+                        : Icons.auto_awesome_rounded,
+                    label: _memory.hasWish ? t.candleWishSealed : t.candleWish,
+                    onTap: _openWishSheet,
+                  ),
+                  const Spacer(),
+                  _CandleActionChip(
+                    key: const ValueKey('candle-portal'),
+                    icon: _portalActive
+                        ? Icons.mobile_friendly_rounded
+                        : Icons.mobile_screen_share_rounded,
+                    label: t.candlePortal,
+                    active: _portalRequested,
+                    onTap: _togglePortal,
+                  ),
+                ],
               ),
             ),
             Positioned(
@@ -505,9 +862,15 @@ class _CandleModeViewState extends ConsumerState<_CandleModeView>
               right: 0,
               child: Center(
                 child: Text(
-                  _calibrated
-                      ? (_isLit ? t.candleBlowHint : t.candleTouchHint)
-                      : t.candleCalibrating,
+                  !_calibrated
+                      ? t.candleCalibrating
+                      : _waitingForSharedIgnition
+                          ? t.candleWaitingForPartner
+                          : _isLit
+                              ? t.candleBlowHint
+                              : _style.character.requiresSharedIgnition
+                                  ? t.candlePromiseHint
+                                  : t.candleTouchHint,
                   style: const TextStyle(
                     color: AppColors.textMuted,
                     fontSize: 13,
@@ -546,6 +909,38 @@ class _CandleModeViewState extends ConsumerState<_CandleModeView>
                       fontWeight: FontWeight.w700,
                       letterSpacing: .8,
                     ),
+                  ),
+                ),
+              ),
+            if (_portalRequested)
+              Positioned(
+                top: 76,
+                left: 30,
+                right: 30,
+                child: Text(
+                  _portalActive ? t.candlePortalReady : t.candlePortalWaiting,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: _portalActive
+                        ? const Color(0xFFD9BBFF)
+                        : AppColors.textMuted,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            if (_isLit && (_localShielded || _partnerShielded))
+              Positioned(
+                top: 96,
+                left: 30,
+                right: 30,
+                child: Text(
+                  t.candleShieldHint,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Color(0xFFAEDBFF),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ),
@@ -589,9 +984,15 @@ class _CandlePainter extends CustomPainter {
     required this.partnerWind,
     required this.sharedGlow,
     required this.smokeProgress,
+    required this.showSmokeMemory,
     required this.style,
+    required this.memory,
+    required this.localShielded,
+    required this.partnerShielded,
+    required this.portalSide,
     required this.candleImage,
     required this.flameImage,
+    required this.gpuFlameShader,
   });
 
   final bool isLit;
@@ -601,9 +1002,15 @@ class _CandlePainter extends CustomPainter {
   final double partnerWind;
   final double sharedGlow;
   final double smokeProgress;
+  final bool showSmokeMemory;
   final CandleStyle style;
+  final CandleMemory memory;
+  final bool localShielded;
+  final bool partnerShielded;
+  final int portalSide;
   final ui.Image? candleImage;
   final ui.Image? flameImage;
+  final ui.FragmentShader? gpuFlameShader;
 
   double get wind => forces.lean;
 
@@ -613,7 +1020,12 @@ class _CandlePainter extends CustomPainter {
     // Keep the object comfortably inside the portrait composition. Its size
     // is tied to screen width (not a cropped media viewport), while the
     // vertical anchor leaves room for the complete flame, base and shadow.
-    final center = Offset(size.width / 2, size.height * 0.46);
+    final centerX = portalSide < 0
+        ? size.width - 1
+        : portalSide > 0
+            ? 1.0
+            : size.width / 2;
+    final center = Offset(centerX, size.height * 0.46);
     final candleWidth =
         size.shortestSide * (style == CandleStyle.glass ? 0.31 : 0.255);
     final candleHeight =
@@ -625,7 +1037,8 @@ class _CandlePainter extends CustomPainter {
       height: candleHeight,
     );
     final image = candleImage;
-    final photoreal = image == null ? null : _photorealLayout(size, image);
+    final photoreal =
+        image == null ? null : _photorealLayout(size, image, centerX);
     final visualBody = photoreal?.visualBounds ?? bodyRect;
     final wickBase = photoreal?.wickBase ?? Offset(center.dx, bodyRect.top - 3);
 
@@ -633,8 +1046,7 @@ class _CandlePainter extends CustomPainter {
     _drawSurfaceShadow(canvas, visualBody, visualBody.width);
 
     if (image != null && photoreal != null) {
-      _drawPhotorealCandle(canvas, image, photoreal.imageRect);
-      _drawPhotorealRelighting(canvas, photoreal, phase);
+      _drawPhotorealCandle(canvas, image, photoreal);
     } else {
       switch (style) {
         case CandleStyle.classic:
@@ -673,22 +1085,36 @@ class _CandlePainter extends CustomPainter {
       _drawWick(canvas, wickBase);
     }
 
-    _drawAirflow(canvas, size, wickBase, phase);
+    _drawWaxMemory(canvas, visualBody, phase);
+    if (portalSide != 0) _drawPortalEdge(canvas, size, phase);
 
+    _drawAirflow(canvas, size, wickBase, phase);
     if (isLit) {
-      _drawFlame(canvas, wickBase, visualBody, phase);
+      final shader = gpuFlameShader;
+      if (shader != null) {
+        _drawGpuFlame(canvas, size, wickBase, shader);
+      } else {
+        _drawFlame(canvas, wickBase, visualBody, phase);
+      }
     } else {
       _drawExtinguishedWick(canvas, wickBase, phase);
     }
+    if (localShielded || partnerShielded) {
+      _drawShieldDome(canvas, wickBase, visualBody, phase);
+    }
   }
 
-  _PhotorealCandleLayout _photorealLayout(Size size, ui.Image image) {
+  _PhotorealCandleLayout _photorealLayout(
+    Size size,
+    ui.Image image,
+    double centerX,
+  ) {
     final widthFactor = style == CandleStyle.glass ? .48 : .55;
     final imageWidth = size.shortestSide * widthFactor;
     final imageHeight = imageWidth * image.height / image.width;
     final centerY = size.height * (style == CandleStyle.glass ? .49 : .50);
     final imageRect = Rect.fromCenter(
-      center: Offset(size.width / 2, centerY),
+      center: Offset(centerX, centerY),
       width: imageWidth,
       height: imageHeight,
     );
@@ -733,80 +1159,168 @@ class _CandlePainter extends CustomPainter {
     );
   }
 
-  void _drawPhotorealCandle(Canvas canvas, ui.Image image, Rect imageRect) {
+  void _drawPhotorealCandle(
+    Canvas canvas,
+    ui.Image image,
+    _PhotorealCandleLayout layout,
+  ) {
+    // These assets carry their own soft alpha matte. Drawing that matte
+    // directly preserves the irregular wax rim and natural halo. A geometric
+    // clip turns the halo into a visible horizontal edge above the flame.
     canvas.drawImageRect(
       image,
       Rect.fromLTWH(0, 0, image.width.toDouble(), image.height.toDouble()),
-      imageRect,
+      layout.imageRect,
       Paint()
         ..isAntiAlias = true
         ..filterQuality = FilterQuality.high,
     );
   }
 
-  void _drawPhotorealRelighting(
+  void _drawGpuFlame(
     Canvas canvas,
-    _PhotorealCandleLayout layout,
+    Size size,
+    Offset wickBase,
+    ui.FragmentShader shader,
+  ) {
+    shader
+      ..setFloat(0, size.width)
+      ..setFloat(1, size.height)
+      ..setFloat(2, flicker * 8)
+      ..setFloat(3, wickBase.dx)
+      ..setFloat(4, wickBase.dy)
+      ..setFloat(5, forces.lean)
+      ..setFloat(6, forces.pressure.clamp(0.0, 1.0))
+      ..setFloat(7, style.character.warmth)
+      ..setFloat(8, sharedGlow)
+      ..setFloat(9, isLit ? 1 : 0);
+    final effectBounds = Rect.fromLTRB(
+      wickBase.dx - 260,
+      wickBase.dy - 285,
+      wickBase.dx + 260,
+      wickBase.dy + 235,
+    ).intersect(Offset.zero & size);
+    canvas.drawRect(
+      effectBounds,
+      Paint()
+        ..shader = shader
+        ..blendMode = BlendMode.plus
+        ..isAntiAlias = true,
+    );
+  }
+
+  void _drawWaxMemory(Canvas canvas, Rect bounds, double phase) {
+    if (bounds.isEmpty) return;
+    final consumed = 1 - memory.waxRemaining;
+    final visibleTop = bounds.top + bounds.height * consumed * .22;
+    final memoryBounds = Rect.fromLTRB(
+      bounds.left,
+      visibleTop,
+      bounds.right,
+      bounds.bottom,
+    );
+    canvas.save();
+    canvas.clipRRect(
+      RRect.fromRectAndRadius(bounds, Radius.circular(bounds.width * .10)),
+    );
+
+    // The shared candle grows thin translucent strata rather than displaying
+    // a conventional progress bar. Each completed ritual adds one layer.
+    final layers = math.min(8, memory.sessions);
+    for (var i = 0; i < layers; i++) {
+      final seed = memory.signatureSeed * .0001 + i * 1.73;
+      final y = memoryBounds.bottom -
+          memoryBounds.height * (.10 + i / math.max(10, layers + 3));
+      final path = Path()..moveTo(memoryBounds.left, y);
+      for (var step = 1; step <= 6; step++) {
+        final x = memoryBounds.left + memoryBounds.width * step / 6;
+        final wave =
+            math.sin(seed + step * 1.41 + phase * .12) * (1.6 + (i % 3));
+        path.lineTo(x, y + wave);
+      }
+      canvas.drawPath(
+        path,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.1 + (i.isEven ? .4 : 0)
+          ..color = Color.lerp(
+            const Color(0xFFFFB65F),
+            const Color(0xFFC18BFF),
+            i / math.max(1, layers - 1),
+          )!
+              .withValues(alpha: .13 + memory.sharedBreath * .11),
+      );
+    }
+
+    // The current burn amount stays in the simulation and encrypted memory.
+    // Only completed shared sessions become visible strata: a transient level
+    // line looks artificial against the candle's irregular photoreal rim.
+    canvas.restore();
+  }
+
+  void _drawShieldDome(
+    Canvas canvas,
+    Offset wickBase,
+    Rect body,
     double phase,
   ) {
-    if (!isLit) return;
-    final character = style.character;
-    final pulse = 1 + math.sin(phase * 2.3) * .035 * character.flickerAmount;
-    final bounds = layout.visualBounds;
-    final warm = Color.lerp(
-      const Color(0xFFFF9D45),
-      const Color(0xFFC27CFF),
-      style == CandleStyle.violet ? .34 : 0,
-    )!;
-    canvas.saveLayer(bounds.inflate(18), Paint());
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(bounds, Radius.circular(bounds.width * .12)),
+    final count = (localShielded ? 1 : 0) + (partnerShielded ? 1 : 0);
+    final pulse = .72 + math.sin(phase * 1.4) * .08;
+    final dome = Rect.fromCenter(
+      center: Offset(wickBase.dx, wickBase.dy + body.width * .10),
+      width: body.width * 1.72,
+      height: body.width * 1.38,
+    );
+    canvas.drawArc(
+      dome,
+      math.pi,
+      math.pi,
+      false,
       Paint()
-        ..blendMode = BlendMode.screen
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = count == 2 ? 2.2 : 1.35
+        ..shader = LinearGradient(
+          colors: [
+            Colors.transparent,
+            const Color(0xFFBBDFFF).withValues(alpha: .55 * pulse),
+            const Color(0xFFE1C6FF).withValues(alpha: .35 * pulse),
+            Colors.transparent,
+          ],
+        ).createShader(dome)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 1.8),
+    );
+    canvas.drawOval(
+      dome,
+      Paint()
+        ..shader = RadialGradient(
+          center: const Alignment(0, -.45),
+          colors: [
+            const Color(0xFFBFE6FF).withValues(alpha: .055 * count),
+            Colors.transparent,
+          ],
+        ).createShader(dome),
+    );
+  }
+
+  void _drawPortalEdge(Canvas canvas, Size size, double phase) {
+    final left = portalSide > 0;
+    final rect = Rect.fromLTWH(left ? 0 : size.width - 8, 0, 8, size.height);
+    final pulse = .64 + math.sin(phase * 1.3) * .18;
+    canvas.drawRect(
+      rect,
+      Paint()
         ..shader = LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            warm.withValues(alpha: .26 * pulse * character.warmth),
-            warm.withValues(alpha: .08 * character.warmth),
+            Colors.transparent,
+            const Color(0xFFC28CFF).withValues(alpha: .42 * pulse),
+            const Color(0xFFFFA66B).withValues(alpha: .36 * pulse),
             Colors.transparent,
           ],
-          stops: const [0, .36, 1],
-        ).createShader(bounds),
+        ).createShader(rect)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 7),
     );
-    canvas.restore();
-
-    final pool = Rect.fromCenter(
-      center: layout.wickBase + const Offset(0, 6),
-      width: bounds.width * (style == CandleStyle.glass ? .82 : .68),
-      height: bounds.width * .23,
-    );
-    canvas.drawOval(
-      pool,
-      Paint()
-        ..blendMode = BlendMode.plus
-        ..shader = RadialGradient(
-          colors: [
-            const Color(0xFFFFF1B0).withValues(alpha: .30 * pulse),
-            warm.withValues(alpha: .17 * pulse),
-            Colors.transparent,
-          ],
-        ).createShader(pool),
-    );
-
-    if (style == CandleStyle.glass) {
-      final x = bounds.left + bounds.width * (.20 + math.sin(phase) * .018);
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(
-          Rect.fromLTWH(x, bounds.top + 12, 4, bounds.height * .62),
-          const Radius.circular(4),
-        ),
-        Paint()
-          ..blendMode = BlendMode.screen
-          ..color = const Color(0xFFFFD79A).withValues(alpha: .28 * pulse)
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3),
-      );
-    }
   }
 
   void _drawAtmosphere(
@@ -1450,6 +1964,9 @@ class _CandlePainter extends CustomPainter {
       );
     }
 
+    if (showSmokeMemory && smokeProgress > .34) {
+      _drawSmokeSigil(canvas, wickBase, phase);
+    }
     if (smokeProgress >= 1) return;
     final fade = math.pow(1 - smokeProgress, 1.45).toDouble();
     final rise = 24 + smokeProgress * 88;
@@ -1482,6 +1999,86 @@ class _CandlePainter extends CustomPainter {
     }
   }
 
+  void _drawSmokeSigil(Canvas canvas, Offset wickBase, double phase) {
+    final reveal = ((smokeProgress - .34) / .46).clamp(0.0, 1.0);
+    final center = wickBase +
+        Offset(
+          math.sin(phase * .42) * 4,
+          -92 - reveal * 18,
+        );
+    final scale = 18 + reveal * 11;
+    final path = Path();
+    switch (memory.smokeSignature) {
+      case 0:
+        // A continuous infinity path: two people, one unbroken trace.
+        path.moveTo(center.dx - scale, center.dy);
+        path.cubicTo(
+          center.dx - scale * .45,
+          center.dy - scale,
+          center.dx + scale * .45,
+          center.dy + scale,
+          center.dx + scale,
+          center.dy,
+        );
+        path.cubicTo(
+          center.dx + scale * .45,
+          center.dy - scale,
+          center.dx - scale * .45,
+          center.dy + scale,
+          center.dx - scale,
+          center.dy,
+        );
+        break;
+      case 1:
+        // A softly imperfect heart created from the session's smoke.
+        path.moveTo(center.dx, center.dy + scale * .82);
+        path.cubicTo(
+          center.dx - scale * 1.30,
+          center.dy + scale * .05,
+          center.dx - scale * .75,
+          center.dy - scale,
+          center.dx,
+          center.dy - scale * .26,
+        );
+        path.cubicTo(
+          center.dx + scale * .75,
+          center.dy - scale,
+          center.dx + scale * 1.30,
+          center.dy + scale * .05,
+          center.dx,
+          center.dy + scale * .82,
+        );
+        break;
+      default:
+        // Two orbits cross once and continue, like two separate lives
+        // touching without becoming identical.
+        path.addOval(Rect.fromCenter(
+          center: center + Offset(-scale * .28, 0),
+          width: scale * 1.45,
+          height: scale * .72,
+        ));
+        path.addOval(Rect.fromCenter(
+          center: center + Offset(scale * .28, 0),
+          width: scale * 1.45,
+          height: scale * .72,
+        ));
+    }
+    canvas.drawPath(
+      path,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.1
+        ..strokeCap = StrokeCap.round
+        ..color = Color.lerp(
+          const Color(0xFFC8BDD3),
+          const Color(0xFFD9B9FF),
+          memory.sharedBreath,
+        )!
+            .withValues(alpha: .08 + reveal * .42)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2.4),
+    );
+  }
+
   @override
   bool shouldRepaint(covariant _CandlePainter old) =>
       old.isLit != isLit ||
@@ -1494,8 +2091,14 @@ class _CandlePainter extends CustomPainter {
       old.partnerWind != partnerWind ||
       old.sharedGlow != sharedGlow ||
       old.smokeProgress != smokeProgress ||
+      old.showSmokeMemory != showSmokeMemory ||
+      old.memory != memory ||
+      old.localShielded != localShielded ||
+      old.partnerShielded != partnerShielded ||
+      old.portalSide != portalSide ||
       old.candleImage != candleImage ||
       old.flameImage != flameImage ||
+      old.gpuFlameShader != gpuFlameShader ||
       old.style != style;
 }
 
@@ -1578,6 +2181,266 @@ class _CandleStylePicker extends StatelessWidget {
             );
           }).toList(growable: false),
         ),
+      ),
+    );
+  }
+}
+
+class _CandleActionChip extends StatelessWidget {
+  const _CandleActionChip({
+    super.key,
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.active = false,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  final bool active;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: active
+          ? AppColors.pulse.withValues(alpha: .28)
+          : const Color(0xFF211631).withValues(alpha: .82),
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 15, color: const Color(0xFFD9BCFF)),
+              const SizedBox(width: 7),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 126),
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CandleWishResult {
+  const _CandleWishResult({this.sealedWish, this.requestReveal = false});
+
+  final String? sealedWish;
+  final bool requestReveal;
+}
+
+class _CandleWishSheet extends StatefulWidget {
+  const _CandleWishSheet({
+    required this.memory,
+    required this.partnerSealed,
+    required this.partnerWish,
+  });
+
+  final CandleMemory memory;
+  final bool partnerSealed;
+  final String? partnerWish;
+
+  @override
+  State<_CandleWishSheet> createState() => _CandleWishSheetState();
+}
+
+class _CandleWishSheetState extends State<_CandleWishSheet> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context)!;
+    final hasWish = widget.memory.hasWish;
+    final partnerWish = widget.partnerWish;
+    return Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+      child: DecoratedBox(
+        decoration: const BoxDecoration(
+          color: Color(0xFF171020),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+        ),
+        child: SafeArea(
+          top: false,
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 42,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: .16),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.auto_awesome_rounded,
+                        color: Color(0xFFD7B3FF),
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        t.candleWish,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    t.candleWishHint,
+                    style: const TextStyle(
+                      color: AppColors.textMuted,
+                      fontSize: 13,
+                      height: 1.45,
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  if (!hasWish) ...[
+                    TextField(
+                      key: const ValueKey('candle-wish-field'),
+                      controller: _controller,
+                      autofocus: true,
+                      maxLength: 80,
+                      maxLines: 3,
+                      style: const TextStyle(color: Colors.white),
+                      decoration: InputDecoration(
+                        filled: true,
+                        fillColor: Colors.white.withValues(alpha: .055),
+                        hintText: t.candleWish,
+                        hintStyle: const TextStyle(color: AppColors.textMuted),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(18),
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    FilledButton(
+                      key: const ValueKey('candle-seal-wish'),
+                      onPressed: () {
+                        final value = _controller.text.trim();
+                        if (value.isEmpty) return;
+                        Navigator.pop(
+                          context,
+                          _CandleWishResult(sealedWish: value),
+                        );
+                      },
+                      child: Text(t.candleSealWish),
+                    ),
+                  ] else ...[
+                    _WishStatusLine(
+                      icon: Icons.lock_rounded,
+                      text: t.candleWishSealed,
+                    ),
+                    if (widget.partnerSealed)
+                      _WishStatusLine(
+                        icon: Icons.favorite_rounded,
+                        text: t.candlePartnerWishSealed,
+                      ),
+                    if (partnerWish != null) ...[
+                      const SizedBox(height: 16),
+                      Text(
+                        t.candlePartnerWish,
+                        style: const TextStyle(
+                          color: Color(0xFFD7B3FF),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        partnerWish,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 17,
+                          height: 1.4,
+                        ),
+                      ),
+                    ] else ...[
+                      const SizedBox(height: 16),
+                      FilledButton.tonal(
+                        key: const ValueKey('candle-reveal-wish'),
+                        onPressed: () => Navigator.pop(
+                          context,
+                          const _CandleWishResult(requestReveal: true),
+                        ),
+                        child: Text(t.candleRevealWish),
+                      ),
+                    ],
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _WishStatusLine extends StatelessWidget {
+  const _WishStatusLine({required this.icon, required this.text});
+
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 5),
+      child: Row(
+        children: [
+          Icon(icon, size: 16, color: const Color(0xFFD7B3FF)),
+          const SizedBox(width: 9),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 13,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

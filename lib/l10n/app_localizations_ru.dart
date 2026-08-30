@@ -372,7 +372,7 @@ class AppLocalizationsRu extends AppLocalizations {
   String get modeHalfHeart => 'Половина сердца';
 
   @override
-  String get modeCandle => 'Свечка';
+  String get modeCandle => 'Один огонь';
 
   @override
   String get modeWhisper => 'Шёпот';
@@ -453,10 +453,10 @@ class AppLocalizationsRu extends AppLocalizations {
   String get constellationHint => 'Касайся точек — подожди, чтобы соединить';
 
   @override
-  String get candleTouchHint => 'Коснись, чтобы зажечь свечу';
+  String get candleTouchHint => 'Коснитесь, чтобы зажечь огонь';
 
   @override
-  String get candleBlowHint => 'Подуй, чтобы погасить';
+  String get candleBlowHint => 'Дышите — огонь чувствует вас';
 
   @override
   String get candleCalibrating => 'Прислушиваемся к комнате…';
@@ -471,13 +471,62 @@ class AppLocalizationsRu extends AppLocalizations {
   String get candleSoundOff => 'Выключить звук свечи';
 
   @override
-  String get candleClassic => 'Классика';
+  String get candleClassic => 'Искра';
 
   @override
-  String get candleGlass => 'Стекло';
+  String get candleGlass => 'Вечер';
 
   @override
-  String get candleViolet => 'Фиолетовая';
+  String get candleViolet => 'Обещание';
+
+  @override
+  String get candlePromiseHint => 'Коснитесь вдвоём, чтобы зажечь';
+
+  @override
+  String get candleWaitingForPartner => 'Ждём прикосновения близкого…';
+
+  @override
+  String get candleShieldHint => 'Удерживайте ладонь, чтобы защитить огонь';
+
+  @override
+  String get candleWish => 'Желание';
+
+  @override
+  String get candleSealWish => 'Запечатать желание';
+
+  @override
+  String get candleWishHint =>
+      'Оно откроется, когда свеча догорит или вы оба решите раскрыть его';
+
+  @override
+  String get candleWishSealed => 'Ваше желание запечатано';
+
+  @override
+  String get candlePartnerWishSealed => 'Близкий тоже оставил желание';
+
+  @override
+  String get candleRevealWish => 'Раскрыть вместе';
+
+  @override
+  String get candleWaitingReveal => 'Ждём решения близкого…';
+
+  @override
+  String get candlePartnerWish => 'Желание близкого';
+
+  @override
+  String get candlePortal => 'Два экрана';
+
+  @override
+  String get candlePortalWaiting => 'Включите режим на втором телефоне';
+
+  @override
+  String get candlePortalReady =>
+      'Поставьте телефоны подсвеченными краями друг к другу';
+
+  @override
+  String candleMemory(int count) {
+    return 'Память огня · $count';
+  }
 
   @override
   String get breathInhale => 'вдох';

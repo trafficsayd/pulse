@@ -743,7 +743,7 @@ abstract class AppLocalizations {
   /// No description provided for @modeCandle.
   ///
   /// In en, this message translates to:
-  /// **'Candle'**
+  /// **'One Flame'**
   String get modeCandle;
 
   /// No description provided for @modeWhisper.
@@ -905,13 +905,13 @@ abstract class AppLocalizations {
   /// No description provided for @candleTouchHint.
   ///
   /// In en, this message translates to:
-  /// **'Touch to light the candle'**
+  /// **'Touch to light the flame'**
   String get candleTouchHint;
 
   /// No description provided for @candleBlowHint.
   ///
   /// In en, this message translates to:
-  /// **'Blow to extinguish'**
+  /// **'Breathe — the flame can feel you'**
   String get candleBlowHint;
 
   /// No description provided for @candleCalibrating.
@@ -941,20 +941,110 @@ abstract class AppLocalizations {
   /// No description provided for @candleClassic.
   ///
   /// In en, this message translates to:
-  /// **'Classic'**
+  /// **'Spark'**
   String get candleClassic;
 
   /// No description provided for @candleGlass.
   ///
   /// In en, this message translates to:
-  /// **'Glass'**
+  /// **'Evening'**
   String get candleGlass;
 
   /// No description provided for @candleViolet.
   ///
   /// In en, this message translates to:
-  /// **'Violet'**
+  /// **'Promise'**
   String get candleViolet;
+
+  /// No description provided for @candlePromiseHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Touch together to light it'**
+  String get candlePromiseHint;
+
+  /// No description provided for @candleWaitingForPartner.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for your close one\'s touch…'**
+  String get candleWaitingForPartner;
+
+  /// No description provided for @candleShieldHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Hold your palm to protect the flame'**
+  String get candleShieldHint;
+
+  /// No description provided for @candleWish.
+  ///
+  /// In en, this message translates to:
+  /// **'Wish'**
+  String get candleWish;
+
+  /// No description provided for @candleSealWish.
+  ///
+  /// In en, this message translates to:
+  /// **'Seal the wish'**
+  String get candleSealWish;
+
+  /// No description provided for @candleWishHint.
+  ///
+  /// In en, this message translates to:
+  /// **'It opens when the candle burns down or when you both choose to reveal it'**
+  String get candleWishHint;
+
+  /// No description provided for @candleWishSealed.
+  ///
+  /// In en, this message translates to:
+  /// **'Your wish is sealed'**
+  String get candleWishSealed;
+
+  /// No description provided for @candlePartnerWishSealed.
+  ///
+  /// In en, this message translates to:
+  /// **'Your close one left a wish too'**
+  String get candlePartnerWishSealed;
+
+  /// No description provided for @candleRevealWish.
+  ///
+  /// In en, this message translates to:
+  /// **'Reveal together'**
+  String get candleRevealWish;
+
+  /// No description provided for @candleWaitingReveal.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for your close one\'s choice…'**
+  String get candleWaitingReveal;
+
+  /// No description provided for @candlePartnerWish.
+  ///
+  /// In en, this message translates to:
+  /// **'Your close one\'s wish'**
+  String get candlePartnerWish;
+
+  /// No description provided for @candlePortal.
+  ///
+  /// In en, this message translates to:
+  /// **'Two screens'**
+  String get candlePortal;
+
+  /// No description provided for @candlePortalWaiting.
+  ///
+  /// In en, this message translates to:
+  /// **'Turn the mode on on the second phone'**
+  String get candlePortalWaiting;
+
+  /// No description provided for @candlePortalReady.
+  ///
+  /// In en, this message translates to:
+  /// **'Place the glowing edges of the phones together'**
+  String get candlePortalReady;
+
+  /// No description provided for @candleMemory.
+  ///
+  /// In en, this message translates to:
+  /// **'Flame memory · {count}'**
+  String candleMemory(int count);
 
   /// No description provided for @breathInhale.
   ///

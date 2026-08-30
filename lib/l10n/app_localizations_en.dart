@@ -370,7 +370,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get modeHalfHeart => 'Half-Heart';
 
   @override
-  String get modeCandle => 'Candle';
+  String get modeCandle => 'One Flame';
 
   @override
   String get modeWhisper => 'Whisper';
@@ -452,10 +452,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get constellationHint => 'Tap stars — wait to draw the lines';
 
   @override
-  String get candleTouchHint => 'Touch to light the candle';
+  String get candleTouchHint => 'Touch to light the flame';
 
   @override
-  String get candleBlowHint => 'Blow to extinguish';
+  String get candleBlowHint => 'Breathe — the flame can feel you';
 
   @override
   String get candleCalibrating => 'Listening to the room…';
@@ -470,13 +470,62 @@ class AppLocalizationsEn extends AppLocalizations {
   String get candleSoundOff => 'Turn candle sound off';
 
   @override
-  String get candleClassic => 'Classic';
+  String get candleClassic => 'Spark';
 
   @override
-  String get candleGlass => 'Glass';
+  String get candleGlass => 'Evening';
 
   @override
-  String get candleViolet => 'Violet';
+  String get candleViolet => 'Promise';
+
+  @override
+  String get candlePromiseHint => 'Touch together to light it';
+
+  @override
+  String get candleWaitingForPartner => 'Waiting for your close one\'s touch…';
+
+  @override
+  String get candleShieldHint => 'Hold your palm to protect the flame';
+
+  @override
+  String get candleWish => 'Wish';
+
+  @override
+  String get candleSealWish => 'Seal the wish';
+
+  @override
+  String get candleWishHint =>
+      'It opens when the candle burns down or when you both choose to reveal it';
+
+  @override
+  String get candleWishSealed => 'Your wish is sealed';
+
+  @override
+  String get candlePartnerWishSealed => 'Your close one left a wish too';
+
+  @override
+  String get candleRevealWish => 'Reveal together';
+
+  @override
+  String get candleWaitingReveal => 'Waiting for your close one\'s choice…';
+
+  @override
+  String get candlePartnerWish => 'Your close one\'s wish';
+
+  @override
+  String get candlePortal => 'Two screens';
+
+  @override
+  String get candlePortalWaiting => 'Turn the mode on on the second phone';
+
+  @override
+  String get candlePortalReady =>
+      'Place the glowing edges of the phones together';
+
+  @override
+  String candleMemory(int count) {
+    return 'Flame memory · $count';
+  }
 
   @override
   String get breathInhale => 'inhale';

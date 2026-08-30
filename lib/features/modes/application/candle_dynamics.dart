@@ -10,6 +10,9 @@ class CandleCharacter {
     required this.flickerAmount,
     required this.warmth,
     required this.crackle,
+    required this.burnRatePerSecond,
+    required this.shieldEfficiency,
+    required this.requiresSharedIgnition,
   });
 
   final double windResponse;
@@ -18,6 +21,9 @@ class CandleCharacter {
   final double flickerAmount;
   final double warmth;
   final double crackle;
+  final double burnRatePerSecond;
+  final double shieldEfficiency;
+  final bool requiresSharedIgnition;
 }
 
 extension CandleStyleCharacter on CandleStyle {
@@ -29,6 +35,9 @@ extension CandleStyleCharacter on CandleStyle {
             flickerAmount: .86,
             warmth: 1,
             crackle: .72,
+            burnRatePerSecond: 1 / 7200,
+            shieldEfficiency: .74,
+            requiresSharedIgnition: false,
           ),
         CandleStyle.glass => const CandleCharacter(
             windResponse: .82,
@@ -37,6 +46,9 @@ extension CandleStyleCharacter on CandleStyle {
             flickerAmount: .64,
             warmth: .94,
             crackle: .42,
+            burnRatePerSecond: 1 / 14400,
+            shieldEfficiency: .84,
+            requiresSharedIgnition: false,
           ),
         CandleStyle.violet => const CandleCharacter(
             windResponse: .68,
@@ -45,6 +57,9 @@ extension CandleStyleCharacter on CandleStyle {
             flickerAmount: .52,
             warmth: .76,
             crackle: .28,
+            burnRatePerSecond: 1 / 21600,
+            shieldEfficiency: .90,
+            requiresSharedIgnition: true,
           ),
       };
 }
@@ -152,10 +167,17 @@ class CandleForces {
     required double localPressure,
     required double partnerPressure,
     required CandleStyle style,
+    bool localShielded = false,
+    bool partnerShielded = false,
   }) {
     final character = style.character;
-    final local = localPressure.clamp(0.0, 1.0);
-    final partner = partnerPressure.clamp(0.0, 1.0);
+    final shieldCount = (localShielded ? 1 : 0) + (partnerShielded ? 1 : 0);
+    final shield = shieldCount == 0
+        ? 0.0
+        : (character.shieldEfficiency + (shieldCount - 1) * .07)
+            .clamp(0.0, .96);
+    final local = (localPressure * (1 - shield)).clamp(0.0, 1.0).toDouble();
+    final partner = (partnerPressure * (1 - shield)).clamp(0.0, 1.0).toDouble();
     final directional = (local - partner) * character.windResponse;
     final combined = (local + partner).clamp(0.0, 1.45);
     final collision = math.min(local, partner);
@@ -168,4 +190,116 @@ class CandleForces {
       heightScale: (1 - combined * .27 / character.stability).clamp(.54, 1.0),
     );
   }
+}
+
+/// A candle is not reset when the screen closes. This compact state is the
+/// physical memory of one pair: its height, wax history and sealed wish.
+class CandleMemory {
+  const CandleMemory({
+    required this.waxRemaining,
+    required this.sessions,
+    required this.totalBurnSeconds,
+    required this.signatureSeed,
+    required this.smokeSignature,
+    required this.sharedBreath,
+    this.sealedWish,
+    this.wishRevealed = false,
+  });
+
+  factory CandleMemory.fresh({required int seed}) => CandleMemory(
+        waxRemaining: 1,
+        sessions: 0,
+        totalBurnSeconds: 0,
+        signatureSeed: seed & 0x7fffffff,
+        smokeSignature: seed.abs() % 3,
+        sharedBreath: 0,
+      );
+
+  final double waxRemaining;
+  final int sessions;
+  final int totalBurnSeconds;
+  final int signatureSeed;
+  final int smokeSignature;
+  final double sharedBreath;
+  final String? sealedWish;
+  final bool wishRevealed;
+
+  bool get isSpent => waxRemaining <= .12;
+  bool get hasWish => sealedWish?.trim().isNotEmpty ?? false;
+
+  CandleMemory burn({
+    required Duration elapsed,
+    required CandleStyle style,
+    double localBreath = 0,
+    double partnerBreath = 0,
+  }) {
+    final seconds = math.max(0, elapsed.inMilliseconds / 1000);
+    final nextWax = math.max(
+      .08,
+      waxRemaining - seconds * style.character.burnRatePerSecond,
+    );
+    final shared = math.min(localBreath, partnerBreath);
+    return copyWith(
+      waxRemaining: nextWax,
+      totalBurnSeconds: totalBurnSeconds + seconds.round(),
+      sharedBreath: (sharedBreath * .92 + shared * .08).clamp(0.0, 1.0),
+    );
+  }
+
+  CandleMemory finishSession() {
+    final nextSessions = sessions + 1;
+    final mixed = signatureSeed ^
+        (nextSessions * 7919) ^
+        totalBurnSeconds ^
+        (sharedBreath * 1000).round();
+    return copyWith(
+      sessions: nextSessions,
+      smokeSignature: mixed.abs() % 3,
+    );
+  }
+
+  CandleMemory copyWith({
+    double? waxRemaining,
+    int? sessions,
+    int? totalBurnSeconds,
+    int? signatureSeed,
+    int? smokeSignature,
+    double? sharedBreath,
+    String? sealedWish,
+    bool? wishRevealed,
+  }) =>
+      CandleMemory(
+        waxRemaining: waxRemaining ?? this.waxRemaining,
+        sessions: sessions ?? this.sessions,
+        totalBurnSeconds: totalBurnSeconds ?? this.totalBurnSeconds,
+        signatureSeed: signatureSeed ?? this.signatureSeed,
+        smokeSignature: smokeSignature ?? this.smokeSignature,
+        sharedBreath: sharedBreath ?? this.sharedBreath,
+        sealedWish: sealedWish ?? this.sealedWish,
+        wishRevealed: wishRevealed ?? this.wishRevealed,
+      );
+
+  Map<String, Object?> toJson() => {
+        'wax': waxRemaining,
+        'sessions': sessions,
+        'burnSeconds': totalBurnSeconds,
+        'seed': signatureSeed,
+        'smoke': smokeSignature,
+        'sharedBreath': sharedBreath,
+        'wish': sealedWish,
+        'wishRevealed': wishRevealed,
+      };
+
+  factory CandleMemory.fromJson(Map<String, Object?> json) => CandleMemory(
+        waxRemaining: ((json['wax'] as num?)?.toDouble() ?? 1).clamp(.08, 1.0),
+        sessions: math.max(0, (json['sessions'] as num?)?.toInt() ?? 0),
+        totalBurnSeconds:
+            math.max(0, (json['burnSeconds'] as num?)?.toInt() ?? 0),
+        signatureSeed: (json['seed'] as num?)?.toInt() ?? 1,
+        smokeSignature: ((json['smoke'] as num?)?.toInt() ?? 0).clamp(0, 2),
+        sharedBreath:
+            ((json['sharedBreath'] as num?)?.toDouble() ?? 0).clamp(0.0, 1.0),
+        sealedWish: json['wish'] as String?,
+        wishRevealed: json['wishRevealed'] as bool? ?? false,
+      );
 }

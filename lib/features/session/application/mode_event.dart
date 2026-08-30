@@ -12,7 +12,7 @@ import 'dart:typed_data';
 /// Well-known event types:
 /// - `tap` — TapTap: `{x, y}`
 /// - `hold_start` / `hold_end` — HalfHeart
-/// - `candle_light` / `candle_blow` — Candle
+/// - `candle_*` — shared Candle ritual (light, breath, shield, wish, memory)
 /// - `whisper_level` — Whisper: `{level}`
 /// - `bell_ring` — Bell: `{intensity}`
 /// - `ray_point` / `ray_end` — Ray: `{x, y}`

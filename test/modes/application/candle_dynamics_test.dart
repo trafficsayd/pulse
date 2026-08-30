@@ -58,4 +58,44 @@ void main() {
       greaterThan(CandleStyle.classic.character.extinguishResistance),
     );
   });
+
+  test('a protecting palm strongly reduces shared wind forces', () {
+    final open = CandleForces.resolve(
+      localPressure: .8,
+      partnerPressure: .6,
+      style: CandleStyle.classic,
+    );
+    final protected = CandleForces.resolve(
+      localPressure: .8,
+      partnerPressure: .6,
+      style: CandleStyle.classic,
+      localShielded: true,
+    );
+    expect(protected.pressure, lessThan(open.pressure * .35));
+    expect(protected.turbulence, lessThan(open.turbulence));
+  });
+
+  test('wax memory burns gradually and survives serialization', () {
+    final fresh = CandleMemory.fresh(seed: 42).copyWith(
+      sealedWish: 'Stay close',
+    );
+    final burned = fresh
+        .burn(
+          elapsed: const Duration(minutes: 10),
+          style: CandleStyle.classic,
+          localBreath: .5,
+          partnerBreath: .4,
+        )
+        .finishSession();
+    final restored = CandleMemory.fromJson(burned.toJson());
+    expect(restored.waxRemaining, lessThan(1));
+    expect(restored.sessions, 1);
+    expect(restored.sealedWish, 'Stay close');
+    expect(restored.smokeSignature, inInclusiveRange(0, 2));
+  });
+
+  test('Promise candle requires both people to ignite it', () {
+    expect(CandleStyle.violet.character.requiresSharedIgnition, isTrue);
+    expect(CandleStyle.classic.character.requiresSharedIgnition, isFalse);
+  });
 }

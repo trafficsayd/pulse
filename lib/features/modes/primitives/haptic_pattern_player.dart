@@ -94,6 +94,37 @@ abstract final class HapticPatterns {
     HapticBeat(duration: Duration(milliseconds: 38), amplitude: 56),
   ]);
 
+  /// A soft rising surface under the palm while the shared flame is covered.
+  static const HapticPattern candleShield = HapticPattern([
+    HapticBeat(duration: Duration(milliseconds: 34), amplitude: 38),
+    HapticBeat(
+      duration: Duration(milliseconds: 62),
+      amplitude: 58,
+      gapAfter: Duration(milliseconds: 22),
+    ),
+    HapticBeat(duration: Duration(milliseconds: 86), amplitude: 42),
+  ]);
+
+  /// A private, delicate seal used for wishes rather than a button-like tap.
+  static const HapticPattern candleWish = HapticPattern([
+    HapticBeat(
+      duration: Duration(milliseconds: 26),
+      amplitude: 44,
+      gapAfter: Duration(milliseconds: 54),
+    ),
+    HapticBeat(duration: Duration(milliseconds: 38), amplitude: 64),
+  ]);
+
+  /// Two outward beats when the candle canvas is split across two phones.
+  static const HapticPattern candlePortal = HapticPattern([
+    HapticBeat(
+      duration: Duration(milliseconds: 38),
+      amplitude: 48,
+      gapAfter: Duration(milliseconds: 42),
+    ),
+    HapticBeat(duration: Duration(milliseconds: 54), amplitude: 72),
+  ]);
+
   /// A small rounded contact used for the user's own Shared Pulse touch.
   static const HapticPattern syncTouch = HapticPattern([
     HapticBeat(duration: Duration(milliseconds: 28), amplitude: 68),

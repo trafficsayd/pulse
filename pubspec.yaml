@@ -81,3 +81,6 @@ flutter:
     - assets/sounds/
     - assets/icons/
     - assets/candles/
+
+  shaders:
+    - shaders/candle_flame.frag

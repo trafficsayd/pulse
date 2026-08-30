@@ -39,6 +39,7 @@ class LocalNetworkTransport implements Transport {
   int? _listenPort;
   bool _disconnectRequested = false;
   bool _dialing = false;
+  Completer<bool>? _identityHandshake;
 
   /// Exponential backoff state for reconnection.
   int _reconnectAttempts = 0;
@@ -95,7 +96,18 @@ class LocalNetworkTransport implements Transport {
         host: reconnectTokens['localNetworkHost'],
         maxAttempts: 1,
       );
-      if (_socket == null && !_disconnectRequested) {
+      final handshake = _identityHandshake;
+      final verified = _connected ||
+          (handshake != null
+              ? await handshake.future.timeout(
+                  const Duration(milliseconds: 600),
+                  onTimeout: () => false,
+                )
+              : false);
+      if (!verified && !_disconnectRequested) {
+        // An unrelated process can own the deterministic port. Do not leave
+        // an unverified socket attached: advertise a fresh listener instead.
+        await _discardUnverifiedSocket();
         _server = await ServerSocket.bind(InternetAddress.anyIPv4, 0);
         _listenPort = _server!.port;
         debugPrint('[LAN] listening on fallback port $_listenPort');
@@ -141,6 +153,7 @@ class LocalNetworkTransport implements Transport {
     _server = null;
     await _socket?.close();
     _socket = null;
+    _identityHandshake = null;
     _reconnectAttempts = 0;
     _dialing = false;
     _state.add(TransportKind.searching);
@@ -150,10 +163,14 @@ class LocalNetworkTransport implements Transport {
   // Internals
   // ---------------------------------------------------------------------------
 
-  /// Deterministic port in the dynamic/private range: 49152 + (hash % 16384).
+  /// Deterministic port outside the OS ephemeral-client range.
+  ///
+  /// Windows normally allocates outbound sockets from 49152–65535. Using
+  /// that same range for our listeners caused intermittent collisions with
+  /// unrelated connections and made two local peers miss each other.
   static int _portFromToken(String token) {
     final hash = _hashToken(token);
-    return 49152 + (hash % 16384);
+    return 20000 + (hash % 12000);
   }
 
   static int _discoveryPortFromToken(String token) {
@@ -332,6 +349,7 @@ class LocalNetworkTransport implements Transport {
   /// Attach to an established socket — send identity, listen for data.
   void _attachSocket(Socket socket) {
     _socket = socket;
+    _identityHandshake = Completer<bool>();
     _reconnectAttempts = 0;
 
     // Send our identity token as the first line.
@@ -378,13 +396,19 @@ class LocalNetworkTransport implements Transport {
         final expected = _identityToken;
         if (expected != null && expected.isNotEmpty && peerToken != expected) {
           debugPrint('[LAN] peer identity mismatch — disconnecting');
-          unawaited(disconnect());
+          if (!(_identityHandshake?.isCompleted ?? true)) {
+            _identityHandshake?.complete(false);
+          }
+          unawaited(_discardUnverifiedSocket());
           return;
         }
         // Mark as connected after identity exchange.
         if (!_connected) {
           _connected = true;
           _state.add(TransportKind.localNetwork);
+        }
+        if (!(_identityHandshake?.isCompleted ?? true)) {
+          _identityHandshake?.complete(true);
         }
         return;
       }
@@ -410,10 +434,28 @@ class LocalNetworkTransport implements Transport {
     unawaited(_socketSub?.cancel());
     _socketSub = null;
     _socket = null;
+    if (!(_identityHandshake?.isCompleted ?? true)) {
+      _identityHandshake?.complete(false);
+    }
+    _identityHandshake = null;
     _reconnectAttempts = 0;
     // UDP discovery and the TCP listener remain armed. The elected dialer
     // reconnects on the next two-second announcement without app intervention.
     _announce();
+  }
+
+  Future<void> _discardUnverifiedSocket() async {
+    if (_connected) return;
+    final subscription = _socketSub;
+    final socket = _socket;
+    _socketSub = null;
+    _socket = null;
+    if (!(_identityHandshake?.isCompleted ?? true)) {
+      _identityHandshake?.complete(false);
+    }
+    _identityHandshake = null;
+    await subscription?.cancel();
+    await socket?.close();
   }
 
   /// Exponential backoff: 1s, 2s, 4s, 8s, 16s capped at 30s.

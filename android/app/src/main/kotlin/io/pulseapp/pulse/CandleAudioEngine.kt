@@ -19,6 +19,9 @@ internal class CandleAudioEngine(private val context: Context) {
     @Volatile private var running = false
     @Volatile private var style = 0
     @Volatile private var intensity = .5
+    @Volatile private var turbulence = 0.0
+    @Volatile private var ember = 0.0
+    @Volatile private var sharedHeat = 0.0
     @Volatile private var cue = 0
     private var audioThread: Thread? = null
     private var audioTrack: AudioTrack? = null
@@ -41,8 +44,11 @@ internal class CandleAudioEngine(private val context: Context) {
         cue = 1
     }
 
-    fun update(value: Double) {
+    fun update(value: Double, turbulence: Double, ember: Double, sharedHeat: Double) {
         intensity = value.coerceIn(0.0, 1.0)
+        this.turbulence = turbulence.coerceIn(0.0, 1.0)
+        this.ember = ember.coerceIn(0.0, 1.0)
+        this.sharedHeat = sharedHeat.coerceIn(0.0, 1.0)
     }
 
     fun extinguish() {
@@ -120,12 +126,18 @@ internal class CandleAudioEngine(private val context: Context) {
             for (index in samples.indices) {
                 val noise = random.nextDouble() * 2 - 1
                 bed = bed * .972 + noise * .028
-                if (random.nextDouble() < .00032 + styleCrackle * .00046) {
+                if (random.nextDouble() <
+                    .00024 + styleCrackle * .00042 + turbulence * .00058) {
                     crackle += (.28 + random.nextDouble() * .72) * styleCrackle
                 }
                 crackle *= .932
                 phase += 2 * PI * 43 / sampleRate
-                var value = bed * .012 + crackle * .046 + sin(phase) * .0016
+                val glassResonance = if (style == 1) sin(phase * 2.31) * .0018 else 0.0
+                val togetherTone = sin(phase * 1.47) * .0019 * sharedHeat
+                var value = bed * (.010 + turbulence * .014) +
+                    crackle * (.038 + turbulence * .020) +
+                    sin(phase) * .0015 + glassResonance + togetherTone +
+                    noise * .012 * ember
                 if (cueSamples > 0) {
                     val total = if (activeCue == 1) sampleRate / 5 else sampleRate * 3 / 4
                     val progress = 1.0 - cueSamples.toDouble() / total

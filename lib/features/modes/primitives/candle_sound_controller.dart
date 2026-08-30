@@ -14,8 +14,18 @@ abstract final class CandleSoundController {
   static Future<void> start(CandleStyle style, {double intensity = .5}) =>
       _invoke('start', {'style': style.index, 'intensity': intensity});
 
-  static Future<void> update(double intensity) =>
-      _invoke('update', {'intensity': intensity.clamp(0.0, 1.0)});
+  static Future<void> update({
+    required double intensity,
+    double turbulence = 0,
+    double ember = 0,
+    double sharedHeat = 0,
+  }) =>
+      _invoke('update', {
+        'intensity': intensity.clamp(0.0, 1.0),
+        'turbulence': turbulence.clamp(0.0, 1.0),
+        'ember': ember.clamp(0.0, 1.0),
+        'sharedHeat': sharedHeat.clamp(0.0, 1.0),
+      });
 
   static Future<void> extinguish() => _invoke('extinguish');
 

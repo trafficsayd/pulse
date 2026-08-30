@@ -171,6 +171,7 @@
   "constellationHint": "Касайся точек — подожди, чтобы соединить",
   "candleTouchHint": "Коснитесь, чтобы зажечь огонь",
   "candleBlowHint": "Дышите — огонь чувствует вас",
+  "candleGestureBreathHint": "Проведите рядом с огнём — он чувствует ваше дыхание",
   "candleCalibrating": "Прислушиваемся к комнате…",
   "candleTogether": "ВЫ ЗАЖГЛИ ЕЁ ВМЕСТЕ",
   "candleSoundOn": "Включить звук свечи",

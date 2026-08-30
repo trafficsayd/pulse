@@ -914,6 +914,12 @@ abstract class AppLocalizations {
   /// **'Breathe — the flame can feel you'**
   String get candleBlowHint;
 
+  /// No description provided for @candleGestureBreathHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Swipe beside the flame — it can feel your breath'**
+  String get candleGestureBreathHint;
+
   /// No description provided for @candleCalibrating.
   ///
   /// In en, this message translates to:

@@ -105,6 +105,22 @@ abstract final class HapticPatterns {
     HapticBeat(duration: Duration(milliseconds: 86), amplitude: 42),
   ]);
 
+  /// Slow, low-amplitude warmth while both people protect the same flame.
+  /// It is deliberately sparse so a long shared hold never becomes a buzz.
+  static const HapticPattern candleBridge = HapticPattern([
+    HapticBeat(
+      duration: Duration(milliseconds: 72),
+      amplitude: 34,
+      gapAfter: Duration(milliseconds: 76),
+    ),
+    HapticBeat(
+      duration: Duration(milliseconds: 104),
+      amplitude: 52,
+      gapAfter: Duration(milliseconds: 82),
+    ),
+    HapticBeat(duration: Duration(milliseconds: 132), amplitude: 38),
+  ]);
+
   /// A private, delicate seal used for wishes rather than a button-like tap.
   static const HapticPattern candleWish = HapticPattern([
     HapticBeat(

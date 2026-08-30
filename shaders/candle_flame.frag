@@ -8,6 +8,10 @@ uniform float uPressure;
 uniform float uWarmth;
 uniform float uSharedGlow;
 uniform float uLit;
+uniform float uEnergy;
+uniform float uTurbulence;
+uniform float uCoreTemperature;
+uniform float uEmber;
 uniform sampler2D uFlameTexture;
 
 out vec4 fragColor;
@@ -29,11 +33,13 @@ void main() {
   vec2 frag = FlutterFragCoord().xy;
   vec2 p = frag - uWick;
   float rise = -p.y;
-  float height = mix(57.0, 32.0, clamp(uPressure, 0.0, 1.0));
+  float height = mix(57.0, 32.0, clamp(uPressure, 0.0, 1.0)) *
+      mix(0.80, 1.04, clamp(uEnergy, 0.0, 1.0));
 
   float gust = uLean * (0.25 + uPressure * 0.18) * rise;
   float living = (noise(vec2(rise * 0.075, uTime * 1.8)) - 0.5) *
-      (2.4 + uPressure * 6.0) * (rise / max(height, 1.0));
+      (2.4 + uPressure * 6.0 + uTurbulence * 3.2) *
+      (rise / max(height, 1.0));
   float centerX = gust + living;
 
   // A flame grows out of a narrow root, swells above the wick and returns to
@@ -75,7 +81,10 @@ void main() {
       step(0.0, flameUv.y) * step(flameUv.y, 1.0);
   vec4 photographed = texture(uFlameTexture, clamp(flameUv, 0.0, 1.0));
   float photographedBody = photographed.a * inTexture;
-  float body = max(max(shell * 0.24, photographedBody), root) * uLit;
+  float texturedShell = shell * 0.10 *
+      smoothstep(0.006, 0.18, photographedBody);
+  float body = max(max(texturedShell, photographedBody), root) * uLit *
+      clamp(uEnergy, 0.0, 1.1);
 
   // Temperature is continuous across the same shell distance field. There
   // is no separate inner silhouette, so the eye reads one volume rather than
@@ -95,7 +104,8 @@ void main() {
       (1.0 - uWarmth) * 0.55);
   vec3 middle = mix(outer, vec3(1.0, 0.72, 0.18), 0.64);
   vec3 flame = mix(outer, middle, clamp(0.18 + centerHeat * 0.68, 0.0, 1.0));
-  flame = mix(flame, vec3(1.0, 0.86, 0.32), hottest * 0.16);
+  flame = mix(flame, vec3(1.0, 0.98, 0.76),
+      hottest * mix(0.08, 0.34, clamp(uCoreTemperature, 0.0, 1.0)));
   flame = mix(flame, vec3(0.32, 0.48, 0.94), blueBase * 0.34);
   vec3 photographedColor = photographed.a > 0.001
       ? photographed.rgb / photographed.a
@@ -106,7 +116,8 @@ void main() {
   vec2 glowDelta = frag - (uWick + vec2(centerX * 0.35, -height * 0.42));
   float glowRadius = 74.0 + uSharedGlow * 24.0;
   float glow = exp(-dot(glowDelta, glowDelta) / (glowRadius * glowRadius)) *
-      (0.20 + uSharedGlow * 0.12) * uLit;
+      (0.20 + uSharedGlow * 0.12) * uLit *
+      mix(0.18, 1.0, clamp(uEnergy, 0.0, 1.0));
   vec3 glowColor = mix(vec3(1.0, 0.38, 0.08), vec3(0.72, 0.32, 1.0),
       (1.0 - uWarmth) * 0.5);
   float contactGlow = exp(-dot(p / vec2(18.0, 9.0), p / vec2(18.0, 9.0))) *
@@ -114,5 +125,6 @@ void main() {
   float alpha = clamp(body + glow * 0.52 + contactGlow * 0.35, 0.0, 1.0);
   vec3 color = flame * body + glowColor * glow;
   color += vec3(1.0, 0.34, 0.08) * contactGlow;
+  color += vec3(1.0, 0.12, 0.02) * uEmber * contactGlow * 0.18;
   fragColor = vec4(color, alpha);
 }

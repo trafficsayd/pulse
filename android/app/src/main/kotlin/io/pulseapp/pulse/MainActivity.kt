@@ -140,10 +140,18 @@ class MainActivity : FlutterActivity() {
                 val arguments = call.arguments as? Map<*, *>
                 val style = (arguments?.get("style") as? Number)?.toInt() ?: 0
                 val intensity = (arguments?.get("intensity") as? Number)?.toDouble() ?: .5
+                val turbulence = (arguments?.get("turbulence") as? Number)?.toDouble() ?: 0.0
+                val ember = (arguments?.get("ember") as? Number)?.toDouble() ?: 0.0
+                val sharedHeat = (arguments?.get("sharedHeat") as? Number)?.toDouble() ?: 0.0
                 when (call.method) {
                     "ignite" -> candleAudioEngine?.ignite(style)
                     "start" -> candleAudioEngine?.start(style, intensity)
-                    "update" -> candleAudioEngine?.update(intensity)
+                    "update" -> candleAudioEngine?.update(
+                        intensity,
+                        turbulence,
+                        ember,
+                        sharedHeat,
+                    )
                     "extinguish" -> candleAudioEngine?.extinguish()
                     "stop" -> candleAudioEngine?.stop()
                     else -> {

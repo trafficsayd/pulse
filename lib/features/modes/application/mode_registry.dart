@@ -206,7 +206,11 @@ PulseModeDescriptor? findMode(PulseModeId id) {
 PulseModeId? modeForEventType(String type) => switch (type) {
       'tap' => PulseModeId.tapTap,
       'hold_start' || 'hold_end' => PulseModeId.halfHeart,
-      'candle_light' || 'candle_blow' || 'candle_wish' => PulseModeId.candle,
+      'candle_light' ||
+      'candle_blow' ||
+      'candle_motion' ||
+      'candle_wish' =>
+        PulseModeId.candle,
       'whisper_level' => PulseModeId.whisper,
       'bell_ring' => PulseModeId.bell,
       'ray_point' ||

@@ -33,6 +33,7 @@ migrate_working_dir/
 .pub/
 /build/
 coverage/
+/artifacts/
 
 # Local machine / Flutter-generated platform files
 android/local.properties

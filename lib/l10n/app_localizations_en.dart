@@ -458,6 +458,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get candleBlowHint => 'Breathe — the flame can feel you';
 
   @override
+  String get candleGestureBreathHint =>
+      'Swipe beside the flame — it can feel your breath';
+
+  @override
   String get candleCalibrating => 'Listening to the room…';
 
   @override

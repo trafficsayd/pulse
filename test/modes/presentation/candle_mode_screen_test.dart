@@ -15,6 +15,69 @@ import 'package:pulse/features/session/application/mode_event_bus.dart';
 import 'package:pulse/l10n/app_localizations.dart';
 
 void main() {
+  testWidgets('works without a microphone using a breath gesture',
+      (tester) async {
+    final incoming = StreamController<ModeEvent>.broadcast();
+    final sent = <ModeEvent>[];
+    final bus = ModeEventBus.testing(
+      incoming.stream,
+      onSend: sent.add,
+    );
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          capabilityDetectorProvider.overrideWithValue(
+            const FakeCapabilityDetector({}),
+          ),
+          modeEventBusProvider.overrideWithValue(bus),
+        ],
+        child: const MaterialApp(
+          localizationsDelegates: [
+            AppLocalizations.delegate,
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: CandleModeScreen(
+            hapticEngine: NullHapticEngine(),
+            calibrationDuration: Duration.zero,
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.text('Touch to light the flame'), findsOneWidget);
+    await tester.tapAt(const Offset(200, 360));
+    await tester.pump();
+    expect(
+      find.text('Swipe beside the flame — it can feel your breath'),
+      findsOneWidget,
+    );
+    await tester.dragFrom(
+      const Offset(80, 360),
+      const Offset(180, 0),
+      touchSlopY: 0,
+    );
+    await tester.pump();
+    expect(sent.any((event) => event.type == 'candle_blow'), isTrue);
+    for (var i = 0; i < 3; i++) {
+      await tester.dragFrom(
+        const Offset(80, 360),
+        const Offset(220, 0),
+        touchSlopY: 0,
+      );
+      await tester.pump();
+    }
+    expect(find.text('Touch to light the flame'), findsOneWidget);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(seconds: 1));
+    await incoming.close();
+  });
+
   testWidgets('weak breath bends the flame without extinguishing it',
       (tester) async {
     final mic = FakeMicLevelStream();
@@ -182,6 +245,45 @@ void main() {
     expect(
       find.text('Place the glowing edges of the phones together'),
       findsOneWidget,
+    );
+
+    await _finish(tester, mic);
+    await incoming.close();
+  });
+
+  testWidgets('restores a lit shared candle from a partner snapshot',
+      (tester) async {
+    final mic = FakeMicLevelStream();
+    final sent = <ModeEvent>[];
+    final incoming = StreamController<ModeEvent>();
+    final bus = ModeEventBus.testing(incoming.stream, onSend: sent.add);
+    await _pump(tester, mic, bus: bus);
+
+    expect(find.text('Touch to light the flame'), findsOneWidget);
+    expect(
+      sent.any((event) => event.type == 'candle_state_request'),
+      isTrue,
+    );
+
+    incoming.add(const ModeEvent(
+      type: 'candle_state',
+      data: {
+        'style': 1,
+        'lit': true,
+        'energy': .72,
+        'wickTemperature': .84,
+        'moltenWax': .31,
+      },
+    ));
+    await tester.pump(const Duration(milliseconds: 150));
+    expect(find.text('Breathe — the flame can feel you'), findsOneWidget);
+
+    incoming.add(const ModeEvent(type: 'candle_state_request'));
+    await tester.pump();
+    expect(
+      sent.any(
+          (event) => event.type == 'candle_state' && event.data['lit'] == true),
+      isTrue,
     );
 
     await _finish(tester, mic);

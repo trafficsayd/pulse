@@ -459,6 +459,10 @@ class AppLocalizationsRu extends AppLocalizations {
   String get candleBlowHint => 'Дышите — огонь чувствует вас';
 
   @override
+  String get candleGestureBreathHint =>
+      'Проведите рядом с огнём — он чувствует ваше дыхание';
+
+  @override
   String get candleCalibrating => 'Прислушиваемся к комнате…';
 
   @override

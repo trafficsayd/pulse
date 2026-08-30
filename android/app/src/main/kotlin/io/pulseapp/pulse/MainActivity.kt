@@ -9,6 +9,7 @@ import android.bluetooth.le.AdvertiseSettings
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
 import android.media.AudioFormat
@@ -18,6 +19,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.ParcelUuid
+import android.provider.Settings
 import android.util.Log
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -158,6 +160,9 @@ class MainActivity : FlutterActivity() {
                     "notificationsEnabled" -> {
                         result.success(LockscreenRayNotifier.notificationsEnabled(this))
                     }
+                    "lockscreenPresentationReady" -> {
+                        result.success(LockscreenRayNotifier.presentationReady(this))
+                    }
                     "requestNotifications" -> requestNotificationPermission(result)
                     "setConnectionKeepAlive" -> {
                         val enabled = call.arguments as? Boolean ?: false
@@ -188,11 +193,11 @@ class MainActivity : FlutterActivity() {
 
     private fun requestNotificationPermission(result: MethodChannel.Result) {
         if (LockscreenRayNotifier.notificationsEnabled(this)) {
-            result.success(true)
+            requestFullScreenIntentAccess(result)
             return
         }
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
-            result.success(true)
+            requestFullScreenIntentAccess(result)
             return
         }
         pendingNotificationResult?.error(
@@ -205,6 +210,25 @@ class MainActivity : FlutterActivity() {
             arrayOf(Manifest.permission.POST_NOTIFICATIONS),
             NOTIFICATION_PERMISSION_REQUEST,
         )
+    }
+
+    private fun requestFullScreenIntentAccess(result: MethodChannel.Result) {
+        if (LockscreenRayNotifier.fullScreenIntentEnabled(this)) {
+            result.success(true)
+            return
+        }
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            result.success(true)
+            return
+        }
+        val settingsIntent = Intent(
+            Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT,
+            Uri.parse("package:$packageName"),
+        )
+        runCatching { startActivity(settingsIntent) }
+        // The system setting is intentionally user-controlled. Flutter
+        // refreshes the actual readiness state when the app resumes.
+        result.success(false)
     }
 
     private fun startMicOrRequestPermission() {
@@ -380,7 +404,11 @@ class MainActivity : FlutterActivity() {
             NOTIFICATION_PERMISSION_REQUEST -> {
                 val result = pendingNotificationResult
                 pendingNotificationResult = null
-                result?.success(granted && LockscreenRayNotifier.notificationsEnabled(this))
+                if (granted && LockscreenRayNotifier.notificationsEnabled(this)) {
+                    result?.let(::requestFullScreenIntentAccess)
+                } else {
+                    result?.success(false)
+                }
             }
         }
     }

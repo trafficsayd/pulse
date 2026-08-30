@@ -21,19 +21,34 @@ class SettingsScreen extends ConsumerStatefulWidget {
   ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
 }
 
-class _SettingsScreenState extends ConsumerState<SettingsScreen> {
+class _SettingsScreenState extends ConsumerState<SettingsScreen>
+    with WidgetsBindingObserver {
   bool _notifications = false;
   bool _crashReports = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _checkPermissions();
     _loadNotificationStatus();
   }
 
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _loadNotificationStatus();
+    }
+  }
+
   Future<void> _loadNotificationStatus() async {
-    final enabled = await LockscreenRayBridge.notificationsEnabled();
+    final enabled = await LockscreenRayBridge.presentationReady();
     if (mounted) setState(() => _notifications = enabled);
   }
 
@@ -45,8 +60,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       await _loadNotificationStatus();
       return;
     }
-    final granted = await LockscreenRayBridge.requestNotifications();
-    if (mounted) setState(() => _notifications = granted);
+    await LockscreenRayBridge.requestNotifications();
+    await _loadNotificationStatus();
   }
 
   // Real permission status map: true = granted.

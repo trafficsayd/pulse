@@ -22,5 +22,10 @@ Acceptance flow:
 7. Repeat in normal idle and forced deep Doze, with notifications allowed and
    denied, and record the OEM/battery-policy outcome.
 
-Status: reproduced by user on a physical device; pending device-specific
-diagnosis and regression test against the latest APK.
+Status: fixed in source and verified on the Android 14 emulator. The native
+Ray bridge now treats both a locked keyguard and a non-interactive (fully
+dark) display as presentation states, uses a bounded 15-second wake-up while
+the secure Ray Activity opens, and keeps the canvas visible during the live
+interaction. Verified for the first live point, a completed card, PIN
+keyguard preservation after closing, and forced deep Doze. Physical OEM
+verification remains required before release.

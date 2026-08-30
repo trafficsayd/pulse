@@ -50,6 +50,20 @@ abstract final class LockscreenRayBridge {
     }
   }
 
+  static Future<bool> presentationReady() async {
+    try {
+      return await _channel.invokeMethod<bool>(
+            'lockscreenPresentationReady',
+          ) ??
+          false;
+    } on MissingPluginException {
+      return false;
+    } on PlatformException catch (error) {
+      debugPrint('Lock-screen presentation check failed: ${error.code}');
+      return false;
+    }
+  }
+
   static Future<bool> requestNotifications() async {
     try {
       return await _channel.invokeMethod<bool>('requestNotifications') ?? false;

@@ -7,5 +7,13 @@
     <!-- Debug-only: allow cleartext HTTP so the app can talk to local
          `wrangler dev` on http://127.0.0.1:8787 via `adb reverse` without a TLS
          cert. Release builds keep the default (cleartext blocked). -->
-    <application android:usesCleartextTraffic="true"/>
+    <application android:usesCleartextTraffic="true">
+        <receiver
+            android:name=".LockscreenRayDebugReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="io.pulseapp.pulse.DEBUG_RAY_EVENT" />
+            </intent-filter>
+        </receiver>
+    </application>
 </manifest>

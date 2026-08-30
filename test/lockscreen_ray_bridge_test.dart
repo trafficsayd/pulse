@@ -15,6 +15,7 @@ void main() {
       calls.add(call);
       return switch (call.method) {
         'notificationsEnabled' => true,
+        'lockscreenPresentationReady' => true,
         'requestNotifications' => true,
         _ => null,
       };
@@ -66,12 +67,14 @@ void main() {
 
   test('reports and requests native notification permission', () async {
     expect(await LockscreenRayBridge.notificationsEnabled(), isTrue);
+    expect(await LockscreenRayBridge.presentationReady(), isTrue);
     expect(await LockscreenRayBridge.requestNotifications(), isTrue);
     await LockscreenRayBridge.setConnectionKeepAlive(true);
     expect(
       calls.map((call) => call.method),
       [
         'notificationsEnabled',
+        'lockscreenPresentationReady',
         'requestNotifications',
         'setConnectionKeepAlive',
       ],

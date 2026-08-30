@@ -55,6 +55,12 @@ android {
     }
 
     buildTypes {
+        debug {
+            // Keep the QA build beside the signed app so emulator tests never
+            // overwrite saved pairs or other release data.
+            applicationIdSuffix ".debug"
+            versionNameSuffix "-debug"
+        }
         release {
             // Use the release keystore if key.properties is configured;
             // otherwise fall back to debug keys so local builds still work.

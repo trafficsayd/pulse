@@ -19,6 +19,7 @@ import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.os.Bundle
+import android.os.PowerManager
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
@@ -31,6 +32,8 @@ import kotlin.math.max
 
 private const val LOCKSCREEN_NOTIFICATION_CHANNEL = "pulse_lockscreen_ray"
 private const val LOCKSCREEN_NOTIFICATION_ID = 7319
+private const val LOCKSCREEN_WAKE_TIMEOUT_MS = 15_000L
+private const val LOCKSCREEN_WAKE_TAG = "pulse:ray-lock-screen"
 
 internal data class NormalizedPoint(val x: Float, val y: Float)
 
@@ -90,9 +93,20 @@ internal object LockscreenRayController {
         currentActivity?.refreshSnapshot()
 
         val keyguard = context.getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
+        val power = context.getSystemService(Context.POWER_SERVICE) as PowerManager
         val locked = keyguard.isKeyguardLocked
-        if (locked) {
+        val screenOff = !power.isInteractive
+        if (locked || screenOff) {
+            // Do this even if Android has not delivered onPause yet: there is
+            // a short race after the power button where the Activity can
+            // still be marked visible while the display is already dark.
+            if (screenOff) LockscreenRayWakeController.wakeForIncoming(context)
             if (currentActivity == null || !activityVisible) {
+                // A dark display is not necessarily reported as a locked
+                // keyguard (for example during the lock-after-screen-timeout
+                // grace period). Wake it explicitly before requesting the
+                // keyguard-safe Activity, otherwise the first live points can
+                // arrive while the phone remains completely black.
                 LockscreenRayNotifier.show(
                     context,
                     eventType == "ray_card" || eventType == "ray_end",
@@ -212,6 +226,46 @@ internal object LockscreenRayController {
     }
 }
 
+/**
+ * Short, bounded display wake-up used only for an incoming Ray interaction.
+ *
+ * [Activity.setTurnScreenOn] remains the primary API. The wake lock closes
+ * the gap before Android creates the full-screen Activity and also covers
+ * OEMs that delay full-screen notification delivery while the display is
+ * fully off. It expires automatically even if an OEM refuses the launch.
+ */
+internal object LockscreenRayWakeController {
+    private var wakeLock: PowerManager.WakeLock? = null
+
+    @Suppress("DEPRECATION")
+    fun wakeForIncoming(context: Context) {
+        val power = context.getSystemService(Context.POWER_SERVICE) as PowerManager
+        if (power.isInteractive) return
+        synchronized(this) {
+            runCatching {
+                val lock = wakeLock ?: power.newWakeLock(
+                    PowerManager.SCREEN_BRIGHT_WAKE_LOCK or
+                        PowerManager.ACQUIRE_CAUSES_WAKEUP or
+                        PowerManager.ON_AFTER_RELEASE,
+                    LOCKSCREEN_WAKE_TAG,
+                ).also {
+                    it.setReferenceCounted(false)
+                    wakeLock = it
+                }
+                if (!lock.isHeld) lock.acquire(LOCKSCREEN_WAKE_TIMEOUT_MS)
+            }
+        }
+    }
+
+    fun release() {
+        synchronized(this) {
+            runCatching {
+                wakeLock?.takeIf { it.isHeld }?.release()
+            }
+        }
+    }
+}
+
 /** Store-safe fallback when an OEM blocks background activity launches. */
 internal object LockscreenRayNotifier {
     fun notificationsEnabled(context: Context): Boolean {
@@ -221,6 +275,15 @@ internal object LockscreenRayNotifier {
             android.content.pm.PackageManager.PERMISSION_GRANTED
         return runtimeGranted && manager.areNotificationsEnabled()
     }
+
+    fun fullScreenIntentEnabled(context: Context): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) return true
+        val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        return manager.canUseFullScreenIntent()
+    }
+
+    fun presentationReady(context: Context): Boolean =
+        notificationsEnabled(context) && fullScreenIntentEnabled(context)
 
     fun show(context: Context, includePreview: Boolean) {
         if (!notificationsEnabled(context)) return
@@ -249,8 +312,10 @@ internal object LockscreenRayNotifier {
             .setCategory(Notification.CATEGORY_MESSAGE)
             .setVisibility(Notification.VISIBILITY_PUBLIC)
             .setPriority(Notification.PRIORITY_HIGH)
+            .setDefaults(Notification.DEFAULT_ALL)
             .setContentIntent(pending)
             .setAutoCancel(true)
+            .setTimeoutAfter(30_000L)
             .setOnlyAlertOnce(!includePreview)
             .setFullScreenIntent(pending, true)
 
@@ -281,6 +346,7 @@ internal object LockscreenRayNotifier {
             }
             lockscreenVisibility = Notification.VISIBILITY_PUBLIC
             enableVibration(true)
+            enableLights(true)
         }
         manager.createNotificationChannel(channel)
     }
@@ -303,7 +369,10 @@ class LockscreenRayActivity : Activity() {
                     WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON,
             )
         }
-        window.addFlags(WindowManager.LayoutParams.FLAG_ALLOW_LOCK_WHILE_SCREEN_ON)
+        window.addFlags(
+            WindowManager.LayoutParams.FLAG_ALLOW_LOCK_WHILE_SCREEN_ON or
+                WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON,
+        )
         window.statusBarColor = Color.TRANSPARENT
         window.navigationBarColor = Color.BLACK
         @Suppress("DEPRECATION")
@@ -322,6 +391,7 @@ class LockscreenRayActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
+        LockscreenRayWakeController.wakeForIncoming(this)
         LockscreenRayController.attach(this)
         LockscreenRayController.setVisible(this, true)
         LockscreenRayNotifier.cancel(this)
@@ -335,6 +405,7 @@ class LockscreenRayActivity : Activity() {
 
     override fun onDestroy() {
         LockscreenRayController.detach(this)
+        LockscreenRayWakeController.release()
         super.onDestroy()
     }
 

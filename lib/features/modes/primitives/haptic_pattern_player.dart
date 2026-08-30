@@ -94,6 +94,54 @@ abstract final class HapticPatterns {
     HapticBeat(duration: Duration(milliseconds: 38), amplitude: 56),
   ]);
 
+  /// A small rounded contact used for the user's own Shared Pulse touch.
+  static const HapticPattern syncTouch = HapticPattern([
+    HapticBeat(duration: Duration(milliseconds: 28), amplitude: 68),
+  ]);
+
+  /// The partner's touch arriving as a slightly softer echo.
+  static const HapticPattern syncEcho = HapticPattern([
+    HapticBeat(duration: Duration(milliseconds: 42), amplitude: 52),
+  ]);
+
+  /// Gentle lub-dub when the two taps land inside the current window.
+  static const HapticPattern syncNear = HapticPattern([
+    HapticBeat(
+      duration: Duration(milliseconds: 42),
+      amplitude: 92,
+      gapAfter: Duration(milliseconds: 64),
+    ),
+    HapticBeat(duration: Duration(milliseconds: 30), amplitude: 62),
+  ]);
+
+  /// Quiet metronome felt only after the pair has started converging.
+  static const HapticPattern syncGuide = HapticPattern([
+    HapticBeat(duration: Duration(milliseconds: 24), amplitude: 38),
+  ]);
+
+  /// A sustained wave sent by holding the shared canvas.
+  static const HapticPattern syncHold = HapticPattern([
+    HapticBeat(duration: Duration(milliseconds: 70), amplitude: 42),
+    HapticBeat(duration: Duration(milliseconds: 110), amplitude: 76),
+    HapticBeat(duration: Duration(milliseconds: 150), amplitude: 108),
+    HapticBeat(duration: Duration(milliseconds: 120), amplitude: 66),
+  ]);
+
+  /// Full, symmetrical culmination when both rhythms become one.
+  static const HapticPattern syncTogether = HapticPattern([
+    HapticBeat(
+      duration: Duration(milliseconds: 76),
+      amplitude: 170,
+      gapAfter: Duration(milliseconds: 86),
+    ),
+    HapticBeat(
+      duration: Duration(milliseconds: 58),
+      amplitude: 118,
+      gapAfter: Duration(milliseconds: 190),
+    ),
+    HapticBeat(duration: Duration(milliseconds: 110), amplitude: 82),
+  ]);
+
   /// Triple-tap ack. Used for sneak-in acknowledged.
   static const HapticPattern triple = HapticPattern([
     HapticBeat(

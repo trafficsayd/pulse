@@ -408,7 +408,25 @@ class AppLocalizationsRu extends AppLocalizations {
   String get modeBreath => 'Дыхание';
 
   @override
-  String get modeSync => 'Синхро';
+  String get modeSync => 'Общий пульс';
+
+  @override
+  String get syncHintStart => 'Коснитесь экранов в одном ритме';
+
+  @override
+  String get syncHintListen => 'Слушайте ритм друг друга';
+
+  @override
+  String get syncHintCloser => 'Ваши ритмы сближаются';
+
+  @override
+  String get syncHintAlmost => 'Ещё немного';
+
+  @override
+  String get syncTogether => 'ВЫ ЧУВСТВУЕТЕ ОДИН РИТМ';
+
+  @override
+  String get syncHoldHint => 'Удерживайте экран, чтобы передать волну';
 
   @override
   String get tapTapHint => 'Коснитесь, чтобы постучать';

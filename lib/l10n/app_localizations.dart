@@ -815,8 +815,44 @@ abstract class AppLocalizations {
   /// No description provided for @modeSync.
   ///
   /// In en, this message translates to:
-  /// **'Sync'**
+  /// **'Shared Pulse'**
   String get modeSync;
+
+  /// No description provided for @syncHintStart.
+  ///
+  /// In en, this message translates to:
+  /// **'Touch both screens in the same rhythm'**
+  String get syncHintStart;
+
+  /// No description provided for @syncHintListen.
+  ///
+  /// In en, this message translates to:
+  /// **'Listen to each other\'s rhythm'**
+  String get syncHintListen;
+
+  /// No description provided for @syncHintCloser.
+  ///
+  /// In en, this message translates to:
+  /// **'Your rhythms are moving closer'**
+  String get syncHintCloser;
+
+  /// No description provided for @syncHintAlmost.
+  ///
+  /// In en, this message translates to:
+  /// **'Almost there'**
+  String get syncHintAlmost;
+
+  /// No description provided for @syncTogether.
+  ///
+  /// In en, this message translates to:
+  /// **'YOU FEEL ONE RHYTHM'**
+  String get syncTogether;
+
+  /// No description provided for @syncHoldHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Hold the screen to send a wave'**
+  String get syncHoldHint;
 
   /// No description provided for @tapTapHint.
   ///

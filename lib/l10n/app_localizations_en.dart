@@ -406,7 +406,25 @@ class AppLocalizationsEn extends AppLocalizations {
   String get modeBreath => 'Breath';
 
   @override
-  String get modeSync => 'Sync';
+  String get modeSync => 'Shared Pulse';
+
+  @override
+  String get syncHintStart => 'Touch both screens in the same rhythm';
+
+  @override
+  String get syncHintListen => 'Listen to each other\'s rhythm';
+
+  @override
+  String get syncHintCloser => 'Your rhythms are moving closer';
+
+  @override
+  String get syncHintAlmost => 'Almost there';
+
+  @override
+  String get syncTogether => 'YOU FEEL ONE RHYTHM';
+
+  @override
+  String get syncHoldHint => 'Hold the screen to send a wave';
 
   @override
   String get tapTapHint => 'Tap to knock';

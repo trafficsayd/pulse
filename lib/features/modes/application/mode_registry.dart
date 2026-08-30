@@ -223,7 +223,7 @@ PulseModeId? modeForEventType(String type) => switch (type) {
       'balance_ball' => PulseModeId.balance,
       'sandbox_particle' => PulseModeId.sandbox,
       'breath_level' => PulseModeId.breath,
-      'sync_tap' => PulseModeId.sync,
+      'sync_tap' || 'sync_hold' => PulseModeId.sync,
       _ => null,
     };
 

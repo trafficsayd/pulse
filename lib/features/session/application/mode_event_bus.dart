@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'mode_event.dart';
@@ -21,14 +20,18 @@ import 'session_provider.dart';
 class ModeEventBus {
   ModeEventBus.live(PulseSession session)
       : _session = session,
-        _inert = false {
+        _inert = false,
+        _onTestSend = null {
     _bindIncoming(session.events);
   }
 
-  @visibleForTesting
-  ModeEventBus.testing(Stream<ModeEvent> incoming)
-      : _session = null,
-        _inert = false {
+  /// Injected transport used by widget tests and isolated QA entrypoints.
+  ModeEventBus.testing(
+    Stream<ModeEvent> incoming, {
+    FutureOr<void> Function(ModeEvent event)? onSend,
+  })  : _session = null,
+        _inert = false,
+        _onTestSend = onSend {
     _bindIncoming(incoming);
   }
 
@@ -43,10 +46,12 @@ class ModeEventBus {
 
   ModeEventBus.inert()
       : _session = null,
-        _inert = true;
+        _inert = true,
+        _onTestSend = null;
 
   final PulseSession? _session;
   final bool _inert;
+  final FutureOr<void> Function(ModeEvent event)? _onTestSend;
   final _live = StreamController<ModeEvent>.broadcast();
   final List<_BufferedModeEvent> _recent = <_BufferedModeEvent>[];
   StreamSubscription<ModeEvent>? _subscription;
@@ -58,6 +63,11 @@ class ModeEventBus {
 
   /// Send a mode event to the partner. No-op if inert.
   Future<void> send(ModeEvent event) async {
+    final testSend = _onTestSend;
+    if (testSend != null) {
+      await testSend(event);
+      return;
+    }
     if (_inert || _session == null) return;
     await _session.sendEvent(event);
   }

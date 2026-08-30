@@ -1090,12 +1090,15 @@ class _CandlePainter extends CustomPainter {
 
     _drawAirflow(canvas, size, wickBase, phase);
     if (isLit) {
+      _drawFlameContact(canvas, wickBase, visualBody, phase);
       final shader = gpuFlameShader;
-      if (shader != null) {
-        _drawGpuFlame(canvas, size, wickBase, shader);
+      final texture = flameImage;
+      if (shader != null && texture != null) {
+        _drawGpuFlame(canvas, size, wickBase, shader, texture);
       } else {
         _drawFlame(canvas, wickBase, visualBody, phase);
       }
+      _drawBurningWickCrown(canvas, wickBase, phase);
     } else {
       _drawExtinguishedWick(canvas, wickBase, phase);
     }
@@ -1182,6 +1185,7 @@ class _CandlePainter extends CustomPainter {
     Size size,
     Offset wickBase,
     ui.FragmentShader shader,
+    ui.Image texture,
   ) {
     shader
       ..setFloat(0, size.width)
@@ -1193,7 +1197,8 @@ class _CandlePainter extends CustomPainter {
       ..setFloat(6, forces.pressure.clamp(0.0, 1.0))
       ..setFloat(7, style.character.warmth)
       ..setFloat(8, sharedGlow)
-      ..setFloat(9, isLit ? 1 : 0);
+      ..setFloat(9, isLit ? 1 : 0)
+      ..setImageSampler(0, texture);
     final effectBounds = Rect.fromLTRB(
       wickBase.dx - 260,
       wickBase.dy - 285,
@@ -1206,6 +1211,86 @@ class _CandlePainter extends CustomPainter {
         ..shader = shader
         ..blendMode = BlendMode.plus
         ..isAntiAlias = true,
+    );
+  }
+
+  void _drawFlameContact(
+    Canvas canvas,
+    Offset wickBase,
+    Rect body,
+    double phase,
+  ) {
+    final pulse = .92 + math.sin(phase * 2.4) * .08;
+    final poolCenter = wickBase + Offset(forces.lean * 1.4, 8);
+    final pool = Rect.fromCenter(
+      center: poolCenter,
+      width: body.width * (.42 + sharedGlow * .05),
+      height: body.width * .13,
+    );
+
+    // The light must visibly belong to the wax before the emissive flame is
+    // drawn. This warm pool is the contact shadow's inverse: it anchors the
+    // fire to the material instead of letting it float above a photograph.
+    canvas.drawOval(
+      pool,
+      Paint()
+        ..blendMode = BlendMode.plus
+        ..shader = RadialGradient(
+          colors: [
+            const Color(0xFFFFD58A).withValues(alpha: .24 * pulse),
+            const Color(0xFFFF8A39).withValues(alpha: .08 * pulse),
+            Colors.transparent,
+          ],
+          stops: const [0, .46, 1],
+        ).createShader(pool)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2.2),
+    );
+    canvas.drawCircle(
+      wickBase + const Offset(0, 1),
+      5.2,
+      Paint()
+        ..blendMode = BlendMode.plus
+        ..shader = RadialGradient(
+          colors: [
+            const Color(0xFFFFFFFF).withValues(alpha: .34 * pulse),
+            const Color(0xFFFF6A2C).withValues(alpha: .18 * pulse),
+            Colors.transparent,
+          ],
+        ).createShader(Rect.fromCircle(
+          center: wickBase + const Offset(0, 1),
+          radius: 5.2,
+        )),
+    );
+  }
+
+  void _drawBurningWickCrown(Canvas canvas, Offset wickBase, double phase) {
+    final sway = forces.lean * 1.1 + math.sin(phase * 2.1) * .22;
+    final path = Path()
+      ..moveTo(wickBase.dx + .2, wickBase.dy + 2.6)
+      ..cubicTo(
+        wickBase.dx - .8,
+        wickBase.dy,
+        wickBase.dx + sway,
+        wickBase.dy - 3.5,
+        wickBase.dx + sway * .72,
+        wickBase.dy - 6.4,
+      );
+    canvas.drawPath(
+      path,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeCap = StrokeCap.round
+        ..strokeWidth = 1.5
+        ..color = const Color(0xFF1B1112).withValues(alpha: .88),
+    );
+    canvas.drawCircle(
+      wickBase + Offset(sway * .72, -6.4),
+      1.25,
+      Paint()
+        ..color = const Color(0xFFFF8A3D).withValues(
+          alpha: .72 + math.sin(phase * 3.6) * .10,
+        )
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, .7),
     );
   }
 

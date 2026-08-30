@@ -14,6 +14,11 @@ abstract final class LockscreenRayBridge {
       MethodChannel('app.pulse.lockscreen/ray');
 
   static const Set<String> _supportedEvents = {
+    'ray_stroke_begin',
+    'ray_stroke_points',
+    'ray_stroke_end',
+    'ray_state',
+    'ray_undo',
     'ray_point',
     'ray_end',
     'ray_clear',

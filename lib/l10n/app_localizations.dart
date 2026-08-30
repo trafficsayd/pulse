@@ -761,7 +761,7 @@ abstract class AppLocalizations {
   /// No description provided for @modeRay.
   ///
   /// In en, this message translates to:
-  /// **'Ray'**
+  /// **'Drawing'**
   String get modeRay;
 
   /// No description provided for @modeConstellation.

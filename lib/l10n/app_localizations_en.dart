@@ -379,7 +379,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get modeBell => 'Bell';
 
   @override
-  String get modeRay => 'Ray';
+  String get modeRay => 'Drawing';
 
   @override
   String get modeConstellation => 'Constellation';

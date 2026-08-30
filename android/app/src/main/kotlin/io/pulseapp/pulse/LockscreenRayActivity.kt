@@ -9,6 +9,7 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
+import android.graphics.BlurMaskFilter
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.LinearGradient
@@ -20,6 +21,7 @@ import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.os.Bundle
 import android.os.PowerManager
+import android.os.SystemClock
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
@@ -28,26 +30,36 @@ import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 import java.lang.ref.WeakReference
+import kotlin.math.abs
+import kotlin.math.hypot
 import kotlin.math.max
+import kotlin.math.sin
 
 private const val LOCKSCREEN_NOTIFICATION_CHANNEL = "pulse_lockscreen_ray"
 private const val LOCKSCREEN_NOTIFICATION_ID = 7319
 private const val LOCKSCREEN_WAKE_TIMEOUT_MS = 15_000L
 private const val LOCKSCREEN_WAKE_TAG = "pulse:ray-lock-screen"
 
-internal data class NormalizedPoint(val x: Float, val y: Float)
+internal data class NormalizedPoint(
+    val x: Float,
+    val y: Float,
+    val pressure: Float = 1f,
+    val elapsedMs: Int = 0,
+)
 
 internal data class NativeRayStroke(
+    val id: String,
     val points: MutableList<NormalizedPoint>,
     val color: Int,
     val width: Float,
     val effect: Int,
+    var complete: Boolean = false,
 )
 
 internal data class NativeRaySnapshot(
     val canvasColor: Int,
     val strokes: List<NativeRayStroke>,
-    val activeStroke: NativeRayStroke?,
+    val activeStrokes: List<NativeRayStroke>,
     val receivingLive: Boolean,
 )
 
@@ -59,7 +71,8 @@ internal data class NativeRaySnapshot(
 internal object LockscreenRayController {
     private val stateLock = Any()
     private val strokes = mutableListOf<NativeRayStroke>()
-    private var activeStroke: NativeRayStroke? = null
+    private val activeStrokes = linkedMapOf<String, NativeRayStroke>()
+    private var legacyStrokeId: String? = null
     private var canvasColor: Int = Color.rgb(18, 13, 29)
     private var receivingLive = false
     private var languageCode = "en"
@@ -76,11 +89,17 @@ internal object LockscreenRayController {
         synchronized(stateLock) {
             if (!languageCode.isNullOrBlank()) this.languageCode = languageCode
             when (eventType) {
-                "ray_point" -> appendPoint(data)
-                "ray_end" -> finishStroke()
+                "ray_stroke_begin" -> beginStroke(data)
+                "ray_stroke_points" -> appendPoints(data)
+                "ray_stroke_end" -> finishStrokeV2(data)
+                "ray_state" -> applyCard(data)
+                "ray_undo" -> undoStroke(data)
+                "ray_point" -> appendLegacyPoint(data)
+                "ray_end" -> finishLegacyStroke()
                 "ray_clear" -> {
                     strokes.clear()
-                    activeStroke = null
+                    activeStrokes.clear()
+                    legacyStrokeId = null
                     receivingLive = true
                 }
                 "ray_canvas" -> number(data["color"])?.let { canvasColor = it.toInt() }
@@ -109,63 +128,136 @@ internal object LockscreenRayController {
                 // arrive while the phone remains completely black.
                 LockscreenRayNotifier.show(
                     context,
-                    eventType == "ray_card" || eventType == "ray_end",
+                    eventType == "ray_card" ||
+                        eventType == "ray_end" ||
+                        eventType == "ray_stroke_end" ||
+                        eventType == "ray_state",
                 )
                 showActivity(context)
             }
-        } else if (!appResumed && (eventType == "ray_card" || eventType == "ray_end")) {
+        } else if (
+            !appResumed &&
+            (eventType == "ray_card" ||
+                eventType == "ray_end" ||
+                eventType == "ray_stroke_end" ||
+                eventType == "ray_state")
+        ) {
             LockscreenRayNotifier.show(context, includePreview = true)
         }
     }
 
-    private fun appendPoint(data: Map<*, *>) {
+    private fun beginStroke(data: Map<*, *>) {
+        val raw = data["stroke"] as? Map<*, *> ?: return
+        val stroke = parseStroke(raw, complete = false) ?: return
+        activeStrokes[stroke.id] = stroke
+        receivingLive = true
+    }
+
+    private fun appendPoints(data: Map<*, *>) {
+        val id = (data["id"] as? String)?.take(120) ?: return
+        val stroke = activeStrokes[id] ?: return
+        val rawPoints = data["points"] as? List<*> ?: return
+        for (raw in rawPoints.take(32)) {
+            val point = parsePoint(raw) ?: continue
+            if (stroke.points.size >= 240) break
+            val previous = stroke.points.lastOrNull()
+            if (previous != null &&
+                kotlin.math.abs(previous.x - point.x) < 0.0004f &&
+                kotlin.math.abs(previous.y - point.y) < 0.0004f
+            ) {
+                continue
+            }
+            stroke.points.add(point)
+        }
+        receivingLive = activeStrokes.isNotEmpty()
+    }
+
+    private fun finishStrokeV2(data: Map<*, *>) {
+        val raw = data["stroke"] as? Map<*, *> ?: return
+        val complete = parseStroke(raw, complete = true) ?: return
+        activeStrokes.remove(complete.id)
+        strokes.removeAll { it.id == complete.id }
+        strokes.add(complete)
+        while (strokes.size > 64) strokes.removeAt(0)
+        receivingLive = activeStrokes.isNotEmpty()
+    }
+
+    private fun undoStroke(data: Map<*, *>) {
+        val id = (data["id"] as? String)?.take(120) ?: return
+        activeStrokes.remove(id)
+        strokes.removeAll { it.id == id }
+        receivingLive = activeStrokes.isNotEmpty()
+    }
+
+    private fun appendLegacyPoint(data: Map<*, *>) {
         val x = number(data["x"])?.toFloat()?.coerceIn(0f, 1f) ?: return
         val y = number(data["y"])?.toFloat()?.coerceIn(0f, 1f) ?: return
         val color = number(data["color"])?.toInt() ?: Color.rgb(151, 71, 255)
         val width = number(data["width"])?.toFloat()?.coerceIn(1f, 32f) ?: 10f
         val effect = number(data["effect"])?.toInt()?.coerceIn(0, 4) ?: 1
-        var current = activeStroke
+        var id = legacyStrokeId
+        var current = id?.let(activeStrokes::get)
         if (current == null) {
-            current = NativeRayStroke(mutableListOf(), color, width, effect)
-            activeStroke = current
+            id = "legacy-${System.nanoTime()}"
+            legacyStrokeId = id
+            current = NativeRayStroke(id, mutableListOf(), color, width, effect)
+            activeStrokes[id] = current
         }
         current.points.add(NormalizedPoint(x, y))
         receivingLive = true
     }
 
-    private fun finishStroke() {
-        activeStroke?.let { if (it.points.isNotEmpty()) strokes.add(it) }
-        activeStroke = null
-        receivingLive = false
+    private fun finishLegacyStroke() {
+        val id = legacyStrokeId
+        val complete = id?.let(activeStrokes::remove)
+        if (complete != null && complete.points.isNotEmpty()) {
+            complete.complete = true
+            strokes.add(complete)
+        }
+        legacyStrokeId = null
+        receivingLive = activeStrokes.isNotEmpty()
     }
 
     private fun applyCard(data: Map<*, *>) {
         strokes.clear()
-        activeStroke = null
+        activeStrokes.clear()
+        legacyStrokeId = null
         number(data["canvas"])?.let { canvasColor = it.toInt() }
         val rawStrokes = data["strokes"] as? List<*> ?: emptyList<Any>()
-        for (rawStroke in rawStrokes.take(16)) {
+        for (rawStroke in rawStrokes.take(64)) {
             val map = rawStroke as? Map<*, *> ?: continue
-            val rawPoints = map["points"] as? List<*> ?: continue
-            val points = mutableListOf<NormalizedPoint>()
-            for (rawPoint in rawPoints.take(80)) {
-                val pair = rawPoint as? List<*> ?: continue
-                if (pair.size < 2) continue
-                val x = number(pair[0])?.toFloat()?.coerceIn(0f, 1f) ?: continue
-                val y = number(pair[1])?.toFloat()?.coerceIn(0f, 1f) ?: continue
-                points.add(NormalizedPoint(x, y))
-            }
-            if (points.isEmpty()) continue
-            strokes.add(
-                NativeRayStroke(
-                    points = points,
-                    color = number(map["color"])?.toInt() ?: Color.rgb(151, 71, 255),
-                    width = number(map["width"])?.toFloat()?.coerceIn(1f, 32f) ?: 10f,
-                    effect = number(map["effect"])?.toInt()?.coerceIn(0, 4) ?: 1,
-                ),
-            )
+            parseStroke(map, complete = true)?.let(strokes::add)
         }
         receivingLive = false
+    }
+
+    private fun parseStroke(map: Map<*, *>, complete: Boolean): NativeRayStroke? {
+        val rawPoints = map["points"] as? List<*> ?: return null
+        val points = mutableListOf<NormalizedPoint>()
+        for (rawPoint in rawPoints.take(240)) {
+            parsePoint(rawPoint)?.let(points::add)
+        }
+        if (points.isEmpty()) return null
+        return NativeRayStroke(
+            id = ((map["id"] as? String)?.take(120)).orEmpty().ifEmpty {
+                "card-${System.nanoTime()}-${strokes.size}"
+            },
+            points = points,
+            color = number(map["color"])?.toInt() ?: Color.rgb(151, 71, 255),
+            width = number(map["width"])?.toFloat()?.coerceIn(1f, 32f) ?: 10f,
+            effect = number(map["effect"])?.toInt()?.coerceIn(0, 4) ?: 1,
+            complete = complete || map["complete"] == true,
+        )
+    }
+
+    private fun parsePoint(rawPoint: Any?): NormalizedPoint? {
+        val pair = rawPoint as? List<*> ?: return null
+        if (pair.size < 2) return null
+        val x = number(pair[0])?.toFloat()?.coerceIn(0f, 1f) ?: return null
+        val y = number(pair[1])?.toFloat()?.coerceIn(0f, 1f) ?: return null
+        val pressure = number(pair.getOrNull(2))?.toFloat()?.coerceIn(0.12f, 1.8f) ?: 1f
+        val elapsed = number(pair.getOrNull(3))?.toInt()?.coerceIn(0, 600_000) ?: 0
+        return NormalizedPoint(x, y, pressure, elapsed)
     }
 
     private fun number(value: Any?): Number? = value as? Number
@@ -174,7 +266,7 @@ internal object LockscreenRayController {
         NativeRaySnapshot(
             canvasColor = canvasColor,
             strokes = strokes.map(::copyStroke),
-            activeStroke = activeStroke?.let(::copyStroke),
+            activeStrokes = activeStrokes.values.map(::copyStroke),
             receivingLive = receivingLive,
         )
     }
@@ -182,10 +274,12 @@ internal object LockscreenRayController {
     fun isRussian(): Boolean = synchronized(stateLock) { languageCode == "ru" }
 
     private fun copyStroke(stroke: NativeRayStroke) = NativeRayStroke(
+        id = stroke.id,
         points = stroke.points.toMutableList(),
         color = stroke.color,
         width = stroke.width,
         effect = stroke.effect,
+        complete = stroke.complete,
     )
 
     fun attach(value: LockscreenRayActivity) {
@@ -206,7 +300,8 @@ internal object LockscreenRayController {
     fun dismiss(context: Context) {
         synchronized(stateLock) {
             strokes.clear()
-            activeStroke = null
+            activeStrokes.clear()
+            legacyStrokeId = null
             receivingLive = false
         }
         LockscreenRayNotifier.cancel(context)
@@ -524,6 +619,9 @@ private class RayLockscreenView(context: Context) : View(context) {
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         RayRenderer.draw(canvas, width, height, snapshot)
+        if (snapshot.strokes.isNotEmpty() || snapshot.activeStrokes.isNotEmpty()) {
+            postInvalidateDelayed(50L)
+        }
     }
 }
 
@@ -561,42 +659,195 @@ private object RayRenderer {
         }
 
         for (stroke in snapshot.strokes) drawStroke(canvas, width, height, stroke)
-        snapshot.activeStroke?.let { drawStroke(canvas, width, height, it) }
+        for (stroke in snapshot.activeStrokes) {
+            drawStroke(canvas, width, height, stroke)
+            drawPresence(canvas, width, height, stroke)
+        }
     }
 
     private fun drawStroke(canvas: Canvas, width: Int, height: Int, stroke: NativeRayStroke) {
         if (stroke.points.isEmpty()) return
-        val path = Path()
+        val path = smoothPath(stroke, width, height)
         val first = stroke.points.first()
-        path.moveTo(first.x * width, first.y * height)
-        for (point in stroke.points.drop(1)) path.lineTo(point.x * width, point.y * height)
         val scaledWidth = (stroke.width * width / 360f).coerceAtLeast(2f)
+        val phase = SystemClock.uptimeMillis() / 1000f * 2f
+        val breathing = 0.88f + ((sin(phase + stroke.id.hashCode() * 0.001f) + 1f) * 0.06f)
 
-        if (stroke.effect in 1..3) {
-            val glow = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = withAlpha(stroke.color, if (stroke.effect == 1) 90 else 62)
-                style = Paint.Style.STROKE
-                strokeCap = Paint.Cap.ROUND
-                strokeJoin = Paint.Join.ROUND
-                strokeWidth = scaledWidth * if (stroke.effect == 1) 3.4f else 2.5f
-                setShadowLayer(scaledWidth * 1.5f, 0f, 0f, stroke.color)
+        when (stroke.effect) {
+            1 -> {
+                canvas.drawPath(
+                    path,
+                    strokePaint(
+                        withAlpha(stroke.color, (52 * breathing).toInt()),
+                        scaledWidth * 4.6f,
+                        scaledWidth * 1.35f,
+                    ),
+                )
+                canvas.drawPath(
+                    path,
+                    strokePaint(withAlpha(stroke.color, 88), scaledWidth * 2.15f),
+                )
             }
-            canvas.drawPath(path, glow)
+            2 -> canvas.drawPath(
+                path,
+                strokePaint(
+                    withAlpha(stroke.color, (56 * breathing).toInt()),
+                    scaledWidth * 3.25f,
+                    scaledWidth,
+                ),
+            )
+            3 -> {
+                canvas.save()
+                canvas.translate(0.8f, -0.6f)
+                canvas.drawPath(path, strokePaint(withAlpha(stroke.color, 34), scaledWidth * 2.7f))
+                canvas.restore()
+                canvas.save()
+                canvas.translate(-0.7f, 0.9f)
+                canvas.drawPath(path, strokePaint(withAlpha(stroke.color, 44), scaledWidth * 1.8f))
+                canvas.restore()
+            }
         }
 
-        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = stroke.color
+        if (stroke.points.size == 1) {
+            canvas.drawCircle(
+                first.x * width,
+                first.y * height,
+                scaledWidth * first.pressure.coerceIn(0.4f, 1.4f) / 2f,
+                Paint(Paint.ANTI_ALIAS_FLAG).apply { color = stroke.color },
+            )
+        } else {
+            drawPressureSegments(canvas, width, height, stroke, scaledWidth)
+        }
+        if (stroke.effect == 4) {
+            drawSparkles(canvas, width, height, stroke, scaledWidth, phase)
+        }
+    }
+
+    private fun smoothPath(stroke: NativeRayStroke, width: Int, height: Int): Path {
+        val path = Path()
+        val points = stroke.points
+        val first = points.first()
+        path.moveTo(first.x * width, first.y * height)
+        if (points.size == 1) return path
+        for (index in 1 until points.lastIndex) {
+            val point = points[index]
+            val next = points[index + 1]
+            path.quadTo(
+                point.x * width,
+                point.y * height,
+                (point.x + next.x) * width / 2f,
+                (point.y + next.y) * height / 2f,
+            )
+        }
+        val last = points.last()
+        path.lineTo(last.x * width, last.y * height)
+        return path
+    }
+
+    private fun drawPressureSegments(
+        canvas: Canvas,
+        width: Int,
+        height: Int,
+        stroke: NativeRayStroke,
+        baseWidth: Float,
+    ) {
+        for (index in 1 until stroke.points.size) {
+            val a = stroke.points[index - 1]
+            val b = stroke.points[index]
+            val ax = a.x * width
+            val ay = a.y * height
+            val bx = b.x * width
+            val by = b.y * height
+            val elapsed = max(1, b.elapsedMs - a.elapsedMs)
+            val speed = hypot(bx - ax, by - ay) / elapsed
+            val speedFactor = (1.08f - speed * 0.22f).coerceIn(0.72f, 1.08f)
+            val pressure = ((a.pressure + b.pressure) / 2f).coerceIn(0.2f, 1.5f)
+            val pressureFactor = (0.58f + pressure * 0.52f).coerceIn(0.62f, 1.28f)
+            val segmentWidth = baseWidth * speedFactor * pressureFactor
+            val segment = Path().apply {
+                moveTo(ax, ay)
+                lineTo(bx, by)
+            }
+            canvas.drawPath(
+                segment,
+                strokePaint(
+                    withAlpha(stroke.color, if (stroke.effect == 3) 148 else 240),
+                    segmentWidth,
+                ),
+            )
+        }
+        val last = stroke.points.last()
+        canvas.drawCircle(
+            last.x * width,
+            last.y * height,
+            baseWidth * last.pressure.coerceIn(0.4f, 1.4f) / 2f,
+            Paint(Paint.ANTI_ALIAS_FLAG).apply { color = withAlpha(stroke.color, 240) },
+        )
+    }
+
+    private fun drawSparkles(
+        canvas: Canvas,
+        width: Int,
+        height: Int,
+        stroke: NativeRayStroke,
+        baseWidth: Float,
+        phase: Float,
+    ) {
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
+        for (index in stroke.points.indices step 6) {
+            val point = stroke.points[index]
+            val twinkle = (sin(phase * 1.6f + index + stroke.id.hashCode() * 0.001f) + 1f) / 2f
+            val radius = baseWidth * (0.12f + twinkle * 0.18f) + 0.8f
+            val direction = if (index % 2 == 0) 1f else -1f
+            val cx = point.x * width + baseWidth * direction
+            val cy = point.y * height - baseWidth * 0.72f
+            paint.color = withAlpha(stroke.color, (118 + twinkle * 118).toInt())
+            canvas.drawCircle(cx, cy, radius, paint)
+            paint.strokeWidth = 0.7f
+            canvas.drawLine(cx - radius * 2.2f, cy, cx + radius * 2.2f, cy, paint)
+            canvas.drawLine(cx, cy - radius * 2.2f, cx, cy + radius * 2.2f, paint)
+        }
+    }
+
+    private fun drawPresence(
+        canvas: Canvas,
+        width: Int,
+        height: Int,
+        stroke: NativeRayStroke,
+    ) {
+        val point = stroke.points.lastOrNull() ?: return
+        val scaledWidth = (stroke.width * width / 360f).coerceAtLeast(2f)
+        val phase = SystemClock.uptimeMillis() / 1000f * 2.7f
+        val pulse = (sin(phase) + 1f) / 2f
+        canvas.drawCircle(
+            point.x * width,
+            point.y * height,
+            scaledWidth * 1.3f + pulse * 5f,
+            Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                style = Paint.Style.STROKE
+                strokeWidth = 1.2f
+                color = withAlpha(stroke.color, (82 + pulse * 72).toInt())
+            },
+        )
+        canvas.drawCircle(
+            point.x * width,
+            point.y * height,
+            scaledWidth * 0.22f + 1.3f,
+            Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(220, 255, 255, 255) },
+        )
+    }
+
+    private fun strokePaint(colorValue: Int, width: Float, blur: Float? = null) =
+        Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = colorValue
             style = Paint.Style.STROKE
             strokeCap = Paint.Cap.ROUND
             strokeJoin = Paint.Join.ROUND
-            strokeWidth = scaledWidth
+            strokeWidth = width
+            if (blur != null) {
+                maskFilter = BlurMaskFilter(blur.coerceIn(1f, 22f), BlurMaskFilter.Blur.NORMAL)
+            }
         }
-        if (stroke.points.size == 1) {
-            canvas.drawCircle(first.x * width, first.y * height, scaledWidth / 2f, paint)
-        } else {
-            canvas.drawPath(path, paint)
-        }
-    }
 
     private fun withAlpha(color: Int, alpha: Int): Int =
         Color.argb(alpha, Color.red(color), Color.green(color), Color.blue(color))

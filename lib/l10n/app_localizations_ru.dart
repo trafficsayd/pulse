@@ -381,7 +381,7 @@ class AppLocalizationsRu extends AppLocalizations {
   String get modeBell => 'Колокольчик';
 
   @override
-  String get modeRay => 'Лучик';
+  String get modeRay => 'Рисунок';
 
   @override
   String get modeConstellation => 'Созвездие';

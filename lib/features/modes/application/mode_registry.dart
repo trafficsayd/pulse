@@ -25,7 +25,7 @@ import '../presentation/modes/whisper_mode_screen.dart';
 const Color _candleOrange = Color(0xFFFFB05C);
 const Color _whisperBlue = Color(0xFF6BD3FF);
 const Color _bellYellow = Color(0xFFFFD86A);
-const Color _rayCyan = Color(0xFF7CE0A1);
+const Color _rayViolet = Color(0xFFB975FF);
 const Color _constellationLavender = Color(0xFFB39CFF);
 
 /// The full ordered set of modes. The first 7 are the trial starter set;
@@ -88,7 +88,7 @@ final List<PulseModeDescriptor> kAllModes = [
     icon: Icons.brush_rounded,
     titleKey: 'modeRay',
     isStarter: true,
-    tint: _rayCyan,
+    tint: _rayViolet,
     glyph: '✨',
     builder: (context) => const RaySketchModeScreen(),
   ),
@@ -215,6 +215,12 @@ PulseModeId? modeForEventType(String type) => switch (type) {
       'bell_ring' => PulseModeId.bell,
       'ray_point' ||
       'ray_end' ||
+      'ray_stroke_begin' ||
+      'ray_stroke_points' ||
+      'ray_stroke_end' ||
+      'ray_state_request' ||
+      'ray_state' ||
+      'ray_undo' ||
       'ray_clear' ||
       'ray_canvas' ||
       'ray_card' =>

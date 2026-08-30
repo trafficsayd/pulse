@@ -59,7 +59,7 @@ class ModeEventBus {
   static const _replayWindow = Duration(seconds: 30);
 
   /// True when the bus is backed by a live encrypted channel.
-  bool get isConnected => !_inert && _session != null;
+  bool get isConnected => !_inert;
 
   /// Send a mode event to the partner. No-op if inert.
   Future<void> send(ModeEvent event) async {

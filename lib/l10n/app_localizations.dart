@@ -878,6 +878,30 @@ abstract class AppLocalizations {
   /// **'Blow to extinguish'**
   String get candleBlowHint;
 
+  /// No description provided for @candleCalibrating.
+  ///
+  /// In en, this message translates to:
+  /// **'Listening to the room…'**
+  String get candleCalibrating;
+
+  /// No description provided for @candleTogether.
+  ///
+  /// In en, this message translates to:
+  /// **'YOU LIT IT TOGETHER'**
+  String get candleTogether;
+
+  /// No description provided for @candleSoundOn.
+  ///
+  /// In en, this message translates to:
+  /// **'Turn candle sound on'**
+  String get candleSoundOn;
+
+  /// No description provided for @candleSoundOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Turn candle sound off'**
+  String get candleSoundOff;
+
   /// No description provided for @candleClassic.
   ///
   /// In en, this message translates to:

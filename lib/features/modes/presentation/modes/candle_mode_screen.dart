@@ -10,8 +10,10 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../capabilities/application/capability_providers.dart';
 import '../../../capabilities/domain/device_capability.dart';
+import '../../application/candle_dynamics.dart';
 import '../../../session/application/mode_event.dart';
 import '../../../session/application/mode_event_bus.dart';
+import '../../primitives/candle_sound_controller.dart';
 import '../../primitives/haptic_pattern_player.dart';
 import '../../primitives/mic_level_stream.dart';
 import '../../primitives/primitive_providers.dart';
@@ -29,12 +31,14 @@ class CandleModeScreen extends ConsumerWidget {
     this.hapticEngine,
     this.blowThreshold = 0.6,
     this.requiredBlowSamples = 3,
+    this.calibrationDuration = const Duration(milliseconds: 1800),
   });
 
   final MicLevelStream? micLevelStream;
   final HapticEngine? hapticEngine;
   final double blowThreshold;
   final int requiredBlowSamples;
+  final Duration calibrationDuration;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -61,6 +65,7 @@ class CandleModeScreen extends ConsumerWidget {
       hapticEngine: hapticEngine ?? ref.watch(hapticEngineProvider),
       blowThreshold: blowThreshold,
       requiredBlowSamples: requiredBlowSamples,
+      calibrationDuration: calibrationDuration,
     );
   }
 }
@@ -71,12 +76,14 @@ class _CandleModeView extends ConsumerStatefulWidget {
     required this.hapticEngine,
     required this.blowThreshold,
     required this.requiredBlowSamples,
+    required this.calibrationDuration,
   });
 
   final MicLevelStream? micLevelStream;
   final HapticEngine? hapticEngine;
   final double blowThreshold;
   final int requiredBlowSamples;
+  final Duration calibrationDuration;
 
   @override
   ConsumerState<_CandleModeView> createState() => _CandleModeViewState();
@@ -87,19 +94,28 @@ class _CandleModeViewState extends ConsumerState<_CandleModeView>
   late final MicLevelStream _mic;
   late final HapticEngine _engine;
   late final HapticPatternPlayer _player;
+  late final CandleBreathAnalyzer _breathAnalyzer;
   late final AnimationController _flicker;
   StreamSubscription<MicLevel>? _micSub;
   StreamSubscription<ModeEvent>? _partnerSub;
   Timer? _partnerWindDecay;
+  Timer? _sharedGlowTimer;
   bool _ownsMic = false;
   bool _ownsEngine = false;
 
   bool _isLit = false;
+  bool _soundEnabled = true;
+  bool _partnerWasBlowing = false;
   int _blowSamplesOverThreshold = 0;
   double _localWind = 0;
   double _partnerWind = 0;
   DateTime? _lastWindSentAt;
   double _lastWindSentLevel = 0;
+  double _calibrationProgress = 0;
+  bool _calibrated = false;
+  DateTime? _lastSoundUpdateAt;
+  DateTime? _lastLocalLightAt;
+  DateTime? _sharedGlowUntil;
   DateTime? _extinguishedAt;
   CandleStyle _style = CandleStyle.classic;
   final Map<CandleStyle, ui.Image> _candleImages = {};
@@ -121,6 +137,10 @@ class _CandleModeViewState extends ConsumerState<_CandleModeView>
       _engine = widget.hapticEngine!;
     }
     _player = HapticPatternPlayer(_engine);
+    _breathAnalyzer = CandleBreathAnalyzer(
+      calibrationDuration: widget.calibrationDuration,
+    );
+    _calibrated = _breathAnalyzer.calibrated;
     _flicker = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1500),
@@ -196,19 +216,42 @@ class _CandleModeViewState extends ConsumerState<_CandleModeView>
           styleIndex < CandleStyle.values.length) {
         setState(() => _style = CandleStyle.values[styleIndex]);
       }
+      final now = DateTime.now();
+      final shared = _isLit &&
+          _lastLocalLightAt != null &&
+          now.difference(_lastLocalLightAt!) < const Duration(seconds: 2);
       _lightCandle();
+      if (shared) {
+        setState(() => _sharedGlowUntil = now.add(const Duration(seconds: 2)));
+        _sharedGlowTimer?.cancel();
+        _sharedGlowTimer = Timer(const Duration(seconds: 2), () {
+          if (mounted) setState(() => _sharedGlowUntil = null);
+        });
+        unawaited(_player.play(HapticPatterns.candleTogether));
+      }
     } else if (event.type == 'candle_blow') {
       final level = (event.data['level'] as num?)?.toDouble() ?? 0;
       final extinguished =
           event.data['extinguished'] as bool? ?? level >= widget.blowThreshold;
       setState(() {
         final target = level.clamp(0.0, 1.0);
-        _partnerWind = _partnerWind * 0.3 + target * 0.7;
+        _partnerWind = _partnerWind * 0.34 + target * 0.66;
       });
+      if (level >= .16 && !_partnerWasBlowing) {
+        _partnerWasBlowing = true;
+        unawaited(_player.play(HapticPatterns.candleBreath));
+      } else if (level < .08) {
+        _partnerWasBlowing = false;
+      }
       _partnerWindDecay?.cancel();
       if (!extinguished && level > 0) {
         _partnerWindDecay = Timer(const Duration(milliseconds: 450), () {
-          if (mounted) setState(() => _partnerWind = 0);
+          if (mounted) {
+            setState(() {
+              _partnerWind = 0;
+              _partnerWasBlowing = false;
+            });
+          }
         });
       }
       if (extinguished) _extinguishCandle();
@@ -216,17 +259,44 @@ class _CandleModeViewState extends ConsumerState<_CandleModeView>
   }
 
   void _onMicLevel(MicLevel sample) {
-    if (!mounted || !_isLit) return;
-    final level = sample.level01.clamp(0.0, 1.0);
+    if (!mounted) return;
+    final reading = _breathAnalyzer.add(
+      level: sample.level01,
+      noiseLikeness: sample.noiseLikeness,
+      at: sample.timestamp,
+    );
+    if (_calibrated != reading.calibrated ||
+        (_calibrationProgress - reading.calibrationProgress).abs() >= .04) {
+      setState(() {
+        _calibrated = reading.calibrated;
+        _calibrationProgress = reading.calibrationProgress;
+      });
+    }
+    if (!_isLit || !reading.calibrated) return;
+    final level = reading.pressure;
     // Microphone samples are noisy. A short low-pass filter keeps the flame
     // organic while still reacting quickly enough to a real breath.
-    setState(() => _localWind = _localWind * 0.28 + level * 0.72);
-    _sendWind(level, extinguished: false, at: sample.timestamp);
-    if (sample.level01 > widget.blowThreshold) {
+    setState(() => _localWind = _localWind * 0.36 + level * 0.64);
+    _sendWind(
+      level,
+      confidence: reading.confidence,
+      extinguished: false,
+      at: sample.timestamp,
+    );
+    _updateSound(level, sample.timestamp);
+    final threshold =
+        widget.blowThreshold * _style.character.extinguishResistance;
+    if (level > threshold) {
       _blowSamplesOverThreshold++;
       if (_blowSamplesOverThreshold >= widget.requiredBlowSamples) {
         _extinguishCandle();
-        _sendWind(level, extinguished: true, at: sample.timestamp, force: true);
+        _sendWind(
+          level,
+          confidence: reading.confidence,
+          extinguished: true,
+          at: sample.timestamp,
+          force: true,
+        );
         _blowSamplesOverThreshold = 0;
       }
     } else {
@@ -239,6 +309,7 @@ class _CandleModeViewState extends ConsumerState<_CandleModeView>
 
   void _sendWind(
     double level, {
+    required double confidence,
     required bool extinguished,
     required DateTime at,
     bool force = false,
@@ -259,8 +330,25 @@ class _CandleModeViewState extends ConsumerState<_CandleModeView>
     _lastWindSentLevel = level;
     unawaited(ref.read(modeEventBusProvider).send(ModeEvent(
           type: 'candle_blow',
-          data: {'level': level, 'extinguished': extinguished},
+          data: {
+            'level': level,
+            'confidence': confidence,
+            'extinguished': extinguished,
+          },
         )));
+  }
+
+  void _updateSound(double pressure, DateTime at) {
+    if (!_soundEnabled) return;
+    if (_lastSoundUpdateAt != null &&
+        at.difference(_lastSoundUpdateAt!) <
+            const Duration(milliseconds: 180)) {
+      return;
+    }
+    _lastSoundUpdateAt = at;
+    unawaited(CandleSoundController.update(
+      (.34 + pressure * .66) * _style.character.crackle,
+    ));
   }
 
   void _lightCandle() {
@@ -272,6 +360,9 @@ class _CandleModeViewState extends ConsumerState<_CandleModeView>
     });
     HapticFeedback.lightImpact();
     unawaited(_player.play(HapticPatterns.tap));
+    if (_soundEnabled) {
+      unawaited(CandleSoundController.ignite(_style));
+    }
   }
 
   void _extinguishCandle() {
@@ -283,11 +374,13 @@ class _CandleModeViewState extends ConsumerState<_CandleModeView>
       _extinguishedAt = DateTime.now();
     });
     HapticFeedback.mediumImpact();
-    unawaited(_player.play(HapticPatterns.whisper));
+    unawaited(_player.play(HapticPatterns.candleOut));
+    if (_soundEnabled) unawaited(CandleSoundController.extinguish());
   }
 
   void _onTap() {
     if (!_isLit) {
+      _lastLocalLightAt = DateTime.now();
       _lightCandle();
       ref.read(modeEventBusProvider).send(ModeEvent(
             type: 'candle_light',
@@ -299,6 +392,12 @@ class _CandleModeViewState extends ConsumerState<_CandleModeView>
   void _selectStyle(CandleStyle style) {
     if (_style == style) return;
     setState(() => _style = style);
+    if (_isLit && _soundEnabled) {
+      unawaited(CandleSoundController.start(
+        style,
+        intensity: style.character.crackle,
+      ));
+    }
     if (_isLit) {
       unawaited(ref.read(modeEventBusProvider).send(ModeEvent(
             type: 'candle_light',
@@ -307,11 +406,24 @@ class _CandleModeViewState extends ConsumerState<_CandleModeView>
     }
   }
 
+  void _toggleSound() {
+    setState(() => _soundEnabled = !_soundEnabled);
+    if (_soundEnabled && _isLit) {
+      unawaited(CandleSoundController.start(
+        _style,
+        intensity: _style.character.crackle,
+      ));
+    } else {
+      unawaited(CandleSoundController.stop());
+    }
+  }
+
   @override
   void dispose() {
     _micSub?.cancel();
     _partnerSub?.cancel();
     _partnerWindDecay?.cancel();
+    _sharedGlowTimer?.cancel();
     _flicker.dispose();
     unawaited(_player.stop());
     if (_ownsMic) unawaited(_mic.dispose());
@@ -320,6 +432,7 @@ class _CandleModeViewState extends ConsumerState<_CandleModeView>
       image.dispose();
     }
     _flameImage?.dispose();
+    unawaited(CandleSoundController.stop());
     super.dispose();
   }
 
@@ -345,13 +458,28 @@ class _CandleModeViewState extends ConsumerState<_CandleModeView>
                                 .difference(extinguishedAt)
                                 .inMilliseconds /
                             4200;
+                    final forces = CandleForces.resolve(
+                      localPressure: _localWind,
+                      partnerPressure: _partnerWind,
+                      style: _style,
+                    );
+                    final sharedUntil = _sharedGlowUntil;
+                    final sharedGlow = sharedUntil == null
+                        ? 0.0
+                        : (sharedUntil
+                                    .difference(DateTime.now())
+                                    .inMilliseconds /
+                                2000)
+                            .clamp(0.0, 1.0)
+                            .toDouble();
                     return CustomPaint(
                       painter: _CandlePainter(
                         isLit: _isLit,
                         flicker: _flicker.value,
-                        wind: (_localWind - _partnerWind).clamp(-1, 1),
+                        forces: forces,
                         localWind: _localWind,
                         partnerWind: _partnerWind,
+                        sharedGlow: sharedGlow,
                         smokeProgress: smokeProgress.clamp(0.0, 1.0),
                         style: _style,
                         candleImage: _candleImages[_style],
@@ -377,13 +505,62 @@ class _CandleModeViewState extends ConsumerState<_CandleModeView>
               right: 0,
               child: Center(
                 child: Text(
-                  _isLit ? t.candleBlowHint : t.candleTouchHint,
+                  _calibrated
+                      ? (_isLit ? t.candleBlowHint : t.candleTouchHint)
+                      : t.candleCalibrating,
                   style: const TextStyle(
                     color: AppColors.textMuted,
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
+              ),
+            ),
+            if (!_calibrated)
+              Positioned(
+                top: 42,
+                left: 84,
+                right: 84,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(2),
+                  child: LinearProgressIndicator(
+                    minHeight: 2,
+                    value: _calibrationProgress,
+                    color: AppColors.pulse,
+                    backgroundColor: Colors.white.withValues(alpha: .08),
+                  ),
+                ),
+              ),
+            if (_sharedGlowUntil != null &&
+                _sharedGlowUntil!.isAfter(DateTime.now()))
+              Positioned(
+                top: 52,
+                left: 0,
+                right: 0,
+                child: Center(
+                  child: Text(
+                    t.candleTogether,
+                    style: const TextStyle(
+                      color: Color(0xFFFFD58A),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: .8,
+                    ),
+                  ),
+                ),
+              ),
+            Positioned(
+              top: 8,
+              left: 8,
+              child: IconButton(
+                tooltip: _soundEnabled ? t.candleSoundOff : t.candleSoundOn,
+                color: AppColors.textSecondary,
+                icon: Icon(
+                  _soundEnabled
+                      ? Icons.volume_up_rounded
+                      : Icons.volume_off_rounded,
+                ),
+                onPressed: _toggleSound,
               ),
             ),
             Positioned(
@@ -407,9 +584,10 @@ class _CandlePainter extends CustomPainter {
   _CandlePainter({
     required this.isLit,
     required this.flicker,
-    required this.wind,
+    required this.forces,
     required this.localWind,
     required this.partnerWind,
+    required this.sharedGlow,
     required this.smokeProgress,
     required this.style,
     required this.candleImage,
@@ -418,13 +596,16 @@ class _CandlePainter extends CustomPainter {
 
   final bool isLit;
   final double flicker;
-  final double wind;
+  final CandleForces forces;
   final double localWind;
   final double partnerWind;
+  final double sharedGlow;
   final double smokeProgress;
   final CandleStyle style;
   final ui.Image? candleImage;
   final ui.Image? flameImage;
+
+  double get wind => forces.lean;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -453,6 +634,7 @@ class _CandlePainter extends CustomPainter {
 
     if (image != null && photoreal != null) {
       _drawPhotorealCandle(canvas, image, photoreal.imageRect);
+      _drawPhotorealRelighting(canvas, photoreal, phase);
     } else {
       switch (style) {
         case CandleStyle.classic:
@@ -562,17 +744,86 @@ class _CandlePainter extends CustomPainter {
     );
   }
 
+  void _drawPhotorealRelighting(
+    Canvas canvas,
+    _PhotorealCandleLayout layout,
+    double phase,
+  ) {
+    if (!isLit) return;
+    final character = style.character;
+    final pulse = 1 + math.sin(phase * 2.3) * .035 * character.flickerAmount;
+    final bounds = layout.visualBounds;
+    final warm = Color.lerp(
+      const Color(0xFFFF9D45),
+      const Color(0xFFC27CFF),
+      style == CandleStyle.violet ? .34 : 0,
+    )!;
+    canvas.saveLayer(bounds.inflate(18), Paint());
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(bounds, Radius.circular(bounds.width * .12)),
+      Paint()
+        ..blendMode = BlendMode.screen
+        ..shader = LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            warm.withValues(alpha: .26 * pulse * character.warmth),
+            warm.withValues(alpha: .08 * character.warmth),
+            Colors.transparent,
+          ],
+          stops: const [0, .36, 1],
+        ).createShader(bounds),
+    );
+    canvas.restore();
+
+    final pool = Rect.fromCenter(
+      center: layout.wickBase + const Offset(0, 6),
+      width: bounds.width * (style == CandleStyle.glass ? .82 : .68),
+      height: bounds.width * .23,
+    );
+    canvas.drawOval(
+      pool,
+      Paint()
+        ..blendMode = BlendMode.plus
+        ..shader = RadialGradient(
+          colors: [
+            const Color(0xFFFFF1B0).withValues(alpha: .30 * pulse),
+            warm.withValues(alpha: .17 * pulse),
+            Colors.transparent,
+          ],
+        ).createShader(pool),
+    );
+
+    if (style == CandleStyle.glass) {
+      final x = bounds.left + bounds.width * (.20 + math.sin(phase) * .018);
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromLTWH(x, bounds.top + 12, 4, bounds.height * .62),
+          const Radius.circular(4),
+        ),
+        Paint()
+          ..blendMode = BlendMode.screen
+          ..color = const Color(0xFFFFD79A).withValues(alpha: .28 * pulse)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3),
+      );
+    }
+  }
+
   void _drawAtmosphere(
     Canvas canvas,
     Size size,
     Offset wickBase,
     double phase,
   ) {
-    final pulse = 0.96 + math.sin(phase * 1.7) * 0.04;
+    final character = style.character;
+    final pulse = 0.96 +
+        math.sin(phase * 1.7) * 0.04 * character.flickerAmount +
+        forces.turbulence * math.sin(phase * 5.3) * .025;
     final center = wickBase + Offset(wind * 8, -34);
     final rect =
         Rect.fromCircle(center: center, radius: size.shortestSide * .72);
-    final warmAlpha = isLit ? 0.22 * pulse : 0.0;
+    final warmAlpha =
+        isLit ? (0.20 + sharedGlow * .12) * pulse * character.warmth : 0.0;
     canvas.drawRect(
       Offset.zero & size,
       Paint()
@@ -580,7 +831,12 @@ class _CandlePainter extends CustomPainter {
           center: const Alignment(0, -0.16),
           radius: 0.84,
           colors: [
-            const Color(0xFFFFA34A).withValues(alpha: warmAlpha),
+            Color.lerp(
+              const Color(0xFFFFA34A),
+              const Color(0xFFC380FF),
+              style == CandleStyle.violet ? .24 : 0,
+            )!
+                .withValues(alpha: warmAlpha),
             const Color(0xFF7132A6).withValues(alpha: isLit ? 0.10 : 0.04),
             Colors.transparent,
           ],
@@ -608,7 +864,7 @@ class _CandlePainter extends CustomPainter {
   void _drawSurfaceShadow(Canvas canvas, Rect bodyRect, double candleWidth) {
     canvas.drawOval(
       Rect.fromCenter(
-        center: Offset(bodyRect.center.dx, bodyRect.bottom + 9),
+        center: Offset(bodyRect.center.dx - wind * 4, bodyRect.bottom + 9),
         width: candleWidth * 1.7,
         height: candleWidth * .34,
       ),
@@ -888,30 +1144,43 @@ class _CandlePainter extends CustomPainter {
     Rect bodyRect,
     double phase,
   ) {
-    final gust = wind.abs().clamp(0.0, 1.0);
+    final character = style.character;
+    final gust = forces.pressure.clamp(0.0, 1.0);
+    final unstable = forces.turbulence;
     final turbulence =
-        math.sin(phase * 1.9) * 2.4 + math.sin(phase * 3.7 + 1.2) * 1.1;
-    final height = 43.0 - gust * 12 + math.sin(phase * 2.3) * 2.6;
-    final width = 17.0 + gust * 6 + math.cos(phase * 2.8) * 1.3;
-    final lean = wind * (22 + gust * 14) + turbulence;
+        (math.sin(phase * 1.9) * 2.2 + math.sin(phase * 3.7 + 1.2) * 1.0) *
+                character.flickerAmount +
+            math.sin(phase * 7.1) * unstable * 3.4;
+    final height = 45.0 * forces.heightScale +
+        math.sin(phase * 2.3) * 2.7 * character.flickerAmount;
+    final width = 16.5 +
+        gust * 5 +
+        unstable * 4 +
+        math.cos(phase * 2.8) * 1.2 * character.flickerAmount;
+    final lean = wind * (25 + gust * 15) + turbulence;
     final base = wickBase + const Offset(0, 2);
     final tip = base + Offset(lean, -height);
     final glowCenter = Offset.lerp(base, tip, .52)!;
 
     canvas.drawCircle(
       glowCenter,
-      88 - gust * 12,
+      90 - gust * 13 + sharedGlow * 16,
       Paint()
         ..blendMode = BlendMode.plus
         ..shader = RadialGradient(
           colors: [
-            const Color(0xFFFFC35F).withValues(alpha: .42 - gust * .10),
+            const Color(0xFFFFC35F).withValues(
+              alpha: .40 - gust * .09 + sharedGlow * .08,
+            ),
             const Color(0xFFFF8738).withValues(alpha: .13 - gust * .04),
             Colors.transparent,
           ],
           stops: const [0, .34, 1],
         ).createShader(
-          Rect.fromCircle(center: glowCenter, radius: 88 - gust * 12),
+          Rect.fromCircle(
+            center: glowCenter,
+            radius: 90 - gust * 13 + sharedGlow * 16,
+          ),
         ),
     );
 
@@ -979,6 +1248,9 @@ class _CandlePainter extends CustomPainter {
       );
     }
 
+    _drawInnerFlame(canvas, base, tip, width, phase, unstable);
+    _drawHeatShimmer(canvas, tip, phase, unstable);
+
     // Warm reflection in the molten wax/glass immediately below the flame.
     canvas.drawOval(
       Rect.fromCenter(
@@ -990,6 +1262,83 @@ class _CandlePainter extends CustomPainter {
         ..color = const Color(0xFFFFB349).withValues(alpha: .18)
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5),
     );
+  }
+
+  void _drawInnerFlame(
+    Canvas canvas,
+    Offset base,
+    Offset tip,
+    double width,
+    double phase,
+    double unstable,
+  ) {
+    final innerTip = Offset.lerp(base, tip, .58)! +
+        Offset(math.sin(phase * 3.1) * (1 + unstable * 2), 2);
+    final inner = _flamePath(
+      base: base + const Offset(0, 1),
+      tip: innerTip,
+      width: width * .34,
+    );
+    final bounds = Rect.fromPoints(
+      Offset(base.dx - width, tip.dy),
+      Offset(base.dx + width, base.dy + 4),
+    );
+    canvas.drawPath(
+      inner,
+      Paint()
+        ..blendMode = BlendMode.plus
+        ..shader = LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Colors.white.withValues(alpha: .82),
+            const Color(0xFFFFE985).withValues(alpha: .72),
+            const Color(0xFFFF9A36).withValues(alpha: .38),
+          ],
+        ).createShader(bounds),
+    );
+    canvas.drawOval(
+      Rect.fromCenter(
+        center: base + const Offset(0, 1.8),
+        width: width * .48,
+        height: 4.2,
+      ),
+      Paint()
+        ..blendMode = BlendMode.plus
+        ..shader = const RadialGradient(
+          colors: [Color(0xA0B8D2FF), Color(0x705278FF), Colors.transparent],
+          stops: [0, .46, 1],
+        ).createShader(Rect.fromCircle(center: base, radius: width)),
+    );
+  }
+
+  void _drawHeatShimmer(
+    Canvas canvas,
+    Offset tip,
+    double phase,
+    double unstable,
+  ) {
+    for (var i = 0; i < 3; i++) {
+      final rise = 18.0 + i * 14;
+      final drift =
+          math.sin(phase * (1.1 + i * .17) + i * 2.1) * (3 + unstable * 5);
+      final path = Path()
+        ..moveTo(tip.dx, tip.dy - 2 - i * 2)
+        ..quadraticBezierTo(
+          tip.dx - drift,
+          tip.dy - rise * .55,
+          tip.dx + drift,
+          tip.dy - rise,
+        );
+      canvas.drawPath(
+        path,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.2
+          ..color = const Color(0xFFFFD69A).withValues(alpha: .045 - i * .01)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2.2),
+      );
+    }
   }
 
   void _drawFlameSprite(
@@ -1137,9 +1486,13 @@ class _CandlePainter extends CustomPainter {
   bool shouldRepaint(covariant _CandlePainter old) =>
       old.isLit != isLit ||
       old.flicker != flicker ||
-      old.wind != wind ||
+      old.forces.lean != forces.lean ||
+      old.forces.pressure != forces.pressure ||
+      old.forces.turbulence != forces.turbulence ||
+      old.forces.heightScale != forces.heightScale ||
       old.localWind != localWind ||
       old.partnerWind != partnerWind ||
+      old.sharedGlow != sharedGlow ||
       old.smokeProgress != smokeProgress ||
       old.candleImage != candleImage ||
       old.flameImage != flameImage ||
@@ -1171,8 +1524,6 @@ class _WaxPalette {
   final Color light;
   final Color pool;
 }
-
-enum CandleStyle { classic, glass, violet }
 
 class _CandleStylePicker extends StatelessWidget {
   const _CandleStylePicker({required this.selected, required this.onSelected});

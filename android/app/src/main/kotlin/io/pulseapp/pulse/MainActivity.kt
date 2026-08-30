@@ -32,6 +32,7 @@ private const val CHANNEL_NAME = "app.pulse.ble/peripheral"
 private const val MIC_METHOD_CHANNEL = "app.pulse.audio/mic"
 private const val MIC_EVENT_CHANNEL = "app.pulse.audio/micStream"
 private const val TORCH_CHANNEL = "app.pulse.audio/torch"
+private const val CANDLE_AUDIO_CHANNEL = "app.pulse.audio/candle"
 private const val LOCKSCREEN_RAY_CHANNEL = "app.pulse.lockscreen/ray"
 private const val MIC_PERMISSION_REQUEST = 4242
 private const val CAMERA_PERMISSION_REQUEST = 4243
@@ -72,6 +73,7 @@ class MainActivity : FlutterActivity() {
     private var pendingTorchResult: MethodChannel.Result? = null
     private var pendingNotificationResult: MethodChannel.Result? = null
     private var torchCameraId: String? = null
+    private var candleAudioEngine: CandleAudioEngine? = null
     private var activityResumed = false
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -130,6 +132,26 @@ class MainActivity : FlutterActivity() {
                     }
                     else -> result.notImplemented()
                 }
+            }
+
+        candleAudioEngine = CandleAudioEngine(this)
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CANDLE_AUDIO_CHANNEL)
+            .setMethodCallHandler { call, result ->
+                val arguments = call.arguments as? Map<*, *>
+                val style = (arguments?.get("style") as? Number)?.toInt() ?: 0
+                val intensity = (arguments?.get("intensity") as? Number)?.toDouble() ?: .5
+                when (call.method) {
+                    "ignite" -> candleAudioEngine?.ignite(style)
+                    "start" -> candleAudioEngine?.start(style, intensity)
+                    "update" -> candleAudioEngine?.update(intensity)
+                    "extinguish" -> candleAudioEngine?.extinguish()
+                    "stop" -> candleAudioEngine?.stop()
+                    else -> {
+                        result.notImplemented()
+                        return@setMethodCallHandler
+                    }
+                }
+                result.success(null)
             }
 
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, LOCKSCREEN_RAY_CHANNEL)
@@ -626,6 +648,8 @@ class MainActivity : FlutterActivity() {
 
     override fun onDestroy() {
         stopMic()
+        candleAudioEngine?.stop()
+        candleAudioEngine = null
         setTorch(false)
         pendingTorchResult?.error("activity_destroyed", "Activity destroyed", null)
         pendingTorchResult = null

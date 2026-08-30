@@ -440,6 +440,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get candleBlowHint => 'Blow to extinguish';
 
   @override
+  String get candleCalibrating => 'Listening to the room…';
+
+  @override
+  String get candleTogether => 'YOU LIT IT TOGETHER';
+
+  @override
+  String get candleSoundOn => 'Turn candle sound on';
+
+  @override
+  String get candleSoundOff => 'Turn candle sound off';
+
+  @override
   String get candleClassic => 'Classic';
 
   @override

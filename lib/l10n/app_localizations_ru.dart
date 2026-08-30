@@ -441,6 +441,18 @@ class AppLocalizationsRu extends AppLocalizations {
   String get candleBlowHint => 'Подуй, чтобы погасить';
 
   @override
+  String get candleCalibrating => 'Прислушиваемся к комнате…';
+
+  @override
+  String get candleTogether => 'ВЫ ЗАЖГЛИ ЕЁ ВМЕСТЕ';
+
+  @override
+  String get candleSoundOn => 'Включить звук свечи';
+
+  @override
+  String get candleSoundOff => 'Выключить звук свечи';
+
+  @override
   String get candleClassic => 'Классика';
 
   @override

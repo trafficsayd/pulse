@@ -69,6 +69,31 @@ abstract final class HapticPatterns {
     ),
   ]);
 
+  /// Barely perceptible movement when the partner's breath reaches the flame.
+  static const HapticPattern candleBreath = HapticPattern([
+    HapticBeat(duration: Duration(milliseconds: 24), amplitude: 42),
+  ]);
+
+  /// Soft fading response when the shared flame goes out.
+  static const HapticPattern candleOut = HapticPattern([
+    HapticBeat(
+      duration: Duration(milliseconds: 70),
+      amplitude: 92,
+      gapAfter: Duration(milliseconds: 35),
+    ),
+    HapticBeat(duration: Duration(milliseconds: 110), amplitude: 44),
+  ]);
+
+  /// Two close, delicate beats when both people light at the same moment.
+  static const HapticPattern candleTogether = HapticPattern([
+    HapticBeat(
+      duration: Duration(milliseconds: 34),
+      amplitude: 72,
+      gapAfter: Duration(milliseconds: 70),
+    ),
+    HapticBeat(duration: Duration(milliseconds: 38), amplitude: 56),
+  ]);
+
   /// Triple-tap ack. Used for sneak-in acknowledged.
   static const HapticPattern triple = HapticPattern([
     HapticBeat(

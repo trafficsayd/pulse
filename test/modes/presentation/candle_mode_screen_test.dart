@@ -60,9 +60,43 @@ void main() {
 
     await _finish(tester, mic);
   });
+
+  testWidgets('shows room calibration before accepting breath', (tester) async {
+    final mic = FakeMicLevelStream();
+    await _pump(
+      tester,
+      mic,
+      calibrationDuration: const Duration(seconds: 1),
+    );
+
+    expect(find.text('Listening to the room…'), findsOneWidget);
+    expect(find.byType(LinearProgressIndicator), findsOneWidget);
+
+    await _finish(tester, mic);
+  });
+
+  testWidgets('loud periodic speech does not extinguish the flame',
+      (tester) async {
+    final mic = FakeMicLevelStream();
+    await _pump(tester, mic);
+    await tester.tapAt(const Offset(200, 360));
+    await tester.pump();
+
+    for (var i = 0; i < 5; i++) {
+      mic.add(.92, noiseLikeness: .04);
+    }
+    await tester.pump();
+
+    expect(find.text('Blow to extinguish'), findsOneWidget);
+    await _finish(tester, mic);
+  });
 }
 
-Future<void> _pump(WidgetTester tester, FakeMicLevelStream mic) async {
+Future<void> _pump(
+  WidgetTester tester,
+  FakeMicLevelStream mic, {
+  Duration calibrationDuration = Duration.zero,
+}) async {
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
@@ -81,6 +115,7 @@ Future<void> _pump(WidgetTester tester, FakeMicLevelStream mic) async {
         home: CandleModeScreen(
           micLevelStream: mic,
           hapticEngine: const NullHapticEngine(),
+          calibrationDuration: calibrationDuration,
         ),
       ),
     ),

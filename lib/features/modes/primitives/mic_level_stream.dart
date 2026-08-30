@@ -8,11 +8,20 @@ import 'package:flutter/services.dart';
 /// only cares about "loud / soft", not the absolute SPL, and clipping
 /// inside the source means UI code never has to.
 class MicLevel {
-  const MicLevel({required this.level01, required this.timestamp});
+  const MicLevel({
+    required this.level01,
+    required this.timestamp,
+    this.noiseLikeness = 1,
+  });
 
   /// Linear amplitude in `[0.0, 1.0]`. 0.0 = silent, 1.0 = clipped.
   final double level01;
   final DateTime timestamp;
+
+  /// `0` is strongly periodic (typically voiced speech), `1` is broadband
+  /// noise (typically breath). It is derived locally from zero crossings;
+  /// raw microphone audio is never transmitted.
+  final double noiseLikeness;
 }
 
 /// Owns the lifecycle of a microphone amplitude stream.
@@ -84,20 +93,33 @@ class RealMicLevelStream implements MicLevelStream {
     if (data.length < 2) return;
     final sampleCount = data.length ~/ 2;
     var sumSquares = 0.0;
+    var zeroCrossings = 0;
+    var previousSample = 0;
     final byteData = ByteData.sublistView(
       data is Uint8List ? data : Uint8List.fromList(data),
     );
     for (var i = 0; i < sampleCount; i++) {
       final sample = byteData.getInt16(i * 2, Endian.little);
+      if (i > 0 && ((sample >= 0) != (previousSample >= 0))) {
+        zeroCrossings++;
+      }
+      previousSample = sample;
       final normalised = sample / 32768.0;
       sumSquares += normalised * normalised;
     }
     final rms = math.sqrt(sumSquares / sampleCount);
     // Compress and gamma-correct so soft whispers are still visible.
     final level = _compress(rms).clamp(0.0, 1.0);
+    final zeroCrossingRate = zeroCrossings / math.max(1, sampleCount - 1);
+    final noiseLikeness =
+        ((zeroCrossingRate - .025) / .34).clamp(0.0, 1.0).toDouble();
     final controller = _controller;
     if (controller != null && !controller.isClosed) {
-      controller.add(MicLevel(level01: level, timestamp: DateTime.now()));
+      controller.add(MicLevel(
+        level01: level,
+        timestamp: DateTime.now(),
+        noiseLikeness: noiseLikeness,
+      ));
     }
   }
 
@@ -152,10 +174,13 @@ class FakeMicLevelStream implements MicLevelStream {
   Stream<MicLevel> get levels => _controller.stream;
 
   /// Pushes [level01] (clamped to `[0,1]`) to all listeners.
-  void add(double level01, {DateTime? at}) {
+  void add(double level01, {DateTime? at, double noiseLikeness = 1}) {
     final clamped = level01.clamp(0.0, 1.0).toDouble();
-    _controller
-        .add(MicLevel(level01: clamped, timestamp: at ?? DateTime.now()));
+    _controller.add(MicLevel(
+      level01: clamped,
+      timestamp: at ?? DateTime.now(),
+      noiseLikeness: noiseLikeness.clamp(0.0, 1.0),
+    ));
   }
 
   @override

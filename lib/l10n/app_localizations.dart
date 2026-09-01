@@ -860,6 +860,30 @@ abstract class AppLocalizations {
   /// **'Tap to knock'**
   String get tapTapHint;
 
+  /// No description provided for @tapTapReplyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap to knock back'**
+  String get tapTapReplyHint;
+
+  /// No description provided for @tapTapSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'I quietly knocked on your world'**
+  String get tapTapSubtitle;
+
+  /// No description provided for @tapTapDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'One touch simply says “I’m here”'**
+  String get tapTapDescription;
+
+  /// No description provided for @tapTapSurfaceLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Shared surface for knocking to someone close'**
+  String get tapTapSurfaceLabel;
+
   /// No description provided for @halfHeartHint.
   ///
   /// In en, this message translates to:

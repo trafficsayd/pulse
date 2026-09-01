@@ -6,6 +6,7 @@ void main() {
   test('every built-in mode owns at least one incoming wire event', () {
     const events = <String>[
       'tap',
+      'knock_hit',
       'hold_start',
       'candle_blow',
       'whisper_level',
@@ -26,5 +27,6 @@ void main() {
         events.map(modeForEventType).whereType<PulseModeId>().toSet();
     expect(mapped, PulseModeId.values.toSet());
     expect(modeForEventType('unknown'), isNull);
+    expect(modeForEventType('knock_reply'), PulseModeId.tapTap);
   });
 }

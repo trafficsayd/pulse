@@ -430,6 +430,19 @@ class AppLocalizationsEn extends AppLocalizations {
   String get tapTapHint => 'Tap to knock';
 
   @override
+  String get tapTapReplyHint => 'Tap to knock back';
+
+  @override
+  String get tapTapSubtitle => 'I quietly knocked on your world';
+
+  @override
+  String get tapTapDescription => 'One touch simply says “I’m here”';
+
+  @override
+  String get tapTapSurfaceLabel =>
+      'Shared surface for knocking to someone close';
+
+  @override
   String get halfHeartHint => 'Hold the half on your side';
 
   @override

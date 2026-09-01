@@ -6,307 +6,452 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/widgets/pulse_mockup.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../capabilities/application/capability_providers.dart';
 import '../../../capabilities/domain/device_capability.dart';
+import '../../../session/application/mode_event.dart';
+import '../../../session/application/mode_event_bus.dart';
+import '../../application/bell/bell_models.dart';
+import '../../application/bell/bell_physics_engine.dart';
+import '../../application/bell/bell_protocol.dart';
 import '../../primitives/accelerometer_3d_stream.dart';
 import '../../primitives/haptic_pattern_player.dart';
 import '../../primitives/primitive_providers.dart';
-import '../../../session/application/mode_event.dart';
-import '../../../session/application/mode_event_bus.dart';
-import 'unsupported_mode_screen.dart';
+import 'bell/bell_physical_painter.dart';
 
-/// "Bell" — shake-to-ring mode driven by [Accelerometer3DStream].
-///
-/// Detects a shake when [Accel3.netMagnitude] stays above 12 m/s² for
-/// at least 100ms. On a shake we:
-///   1. Play [HapticPatterns.triple] through the haptic engine.
-///   2. Animate a bell-icon rotation tween (a quick swing + decay).
-///   3. Ring a system alert tone via [SystemSound.play].
-///
-/// Disposal: cancels the sensor subscription, stops the animation
-/// controller, and aborts any in-flight haptic before [super.dispose].
-class BellModeScreen extends ConsumerWidget {
+/// A material bell rather than a shake detector: body and clapper have
+/// independent inertia, every strike carries its physical character to the
+/// partner, and a drag gesture is a first-class fallback without sensors.
+class BellModeScreen extends ConsumerStatefulWidget {
   const BellModeScreen({
     super.key,
     this.accelerometerStream,
     this.hapticEngine,
-    this.shakeThreshold = 12.0,
-    this.shakeWindow = const Duration(milliseconds: 100),
-  });
-
-  /// Optional override. Tests pass in a [FakeAccelerometer3DStream] and
-  /// push synthetic samples through [FakeAccelerometer3DStream.push].
-  /// In production this is null and the screen reads the real sensor
-  /// via [accelerometerStreamProvider].
-  final Accelerometer3DStream? accelerometerStream;
-
-  /// Optional override for the haptic engine. Defaults to the real
-  /// device vibrator via [hapticEngineProvider].
-  final HapticEngine? hapticEngine;
-
-  /// Net magnitude (m/s², gravity removed) that counts as "shaking".
-  final double shakeThreshold;
-
-  /// Minimum dwell time over [shakeThreshold] before a shake is
-  /// recognised — filters out single accidental jolts.
-  final Duration shakeWindow;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final t = AppLocalizations.of(context)!;
-    final capsAsync = ref.watch(deviceCapabilitiesProvider);
-    const required = {DeviceCapability.accelerometer};
-    if (capsAsync.isLoading) {
-      return const Scaffold(
-        backgroundColor: AppColors.background,
-        body: Center(
-          child: CircularProgressIndicator(color: AppColors.pulse),
-        ),
-      );
-    }
-    final caps = capsAsync.asData?.value ?? const DeviceCapabilities.none();
-    if (!caps.hasAll(required)) {
-      return UnsupportedModeScreen(
-        title: t.modeBell,
-        missing: caps.missing(required),
-      );
-    }
-    return _BellModeView(
-      accelerometerStream:
-          accelerometerStream ?? ref.watch(accelerometerStreamProvider),
-      hapticEngine: hapticEngine ?? ref.watch(hapticEngineProvider),
-      shakeThreshold: shakeThreshold,
-      shakeWindow: shakeWindow,
-    );
-  }
-}
-
-class _BellModeView extends ConsumerStatefulWidget {
-  const _BellModeView({
-    required this.accelerometerStream,
-    required this.hapticEngine,
-    required this.shakeThreshold,
-    required this.shakeWindow,
+    this.physicsEngine,
+    this.playSystemSound = true,
   });
 
   final Accelerometer3DStream? accelerometerStream;
   final HapticEngine? hapticEngine;
-  final double shakeThreshold;
-  final Duration shakeWindow;
+  final BellPhysicsEngine? physicsEngine;
+  final bool playSystemSound;
 
   @override
-  ConsumerState<_BellModeView> createState() => _BellModeViewState();
+  ConsumerState<BellModeScreen> createState() => _BellModeScreenState();
 }
 
-class _BellModeViewState extends ConsumerState<_BellModeView>
+class _BellModeScreenState extends ConsumerState<BellModeScreen>
     with SingleTickerProviderStateMixin {
-  late final Accelerometer3DStream _accel;
-  late final HapticEngine _engine;
-  late final HapticPatternPlayer _player;
-  late final AnimationController _swing;
-  StreamSubscription<Accel3>? _sub;
-  StreamSubscription<ModeEvent>? _partnerSub;
-  Timer? _cooldownTimer;
+  late final BellPhysicsEngine _physics;
+  late final HapticEngine _hapticEngine;
+  late final HapticPatternPlayer _hapticPlayer;
+  late final AnimationController _ticker;
+  final BellStrikeDeduplicator _deduplicator = BellStrikeDeduplicator();
 
-  bool _ownsAccel = false;
-  bool _ownsEngine = false;
-
-  /// Smoothed shake intensity in `[0, 1]`. Drives the bottom "intensity
-  /// bar" and stays alive even after the burst of shakes settles.
-  double _intensity = 0.0;
-
-  /// Timestamp of the first sample inside the current over-threshold
-  /// window. Reset whenever the magnitude dips back below threshold.
-  DateTime? _windowStart;
-
-  /// Set during a shake event for [_cooldown] so a single sustained
-  /// shake fires the bell once rather than 60 times a second.
-  bool _cooldownActive = false;
-  static const Duration _cooldown = Duration(milliseconds: 400);
+  StreamSubscription<Accel3>? _sensorSubscription;
+  StreamSubscription<ModeEvent>? _partnerSubscription;
+  Duration? _lastElapsed;
+  DateTime? _lastSensorAt;
+  double _lastTangential = 0;
+  double _sensorDrive = 0;
+  double _strikePulse = 0;
+  bool _lastStrikeWasRemote = false;
+  bool _sensorBound = false;
+  int _gestureDirection = 1;
+  int _suppressPhysicsStrikeUntilMs = 0;
 
   @override
   void initState() {
     super.initState();
-    if (widget.accelerometerStream == null) {
-      _accel = FakeAccelerometer3DStream();
-      _ownsAccel = true;
-    } else {
-      _accel = widget.accelerometerStream!;
-    }
-    if (widget.hapticEngine == null) {
-      _engine = const NullHapticEngine();
-      _ownsEngine = true;
-    } else {
-      _engine = widget.hapticEngine!;
-    }
-    _player = HapticPatternPlayer(_engine);
-    _swing = AnimationController(
+    _physics = widget.physicsEngine ?? BellPhysicsEngine();
+    _hapticEngine = widget.hapticEngine ?? ref.read(hapticEngineProvider);
+    _hapticPlayer = HapticPatternPlayer(_hapticEngine);
+    _ticker = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 700),
-      value: 0.0,
-    );
-    _sub = _accel.events.listen(_onAccel);
-    _partnerSub = ref.read(modeEventBusProvider).incoming
-        .where((e) => e.type == 'bell_ring')
-        .listen((e) {
-      if (mounted) _firePartnerRing();
-    });
+      duration: const Duration(seconds: 4),
+    )
+      ..addListener(_onFrame)
+      ..repeat();
+    _partnerSubscription = ref
+        .read(modeEventBusProvider)
+        .incoming
+        .where((event) => event.type == BellProtocol.eventType)
+        .listen(_onPartnerRing);
   }
 
-  void _firePartnerRing() {
-    _swing
-      ..value = 0.0
-      ..forward();
-    unawaited(SystemSound.play(SystemSoundType.alert));
-    unawaited(_player.play(HapticPatterns.triple));
-  }
-
-  void _onAccel(Accel3 sample) {
-    if (!mounted) return;
-    final mag = sample.netMagnitude;
-    // Lightweight low-pass over the intensity bar so it visually
-    // settles back even when samples are noisy.
-    final normalized = (mag / (widget.shakeThreshold * 1.6)).clamp(0.0, 1.0);
-    setState(() {
-      _intensity = math.max(_intensity * 0.85, normalized);
-    });
-
-    if (mag <= widget.shakeThreshold) {
-      _windowStart = null;
+  void _bindSensorIfNeeded(bool sensorAvailable) {
+    if (_sensorBound || !sensorAvailable) return;
+    _sensorBound = true;
+    final stream =
+        widget.accelerometerStream ?? ref.read(accelerometerStreamProvider);
+    if (stream == null) {
+      _sensorBound = false;
       return;
     }
-    final now = sample.timestamp;
-    _windowStart ??= now;
-    final dwell = now.difference(_windowStart!);
-    if (dwell >= widget.shakeWindow && !_cooldownActive) {
-      _fireShake();
+    _sensorSubscription = stream.events.listen(
+      _onSensorSample,
+      onError: (_) {
+        if (mounted) setState(() => _sensorBound = false);
+      },
+    );
+  }
+
+  void _onSensorSample(Accel3 sample) {
+    if (!mounted) return;
+    final tangential =
+        ((sample.x + sample.y * .32) / 9.81).clamp(-2.6, 2.6).toDouble();
+    final dt = _lastSensorAt == null
+        ? 1 / 60
+        : sample.timestamp
+                .difference(_lastSensorAt!)
+                .inMicroseconds
+                .clamp(4000, 80000) /
+            1000000;
+    final jerk = (tangential - _lastTangential) / math.max(dt, .01);
+    _lastTangential = tangential;
+    _lastSensorAt = sample.timestamp;
+    _sensorDrive = tangential;
+    if (jerk.abs() > 7.5) {
+      _physics.applyImpulse((jerk * .026).clamp(-3.8, 3.8).toDouble());
     }
   }
 
-  void _fireShake() {
-    _cooldownActive = true;
-    _swing
-      ..value = 0.0
-      ..forward();
-    unawaited(SystemSound.play(SystemSoundType.alert));
-    unawaited(_player.play(HapticPatterns.triple));
-    // Send bell ring event to partner.
-    ref.read(modeEventBusProvider).send(
-          ModeEvent(type: 'bell_ring', data: {'intensity': _intensity}),
-        );
-    _cooldownTimer?.cancel();
-    _cooldownTimer = Timer(_cooldown, () {
-      if (!mounted) return;
-      _cooldownActive = false;
-      _windowStart = null;
+  void _onFrame() {
+    if (!mounted) return;
+    final elapsed = _ticker.lastElapsedDuration;
+    if (elapsed == null) return;
+    final previous = _lastElapsed;
+    _lastElapsed = elapsed;
+    if (previous == null) return;
+    var delta = (elapsed - previous).inMicroseconds / 1000000;
+    if (delta <= 0) delta = 1 / 60;
+    _sensorDrive *= math.exp(-delta * 5.8);
+    final nowMs = DateTime.now().millisecondsSinceEpoch;
+    final result = _physics.step(
+      BellMotionInput(tangentialAcceleration: _sensorDrive),
+      delta,
+      nowMs: nowMs,
+    );
+    if (result.strike case final strike?
+        when nowMs >= _suppressPhysicsStrikeUntilMs) {
+      _handleStrike(strike, send: true);
+    }
+    _strikePulse = math.max(0, _strikePulse - delta * .82);
+    setState(() {});
+  }
+
+  void _onPartnerRing(ModeEvent event) {
+    final strike = BellProtocol.decode(event);
+    if (strike == null || !_deduplicator.accept(strike.id)) return;
+    _suppressPhysicsStrikeUntilMs =
+        DateTime.now().millisecondsSinceEpoch + 1100;
+    _physics.applyRemoteStrike(strike);
+    _handleStrike(strike, send: false);
+  }
+
+  void _handleStrike(BellStrike strike, {required bool send}) {
+    if (!mounted) return;
+    setState(() {
+      _strikePulse = math.max(_strikePulse, strike.strength);
+      _lastStrikeWasRemote = strike.remote;
     });
+    unawaited(_playFeedback(strike));
+    if (send) {
+      unawaited(
+        ref.read(modeEventBusProvider).send(BellProtocol.encode(strike)),
+      );
+    }
+  }
+
+  Future<void> _playFeedback(BellStrike strike) async {
+    if (widget.playSystemSound) {
+      unawaited(SystemSound.play(
+        strike.material == BellMaterial.crystal
+            ? SystemSoundType.click
+            : SystemSoundType.alert,
+      ));
+    }
+    final p = BellMaterialProfile.forMaterial(strike.material);
+    final contactAmplitude =
+        (44 + strike.strength * 178 * p.hapticHardness).round().clamp(1, 255);
+    final resonanceAmplitude =
+        (18 + strike.strength * 74).round().clamp(1, 255);
+    await _hapticPlayer.play(HapticPattern([
+      HapticBeat(
+        duration: Duration(milliseconds: 18 + (strike.strength * 28).round()),
+        amplitude: contactAmplitude,
+        gapAfter: Duration(milliseconds: 34 + ((1 - p.pitch) * 34).round()),
+      ),
+      HapticBeat(
+        duration: Duration(milliseconds: 28 + (strike.strength * 48).round()),
+        amplitude: resonanceAmplitude,
+      ),
+    ]));
+  }
+
+  void _onDragUpdate(DragUpdateDetails details) {
+    final impulse = (details.delta.dx * .022).clamp(-.75, .75).toDouble();
+    if (impulse.abs() < .01) return;
+    _gestureDirection = impulse.sign.toInt();
+    _physics.applyImpulse(impulse);
+  }
+
+  void _onDragEnd(DragEndDetails details) {
+    final velocity = details.velocity.pixelsPerSecond.dx;
+    final direction = velocity.abs() < 40 ? _gestureDirection : velocity.sign;
+    final impulse = direction * (1.8 + (velocity.abs() / 640).clamp(0, 3.4));
+    _physics.applyImpulse(impulse.toDouble());
+  }
+
+  void _nudgeBell() {
+    _gestureDirection *= -1;
+    _physics.applyImpulse(_gestureDirection * 3.6);
+  }
+
+  void _selectMaterial(BellMaterial material) {
+    if (_physics.material == material) return;
+    setState(() => _physics.setMaterial(material));
+    unawaited(HapticFeedback.selectionClick());
   }
 
   @override
   void dispose() {
-    _sub?.cancel();
-    _partnerSub?.cancel();
-    _cooldownTimer?.cancel();
-    _swing.dispose();
-    unawaited(_player.stop());
-    if (_ownsAccel) {
-      unawaited(_accel.dispose());
-    }
-    if (_ownsEngine) {
-      unawaited(_engine.cancel());
-    }
+    _sensorSubscription?.cancel();
+    _partnerSubscription?.cancel();
+    _ticker
+      ..removeListener(_onFrame)
+      ..dispose();
+    unawaited(_hapticPlayer.stop());
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context)!;
+    final copy = _BellCopy.of(context);
+    final caps = ref.watch(deviceCapabilitiesProvider).asData?.value;
+    final sensorAvailable = widget.accelerometerStream != null ||
+        (caps?.has(DeviceCapability.accelerometer) ?? false);
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => _bindSensorIfNeeded(sensorAvailable),
+    );
+    final reduceMotion = MediaQuery.disableAnimationsOf(context);
+
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: SafeArea(
-        child: Stack(
-          children: [
-            Center(
-              child: AnimatedBuilder(
-                animation: _swing,
-                builder: (context, _) {
-                  // Decaying triangle wave — full swing on impact,
-                  // fading wobble while the controller eases back.
-                  final v = _swing.value;
-                  final angle = 0.55 *
-                      math.sin(v * math.pi * 4) *
-                      (1 - v).clamp(0.0, 1.0);
-                  return Transform.rotate(
-                    angle: angle,
-                    child: const Icon(
-                      Icons.notifications_active_rounded,
-                      size: 168,
-                      color: AppColors.pulse,
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          const Positioned.fill(child: PulseBackdrop(child: SizedBox())),
+          Positioned.fill(
+            child: Semantics(
+              label: copy.bellSurface,
+              button: true,
+              onTap: _nudgeBell,
+              child: GestureDetector(
+                key: const ValueKey('bell-gesture-surface'),
+                behavior: HitTestBehavior.opaque,
+                onTap: _nudgeBell,
+                onHorizontalDragUpdate: _onDragUpdate,
+                onHorizontalDragEnd: _onDragEnd,
+                child: AnimatedBuilder(
+                  animation: _ticker,
+                  builder: (context, _) => CustomPaint(
+                    key: const ValueKey('physical-bell-renderer'),
+                    painter: BellPhysicalPainter(
+                      state: _physics.state,
+                      material: _physics.material,
+                      ambientProgress: _ticker.value,
+                      strikePulse: _strikePulse,
+                      remotePulse: _lastStrikeWasRemote,
+                      reduceMotion: reduceMotion,
                     ),
-                  );
-                },
-              ),
-            ),
-            Positioned(
-              top: 14,
-              left: 0,
-              right: 0,
-              child: Center(
-                child: Text(
-                  t.bellHint,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    color: AppColors.textMuted,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
+                    child: const SizedBox.expand(),
                   ),
                 ),
               ),
             ),
-            Positioned(
-              left: 24,
-              right: 24,
-              bottom: 32,
+          ),
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
+                child: PulseHeader(
+                  title: t.modeBell,
+                  trailing: PulseRoundButton(
+                    icon: Icons.close_rounded,
+                    onTap: () => Navigator.of(context).maybePop(),
+                    subtle: true,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            top: MediaQuery.paddingOf(context).top + 70,
+            left: 24,
+            right: 24,
+            child: IgnorePointer(
               child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    t.bellIntensity,
+                    copy.subtitle,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: AppColors.textPrimary,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -.35,
+                    ),
+                  ),
+                  const SizedBox(height: 5),
+                  Text(
+                    sensorAvailable ? t.bellHint : copy.fallbackHint,
+                    textAlign: TextAlign.center,
                     style: const TextStyle(
                       color: AppColors.textSecondary,
                       fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(10),
-                    child: LinearProgressIndicator(
-                      value: _intensity.clamp(0.0, 1.0),
-                      minHeight: 8,
-                      backgroundColor: AppColors.outlineSoft,
-                      valueColor: const AlwaysStoppedAnimation(AppColors.pulse),
+                      height: 1.35,
                     ),
                   ),
                 ],
               ),
             ),
-            Positioned(
-              top: 8,
-              right: 8,
-              child: IconButton(
-                tooltip: t.hubExit,
-                color: AppColors.textSecondary,
-                icon: const Icon(Icons.close_rounded),
-                onPressed: () => Navigator.of(context).maybePop(),
+          ),
+          Positioned(
+            left: 20,
+            right: 20,
+            bottom: 28,
+            child: SafeArea(
+              top: false,
+              child: PulsePanel(
+                radius: 26,
+                padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.graphic_eq_rounded,
+                          size: 16,
+                          color: Color(0xFFFFD071),
+                        ),
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: Text(
+                            _lastStrikeWasRemote
+                                ? copy.partnerRang
+                                : copy.materialTitle,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: AppColors.textSecondary,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                        const Spacer(),
+                        Text(
+                          '${(_physics.state.resonance * 100).round()}%',
+                          style: const TextStyle(
+                            color: AppColors.textMuted,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: BellMaterial.values.map((material) {
+                        final selected = material == _physics.material;
+                        return Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 3),
+                            child: Semantics(
+                              selected: selected,
+                              button: true,
+                              child: Material(
+                                color: selected
+                                    ? const Color(0xFFFFD071)
+                                        .withValues(alpha: .14)
+                                    : Colors.transparent,
+                                borderRadius: BorderRadius.circular(17),
+                                child: InkWell(
+                                  key: ValueKey(
+                                    'bell-material-${material.name}',
+                                  ),
+                                  onTap: () => _selectMaterial(material),
+                                  borderRadius: BorderRadius.circular(17),
+                                  child: Container(
+                                    height: 38,
+                                    alignment: Alignment.center,
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(17),
+                                      border: Border.all(
+                                        color: selected
+                                            ? const Color(0xFFFFD071)
+                                                .withValues(alpha: .55)
+                                            : AppColors.outlineSoft,
+                                      ),
+                                    ),
+                                    child: Text(
+                                      copy.material(material),
+                                      maxLines: 1,
+                                      style: TextStyle(
+                                        color: selected
+                                            ? const Color(0xFFFFE3A1)
+                                            : AppColors.textSecondary,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      }).toList(growable: false),
+                    ),
+                  ],
+                ),
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
+}
+
+class _BellCopy {
+  const _BellCopy({required this.ru});
+
+  factory _BellCopy.of(BuildContext context) =>
+      _BellCopy(ru: Localizations.localeOf(context).languageCode == 'ru');
+
+  final bool ru;
+
+  String get subtitle =>
+      ru ? 'Позвони ему через расстояние' : 'Ring it across the distance';
+  String get fallbackHint => ru
+      ? 'Проведи по колокольчику или коснись его'
+      : 'Swipe across the bell or tap it';
+  String get bellSurface => ru
+      ? 'Физический колокольчик. Проведите, чтобы раскачать'
+      : 'Physical bell. Swipe to swing';
+  String get materialTitle => ru ? 'Характер звучания' : 'Sound character';
+  String get partnerRang => ru ? 'Он позвонил тебе' : 'Your person rang you';
+
+  String material(BellMaterial material) => switch (material) {
+        BellMaterial.brass => ru ? 'Латунь' : 'Brass',
+        BellMaterial.crystal => ru ? 'Хрусталь' : 'Crystal',
+        BellMaterial.porcelain => ru ? 'Фарфор' : 'Porcelain',
+      };
 }

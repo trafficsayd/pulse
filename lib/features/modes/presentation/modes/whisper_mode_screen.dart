@@ -8,25 +8,22 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../capabilities/application/capability_providers.dart';
 import '../../../capabilities/domain/device_capability.dart';
+import '../../../session/application/mode_event.dart';
+import '../../../session/application/mode_event_bus.dart';
+import '../../application/whisper/audio_feeling_controller.dart';
+import '../../application/whisper/whisper_feeling.dart';
+import '../../application/whisper/whisper_protocol.dart';
 import '../../primitives/haptic_pattern_player.dart';
 import '../../primitives/mic_level_stream.dart';
 import '../../primitives/primitive_providers.dart';
 import 'unsupported_mode_screen.dart';
 
-import '../../../session/application/mode_event.dart';
-import '../../../session/application/mode_event_bus.dart';
-
-/// "Whisper" — radial waveform driven by [MicLevelStream.levels].
+/// A privacy-first Audio-to-Feeling experience.
 ///
-/// Subscribes to a [MicLevelStream] (Track C) and renders an animated
-/// radial waveform sized by the live amplitude. When the normalized
-/// level crosses 0.15 for two consecutive samples the screen fires
-/// [HapticPatterns.whisper] through [HapticPatternPlayer] — the
-/// "warm exhale" pulse Pulse's vocabulary uses for soft arrivals.
-///
-/// All disposal is centralised in [_WhisperModeViewState.dispose]: the
-/// mic stream is released, the haptic engine cancelled, and the
-/// animation controller stopped before [super.dispose].
+/// Microphone samples are reduced locally to intensity, breathiness and
+/// perceived proximity. Only those non-reversible parameters cross the
+/// encrypted session. When microphone access is unavailable, holding the
+/// central surface sends the same kind of feeling without capturing audio.
 class WhisperModeScreen extends ConsumerWidget {
   const WhisperModeScreen({
     super.key,
@@ -36,32 +33,15 @@ class WhisperModeScreen extends ConsumerWidget {
     this.requiredConsecutive = 2,
   });
 
-  /// Optional override. When null, the screen reads the real microphone
-  /// via [micLevelStreamProvider] (backed by `package:record`).
   final MicLevelStream? micLevelStream;
-
-  /// Optional override for the haptic engine. Tests pass in a
-  /// [RecordingHapticEngine] to assert beats fired.
   final HapticEngine? hapticEngine;
-
-  /// Amplitude that counts as "audible whisper". Values strictly above
-  /// this threshold for [requiredConsecutive] consecutive samples
-  /// trigger the haptic.
   final double threshold;
-
-  /// How many consecutive samples must exceed [threshold]. Default 2 —
-  /// a single noisy spike (a passing footstep) should not pulse the
-  /// partner.
   final int requiredConsecutive;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = AppLocalizations.of(context)!;
     final capsAsync = ref.watch(deviceCapabilitiesProvider);
-    const required = {
-      DeviceCapability.microphone,
-      DeviceCapability.vibration,
-    };
     if (capsAsync.isLoading) {
       return const Scaffold(
         backgroundColor: AppColors.background,
@@ -71,17 +51,21 @@ class WhisperModeScreen extends ConsumerWidget {
       );
     }
     final caps = capsAsync.asData?.value ?? const DeviceCapabilities.none();
-    if (!caps.hasAll(required)) {
+    if (!caps.has(DeviceCapability.vibration)) {
       return UnsupportedModeScreen(
         title: t.modeWhisper,
-        missing: caps.missing(required),
+        missing: const {DeviceCapability.vibration},
       );
     }
+    final hasMicrophone = caps.has(DeviceCapability.microphone);
     return _WhisperModeView(
-      micLevelStream: micLevelStream ?? ref.watch(micLevelStreamProvider),
+      micLevelStream: hasMicrophone
+          ? micLevelStream ?? ref.watch(micLevelStreamProvider)
+          : null,
       hapticEngine: hapticEngine ?? ref.watch(hapticEngineProvider),
       threshold: threshold,
       requiredConsecutive: requiredConsecutive,
+      hasMicrophone: hasMicrophone,
     );
   }
 }
@@ -92,12 +76,14 @@ class _WhisperModeView extends ConsumerStatefulWidget {
     required this.hapticEngine,
     required this.threshold,
     required this.requiredConsecutive,
+    required this.hasMicrophone,
   });
 
   final MicLevelStream? micLevelStream;
-  final HapticEngine? hapticEngine;
+  final HapticEngine hapticEngine;
   final double threshold;
   final int requiredConsecutive;
+  final bool hasMicrophone;
 
   @override
   ConsumerState<_WhisperModeView> createState() => _WhisperModeViewState();
@@ -105,251 +91,460 @@ class _WhisperModeView extends ConsumerStatefulWidget {
 
 class _WhisperModeViewState extends ConsumerState<_WhisperModeView>
     with SingleTickerProviderStateMixin {
-  late final MicLevelStream _mic;
-  late final HapticEngine _engine;
-  late final HapticPatternPlayer _player;
-  StreamSubscription<MicLevel>? _sub;
-  late final AnimationController _ambient;
-
-  double _level = 0.0;
-  double _partnerLevel = 0.0;
-  StreamSubscription<ModeEvent>? _partnerSub;
-  Timer? _partnerLevelDecay;
-  int _ticksOverThreshold = 0;
+  final AudioFeelingController _feelingController = AudioFeelingController();
+  final WhisperReceiver _receiver = WhisperReceiver();
+  StreamSubscription<MicLevel>? _micSubscription;
+  StreamSubscription<ModeEvent>? _partnerSubscription;
+  late final HapticPatternPlayer _hapticPlayer;
+  late final AnimationController _motion;
+  Timer? _fallbackTimer;
+  DateTime? _fallbackStartedAt;
+  WhisperFeeling? _local;
+  WhisperFeeling? _partner;
+  DateTime? _partnerReceivedAt;
   int _partnerTicksOverThreshold = 0;
-  DateTime? _lastLevelSentAt;
-  double _lastLevelSent = 0;
-  bool _ownsMic = false;
-  bool _ownsEngine = false;
+  bool _manualSending = false;
 
   @override
   void initState() {
     super.initState();
-    if (widget.micLevelStream == null) {
-      _mic = FakeMicLevelStream();
-      _ownsMic = true;
-    } else {
-      _mic = widget.micLevelStream!;
-    }
-    if (widget.hapticEngine == null) {
-      _engine = const NullHapticEngine();
-      _ownsEngine = true;
-    } else {
-      _engine = widget.hapticEngine!;
-    }
-    _player = HapticPatternPlayer(_engine);
-    _ambient = AnimationController(
+    _hapticPlayer = HapticPatternPlayer(widget.hapticEngine);
+    _motion = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 3),
+      duration: const Duration(milliseconds: 4200),
     )..repeat();
-    _sub = _mic.levels.listen(_onLevel);
-    _partnerSub = ref
+    _micSubscription = widget.micLevelStream?.levels.listen(_onMicLevel);
+    _partnerSubscription = ref
         .read(modeEventBusProvider)
         .incoming
-        .where((e) => e.type == 'whisper_level')
-        .listen((e) {
-      if (mounted) {
-        final partnerLevel =
-            ((e.data['level'] as num?)?.toDouble() ?? 0).clamp(0.0, 1.0);
-        setState(() => _partnerLevel = partnerLevel);
-        _partnerLevelDecay?.cancel();
-        if (partnerLevel > 0) {
-          _partnerLevelDecay = Timer(const Duration(milliseconds: 450), () {
-            if (!mounted) return;
-            setState(() => _partnerLevel = 0);
-            _partnerTicksOverThreshold = 0;
-          });
-        }
-        if (partnerLevel > widget.threshold) {
-          _partnerTicksOverThreshold++;
-          if (_partnerTicksOverThreshold == widget.requiredConsecutive) {
-            unawaited(_player.play(HapticPatterns.whisper));
-          }
-        } else {
-          _partnerTicksOverThreshold = 0;
-        }
-      }
-    });
+        .where((event) => event.type == WhisperProtocol.eventType)
+        .listen(_onPartnerEvent);
   }
 
-  void _onLevel(MicLevel sample) {
-    if (!mounted) return;
-    setState(() => _level = sample.level01);
-    // Send mic level to partner.
-    final shouldTransmit = sample.level01 > 0.02 || _lastLevelSent > 0.02;
-    if (shouldTransmit &&
-        (_lastLevelSentAt == null ||
-            sample.timestamp.difference(_lastLevelSentAt!) >=
-                const Duration(milliseconds: 100))) {
-      _lastLevelSentAt = sample.timestamp;
-      _lastLevelSent = sample.level01;
-      unawaited(ref.read(modeEventBusProvider).send(
-            ModeEvent(type: 'whisper_level', data: {'level': sample.level01}),
-          ));
-    }
-    if (sample.level01 > widget.threshold) {
-      _ticksOverThreshold++;
-      if (_ticksOverThreshold == widget.requiredConsecutive) {
-        // Fire-and-forget; haptic player handles cancellation if the
-        // widget is unmounted mid-pattern.
-        unawaited(_player.play(HapticPatterns.whisper));
+  void _onMicLevel(MicLevel sample) {
+    if (!mounted || _manualSending) return;
+    final feeling = _feelingController.process(sample);
+    setState(() => _local = feeling);
+    _sendIfNeeded(feeling);
+  }
+
+  void _onPartnerEvent(ModeEvent event) {
+    final feeling = WhisperProtocol.tryDecode(event);
+    if (!mounted || feeling == null || !_receiver.accept(feeling)) return;
+    setState(() {
+      _partner = feeling;
+      _partnerReceivedAt = DateTime.now();
+    });
+    if (feeling.intensity > widget.threshold) {
+      _partnerTicksOverThreshold++;
+      if (_partnerTicksOverThreshold == widget.requiredConsecutive) {
+        unawaited(_hapticPlayer.play(HapticPatterns.whisper));
       }
     } else {
-      _ticksOverThreshold = 0;
+      _partnerTicksOverThreshold = 0;
     }
+  }
+
+  void _sendIfNeeded(WhisperFeeling feeling, {bool force = false}) {
+    if (!_feelingController.shouldSend(feeling, force: force)) return;
+    unawaited(
+      ref.read(modeEventBusProvider).send(WhisperProtocol.encode(feeling)),
+    );
+  }
+
+  void _startFallback() {
+    if (_manualSending) return;
+    setState(() => _manualSending = true);
+    _fallbackStartedAt = DateTime.now();
+    _fallbackTimer = Timer.periodic(
+      const Duration(milliseconds: 80),
+      (_) => _emitFallbackFrame(),
+    );
+    _emitFallbackFrame();
+  }
+
+  void _emitFallbackFrame() {
+    if (!mounted || !_manualSending) return;
+    final now = DateTime.now();
+    final elapsed = now.difference(_fallbackStartedAt!).inMilliseconds;
+    final phase = (elapsed % 2400) / 2400;
+    final feeling = _feelingController.fallback(phase, now);
+    setState(() => _local = feeling);
+    _sendIfNeeded(feeling);
+  }
+
+  void _stopFallback() {
+    if (!_manualSending) return;
+    _fallbackTimer?.cancel();
+    _fallbackTimer = null;
+    final silence = _feelingController.silence(
+      DateTime.now(),
+      isFallback: true,
+    );
+    setState(() {
+      _manualSending = false;
+      _local = silence;
+    });
+    _sendIfNeeded(silence, force: true);
   }
 
   @override
   void dispose() {
-    _sub?.cancel();
-    _partnerSub?.cancel();
-    _partnerLevelDecay?.cancel();
-    _ambient.dispose();
-    unawaited(_player.stop());
-    if (_ownsMic) {
-      unawaited(_mic.dispose());
-    }
-    if (_ownsEngine) {
-      unawaited(_engine.cancel());
-    }
+    _fallbackTimer?.cancel();
+    unawaited(_micSubscription?.cancel());
+    unawaited(_partnerSubscription?.cancel());
+    unawaited(_hapticPlayer.stop());
+    _motion.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context)!;
+    final isRussian = Localizations.localeOf(context).languageCode == 'ru';
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
-        child: Stack(
-          children: [
-            Positioned.fill(
-              child: RepaintBoundary(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+          child: Column(
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      t.modeWhisper,
+                      style: const TextStyle(
+                        color: AppColors.textPrimary,
+                        fontSize: 28,
+                        height: 1.05,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: -0.8,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: t.hubExit,
+                    color: AppColors.textSecondary,
+                    icon: const Icon(Icons.close_rounded),
+                    onPressed: () => Navigator.of(context).maybePop(),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: _PrivacyBadge(
+                  label: isRussian
+                      ? 'Аудио не записывается'
+                      : 'Audio is never recorded',
+                ),
+              ),
+              Expanded(
                 child: AnimatedBuilder(
-                  animation: _ambient,
+                  animation: _motion,
                   builder: (context, _) {
-                    return CustomPaint(
-                      painter: _RadialWaveformPainter(
-                        level01: _level,
-                        partnerLevel01: _partnerLevel,
-                        ambient: _ambient.value,
+                    final partner = _decayedPartner();
+                    return Semantics(
+                      label: isRussian
+                          ? 'Живая волна шёпота'
+                          : 'Living whisper wave',
+                      child: CustomPaint(
+                        key: const Key('whisper-feeling-canvas'),
+                        painter: _WhisperMembranePainter(
+                          local: _local,
+                          partner: partner,
+                          phase: _motion.value,
+                        ),
+                        child: Center(
+                          child: _FeelingCore(
+                            local: _local,
+                            partner: partner,
+                          ),
+                        ),
                       ),
                     );
                   },
                 ),
               ),
-            ),
-            Positioned(
-              top: 14,
-              left: 0,
-              right: 0,
-              child: Center(
-                child: Text(
-                  t.whisperHint,
-                  style: const TextStyle(
-                    color: AppColors.textMuted,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
+              Text(
+                widget.hasMicrophone
+                    ? t.whisperHint
+                    : (isRussian
+                        ? 'Микрофон недоступен. Удерживайте круг, чтобы передать мягкую волну.'
+                        : 'Microphone unavailable. Hold the circle to send a soft wave.'),
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 14,
+                  height: 1.45,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: 18),
+              Semantics(
+                button: true,
+                label: isRussian
+                    ? 'Удерживать для тихой волны'
+                    : 'Hold for a quiet wave',
+                child: GestureDetector(
+                  key: const Key('whisper-fallback-control'),
+                  behavior: HitTestBehavior.opaque,
+                  onTapDown: (_) => _startFallback(),
+                  onTapUp: (_) => _stopFallback(),
+                  onTapCancel: _stopFallback,
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    width: double.infinity,
+                    height: 58,
+                    decoration: BoxDecoration(
+                      color: _manualSending
+                          ? const Color(0xFF242034)
+                          : AppColors.surface,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: _manualSending
+                            ? const Color(0xFFA897D8)
+                            : AppColors.outline,
+                      ),
+                    ),
+                    alignment: Alignment.center,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          _manualSending
+                              ? Icons.graphic_eq_rounded
+                              : Icons.touch_app_rounded,
+                          color: _manualSending
+                              ? const Color(0xFFD7CBFF)
+                              : AppColors.textSecondary,
+                          size: 21,
+                        ),
+                        const SizedBox(width: 10),
+                        Text(
+                          _manualSending
+                              ? (isRussian ? 'Передаю тепло' : 'Sending warmth')
+                              : (isRussian
+                                  ? 'Удерживать без микрофона'
+                                  : 'Hold without microphone'),
+                          style: TextStyle(
+                            color: _manualSending
+                                ? AppColors.textPrimary
+                                : AppColors.textSecondary,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  WhisperFeeling? _decayedPartner() {
+    final partner = _partner;
+    final receivedAt = _partnerReceivedAt;
+    if (partner == null || receivedAt == null || partner.isSilent) {
+      return partner;
+    }
+    final age = DateTime.now().difference(receivedAt).inMilliseconds / 1000;
+    final decay = math.exp(-math.max(0, age - 0.35) / 0.9).clamp(0.0, 1.0);
+    return WhisperFeeling(
+      sequence: partner.sequence,
+      capturedAtMs: partner.capturedAtMs,
+      intensity: partner.intensity * decay,
+      breathiness: partner.breathiness,
+      proximity: partner.proximity * decay,
+      isFallback: partner.isFallback,
+    );
+  }
+}
+
+class _PrivacyBadge extends StatelessWidget {
+  const _PrivacyBadge({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      key: const Key('whisper-privacy-badge'),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: const Color(0xFF111A18),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFF24443B)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.lock_outline_rounded,
+            size: 14,
+            color: Color(0xFF89C9B5),
+          ),
+          const SizedBox(width: 7),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Color(0xFF9DD1C0),
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
             ),
-            Positioned(
-              top: 8,
-              right: 8,
-              child: IconButton(
-                tooltip: t.hubExit,
-                color: AppColors.textSecondary,
-                icon: const Icon(Icons.close_rounded),
-                onPressed: () => Navigator.of(context).maybePop(),
-              ),
-            ),
-          ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FeelingCore extends StatelessWidget {
+  const _FeelingCore({required this.local, required this.partner});
+
+  final WhisperFeeling? local;
+  final WhisperFeeling? partner;
+
+  @override
+  Widget build(BuildContext context) {
+    final localLevel = local?.intensity ?? 0;
+    final partnerLevel = partner?.intensity ?? 0;
+    final active = math.max(localLevel, partnerLevel);
+    return AnimatedScale(
+      duration: const Duration(milliseconds: 180),
+      curve: Curves.easeOutCubic,
+      scale: 1 + active * 0.08,
+      child: Container(
+        width: 104,
+        height: 104,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: Color.lerp(
+            const Color(0xFF171923),
+            const Color(0xFF262136),
+            active,
+          ),
+          border: Border.all(
+            color: partnerLevel > localLevel
+                ? const Color(0xFFD4C5FF)
+                : const Color(0xFF9DDFF0),
+            width: 1.2,
+          ),
+        ),
+        child: Icon(
+          partnerLevel > 0.03 ? Icons.waves_rounded : Icons.air_rounded,
+          size: 31,
+          color: AppColors.textPrimary.withValues(alpha: 0.88),
         ),
       ),
     );
   }
 }
 
-class _RadialWaveformPainter extends CustomPainter {
-  _RadialWaveformPainter({
-    required this.level01,
-    required this.partnerLevel01,
-    required this.ambient,
+class _WhisperMembranePainter extends CustomPainter {
+  const _WhisperMembranePainter({
+    required this.local,
+    required this.partner,
+    required this.phase,
   });
 
-  final double level01;
-  final double partnerLevel01;
-  final double ambient;
+  final WhisperFeeling? local;
+  final WhisperFeeling? partner;
+  final double phase;
 
   @override
   void paint(Canvas canvas, Size size) {
     final center = size.center(Offset.zero);
     final shortest = size.shortestSide;
-    final baseRadius = shortest * 0.18;
-    final amp = level01.clamp(0.0, 1.0);
-    final outerRadius = baseRadius + amp * shortest * 0.32;
-
-    // Soft halo — drifts with the ambient tick so the screen has life
-    // even at perfect silence.
-    final halo = Paint()
-      ..shader = RadialGradient(
-        colors: [
-          AppColors.pulse.withValues(alpha: 0.22 + amp * 0.4),
-          AppColors.pulse.withValues(alpha: 0.0),
-        ],
-      ).createShader(
-        Rect.fromCircle(center: center, radius: outerRadius * 1.6),
-      );
-    canvas.drawCircle(center, outerRadius * 1.6, halo);
-
-    // 24 radial spokes, length modulated by amplitude with a small
-    // ambient breathing offset so silence isn't a frozen disk.
-    const spokes = 24;
-    final spokePaint = Paint()
-      ..color = AppColors.pulse.withValues(alpha: 0.7)
-      ..strokeWidth = 2.0
-      ..strokeCap = StrokeCap.round
-      ..isAntiAlias = true;
-    for (var i = 0; i < spokes; i++) {
-      final theta = (i / spokes) * 2 * math.pi;
-      final wobble = 0.04 * math.sin(ambient * 2 * math.pi + i * (math.pi / 3));
-      final r1 = baseRadius * (0.92 + wobble);
-      final r2 = outerRadius * (0.86 + wobble);
-      final p1 = center + Offset(math.cos(theta), math.sin(theta)) * r1;
-      final p2 = center + Offset(math.cos(theta), math.sin(theta)) * r2;
-      canvas.drawLine(p1, p2, spokePaint);
-    }
-
-    // Inner ring keeps the form readable even at level==0.
-    final inner = Paint()
-      ..color = AppColors.pulse.withValues(alpha: 0.85)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.0
-      ..isAntiAlias = true;
-    canvas.drawCircle(center, baseRadius, inner);
-
-    // The partner breathes as a second, warm ring. Keeping the two signals
-    // visually distinct makes the mode feel shared instead of mirrored.
-    if (partnerLevel01 > 0.01) {
-      final partnerRadius =
-          baseRadius + partnerLevel01.clamp(0.0, 1.0) * shortest * 0.28;
+    final base = shortest * 0.18;
+    _drawFeeling(
+      canvas,
+      center,
+      base,
+      local,
+      phase,
+      const Color(0xFF76CFE5),
+      clockwise: true,
+    );
+    _drawFeeling(
+      canvas,
+      center,
+      base * 1.06,
+      partner,
+      1 - phase,
+      const Color(0xFFC2AEFF),
+      clockwise: false,
+    );
+    if ((local?.intensity ?? 0) < 0.01 && (partner?.intensity ?? 0) < 0.01) {
       canvas.drawCircle(
         center,
-        partnerRadius,
+        base * (1.42 + math.sin(phase * math.pi * 2) * 0.018),
         Paint()
-          ..color = AppColors.heart.withValues(
-            alpha: 0.28 + partnerLevel01 * 0.5,
-          )
+          ..color = const Color(0xFF343846)
           ..style = PaintingStyle.stroke
-          ..strokeWidth = 2.4,
+          ..strokeWidth = 1,
+      );
+    }
+  }
+
+  void _drawFeeling(
+    Canvas canvas,
+    Offset center,
+    double base,
+    WhisperFeeling? feeling,
+    double time,
+    Color color, {
+    required bool clockwise,
+  }) {
+    if (feeling == null || feeling.intensity <= 0.005) return;
+    final intensity = feeling.intensity.clamp(0.0, 1.0);
+    final air = feeling.breathiness.clamp(0.0, 1.0);
+    final proximity = feeling.proximity.clamp(0.0, 1.0);
+    for (var ring = 0; ring < 4; ring++) {
+      final progress = (time + ring * 0.23) % 1;
+      final radius = base * (1.15 + proximity * 0.48 + progress * 1.02);
+      final opacity = intensity * (1 - progress) * (0.34 - ring * 0.035);
+      if (opacity <= 0.01) continue;
+      final path = Path();
+      const points = 96;
+      for (var i = 0; i <= points; i++) {
+        final angle = i / points * math.pi * 2;
+        final direction = clockwise ? 1.0 : -1.0;
+        final texture =
+            math.sin(angle * (3 + ring) + time * math.pi * 2 * direction) *
+                base *
+                (0.012 + air * 0.035) *
+                intensity;
+        final r = radius + texture;
+        final point = center + Offset(math.cos(angle), math.sin(angle)) * r;
+        if (i == 0) {
+          path.moveTo(point.dx, point.dy);
+        } else {
+          path.lineTo(point.dx, point.dy);
+        }
+      }
+      path.close();
+      canvas.drawPath(
+        path,
+        Paint()
+          ..color = color.withValues(alpha: opacity.clamp(0.0, 1.0))
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.1 + intensity * 1.2
+          ..strokeCap = StrokeCap.round
+          ..isAntiAlias = true,
       );
     }
   }
 
   @override
-  bool shouldRepaint(covariant _RadialWaveformPainter old) =>
-      old.level01 != level01 ||
-      old.partnerLevel01 != partnerLevel01 ||
-      old.ambient != ambient;
+  bool shouldRepaint(covariant _WhisperMembranePainter oldDelegate) =>
+      oldDelegate.local != local ||
+      oldDelegate.partner != partner ||
+      oldDelegate.phase != phase;
 }

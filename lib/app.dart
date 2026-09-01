@@ -14,6 +14,7 @@ import 'core/widgets/session_error_banner.dart';
 import 'features/subscription/application/subscription_controller.dart';
 import 'features/connections/application/connections_controller.dart';
 import 'features/lockscreen/application/lockscreen_ray_bridge.dart';
+import 'features/lockscreen/application/lockscreen_knock_bridge.dart';
 import 'features/modes/application/mode_registry.dart';
 import 'features/modes/domain/pulse_mode.dart';
 import 'features/session/application/mode_event.dart';
@@ -49,6 +50,9 @@ class _PulseAppState extends ConsumerState<PulseApp> {
     // redelivery that arrives before the paywall is opened must not be
     // dropped on the floor.
     ref.read(subscriptionControllerProvider.notifier);
+    LockscreenKnockBridge.initialize(
+      onNativeReply: (event) => ref.read(modeEventBusProvider).send(event),
+    );
   }
 
   @override
@@ -66,6 +70,12 @@ class _PulseAppState extends ConsumerState<PulseApp> {
       // not lost while the lock-screen activity is being created.
       unawaited(
         LockscreenRayBridge.handleIncoming(
+          event,
+          languageCode: locale?.languageCode,
+        ),
+      );
+      unawaited(
+        LockscreenKnockBridge.handleIncoming(
           event,
           languageCode: locale?.languageCode,
         ),

@@ -95,6 +95,15 @@
             android:showWhenLocked="true"
             android:turnScreenOn="true"
             android:theme="@style/LockscreenTheme" />
+        <activity
+            android:name=".LockscreenKnockActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:launchMode="singleTop"
+            android:screenOrientation="portrait"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:theme="@style/LockscreenTheme" />
         <service
             android:name=".PulseConnectionService"
             android:exported="false"

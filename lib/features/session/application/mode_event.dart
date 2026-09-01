@@ -10,7 +10,8 @@ import 'dart:typed_data';
 /// after encryption.
 ///
 /// Well-known event types:
-/// - `tap` — TapTap: `{x, y}`
+/// - `tap` — TapTap v1 compatibility: `{x, y}`
+/// - `knock_*` — TapTap v2: versioned tactile series and replies
 /// - `hold_start` / `hold_end` — HalfHeart
 /// - `candle_*` — shared Candle ritual (light, breath, shield, wish, memory)
 /// - `whisper_level` — Whisper: `{level}`

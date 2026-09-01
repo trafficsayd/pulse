@@ -204,7 +204,13 @@ PulseModeDescriptor? findMode(PulseModeId id) {
 /// Resolve a wire event to the mode that owns it. Kept next to the registry
 /// so incoming notifications and tests share one exhaustive mapping.
 PulseModeId? modeForEventType(String type) => switch (type) {
-      'tap' => PulseModeId.tapTap,
+      'tap' ||
+      'knock_begin' ||
+      'knock_hit' ||
+      'knock_end' ||
+      'knock_reply' ||
+      'knock_receipt' =>
+        PulseModeId.tapTap,
       'hold_start' || 'hold_end' => PulseModeId.halfHeart,
       'candle_light' ||
       'candle_blow' ||

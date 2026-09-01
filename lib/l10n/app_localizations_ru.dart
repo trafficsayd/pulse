@@ -432,6 +432,19 @@ class AppLocalizationsRu extends AppLocalizations {
   String get tapTapHint => 'Коснитесь, чтобы постучать';
 
   @override
+  String get tapTapReplyHint => 'Коснитесь, чтобы постучать в ответ';
+
+  @override
+  String get tapTapSubtitle => 'Я тихо постучался в твой мир';
+
+  @override
+  String get tapTapDescription => 'Одно касание — простое «я здесь»';
+
+  @override
+  String get tapTapSurfaceLabel =>
+      'Общая поверхность для стука близкому человеку';
+
+  @override
   String get halfHeartHint => 'Удерживай свою половину';
 
   @override

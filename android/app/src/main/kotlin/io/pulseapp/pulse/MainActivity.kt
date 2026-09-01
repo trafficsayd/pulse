@@ -34,6 +34,8 @@ private const val MIC_EVENT_CHANNEL = "app.pulse.audio/micStream"
 private const val TORCH_CHANNEL = "app.pulse.audio/torch"
 private const val CANDLE_AUDIO_CHANNEL = "app.pulse.audio/candle"
 private const val LOCKSCREEN_RAY_CHANNEL = "app.pulse.lockscreen/ray"
+private const val LOCKSCREEN_KNOCK_CHANNEL = "app.pulse.lockscreen/knock"
+private const val HAPTICS_CHANNEL = "app.pulse/haptics"
 private const val MIC_PERMISSION_REQUEST = 4242
 private const val CAMERA_PERMISSION_REQUEST = 4243
 private const val NOTIFICATION_PERMISSION_REQUEST = 4244
@@ -74,6 +76,8 @@ class MainActivity : FlutterActivity() {
     private var pendingNotificationResult: MethodChannel.Result? = null
     private var torchCameraId: String? = null
     private var candleAudioEngine: CandleAudioEngine? = null
+    private var pulseHapticEngine: PulseHapticEngine? = null
+    private var lockscreenKnockChannel: MethodChannel? = null
     private var activityResumed = false
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -161,6 +165,55 @@ class MainActivity : FlutterActivity() {
                 }
                 result.success(null)
             }
+
+        pulseHapticEngine = PulseHapticEngine(this)
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, HAPTICS_CHANNEL)
+            .setMethodCallHandler { call, result ->
+                if (call.method != "play") {
+                    result.notImplemented()
+                    return@setMethodCallHandler
+                }
+                val arguments = call.arguments as? Map<*, *>
+                val effect = arguments?.get("effect") as? String ?: "clear"
+                val intensity = (arguments?.get("intensity") as? Number)?.toDouble() ?: .5
+                val sharpness = (arguments?.get("sharpness") as? Number)?.toDouble() ?: .5
+                result.success(pulseHapticEngine?.play(effect, intensity, sharpness) == true)
+            }
+
+        lockscreenKnockChannel = MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            LOCKSCREEN_KNOCK_CHANNEL,
+        ).also { channel ->
+            LockscreenKnockController.replySink = { payload ->
+                runOnUiThread { channel.invokeMethod("knockReply", payload) }
+            }
+            channel.setMethodCallHandler { call, result ->
+                if (call.method != "knockEvent") {
+                    result.notImplemented()
+                    return@setMethodCallHandler
+                }
+                val arguments = call.arguments as? Map<*, *>
+                val type = arguments?.get("type") as? String
+                val data = arguments?.get("data") as? Map<*, *>
+                val languageCode = arguments?.get("languageCode") as? String
+                if (type == null || data == null) {
+                    result.error(
+                        "invalid_knock_event",
+                        "Knock event requires type and data",
+                        null,
+                    )
+                } else {
+                    LockscreenKnockController.handleEvent(
+                        context = this,
+                        eventType = type,
+                        data = data,
+                        appResumed = activityResumed,
+                        languageCode = languageCode,
+                    )
+                    result.success(null)
+                }
+            }
+        }
 
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, LOCKSCREEN_RAY_CHANNEL)
             .setMethodCallHandler { call, result ->

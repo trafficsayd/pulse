@@ -12,7 +12,7 @@ between two paired devices.
 │   Host A   │                              │  Partner B │
 └────────────┘                              └────────────┘
       │   1. generate ephemeral X25519 keypair
-      │   2. show QR `pulse://pair?v=1&pk=<pk_A_b64url>`
+      │   2. show QR `pulse://pair?v=1&code=<6 digits>&pk=<pk_A_b64url>`
       │ ─────────────────────────  pk_A  ─────────────────▶
       │                                            │
       │                                3. generate ephemeral X25519 keypair

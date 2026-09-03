@@ -34,6 +34,41 @@ class AppLocalizationsRu extends AppLocalizations {
   String get pairingEnterCode => 'Введите шестизначный код';
 
   @override
+  String get pairingScanQr => 'Сканировать QR-код';
+
+  @override
+  String get pairingScanQrHint =>
+      'Наведите камеру на QR-код на телефоне близкого человека';
+
+  @override
+  String get pairingManualHint =>
+      'Введите код, показанный на телефоне близкого человека';
+
+  @override
+  String get pairingUseCode => 'Ввести код вручную';
+
+  @override
+  String get pairingScanQrInstead => 'Сканировать QR вместо кода';
+
+  @override
+  String get pairingQrInvalid => 'Это не QR-код подключения Pulse';
+
+  @override
+  String get pairingQrConnectionFailed =>
+      'Безопасное подключение не удалось. Проверьте, что QR-код актуален, и повторите.';
+
+  @override
+  String get pairingCameraDenied =>
+      'Для сканирования QR нужен доступ к камере. Код по-прежнему можно ввести вручную.';
+
+  @override
+  String get pairingCameraUnavailable =>
+      'На этом устройстве QR-сканирование недоступно. Введите код вручную.';
+
+  @override
+  String get pairingTorch => 'Фонарик';
+
+  @override
   String get pairingDerivingCode => 'Вычисляем безопасный код…';
 
   @override

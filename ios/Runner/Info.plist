@@ -57,7 +57,7 @@
 	<key>NSMotionUsageDescription</key>
 	<string>Pulse uses motion sensors for modes like Bell, Cradle, and Balance.</string>
 	<key>NSCameraUsageDescription</key>
-	<string>Pulse uses the camera's torch (flashlight) in modes like Thunder. The camera is never used to capture photos or video — only to toggle the flashlight.</string>
+	<string>Pulse uses the camera to scan a partner's secure QR code and to control the torch in modes like Thunder. Camera frames are processed on the device and are never stored or uploaded.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>bluetooth-central</string>

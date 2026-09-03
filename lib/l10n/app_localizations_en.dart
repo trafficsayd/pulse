@@ -34,6 +34,41 @@ class AppLocalizationsEn extends AppLocalizations {
   String get pairingEnterCode => 'Enter the 6-digit code';
 
   @override
+  String get pairingScanQr => 'Scan the QR code';
+
+  @override
+  String get pairingScanQrHint =>
+      'Point the camera at the QR code on your partner\'s phone';
+
+  @override
+  String get pairingManualHint =>
+      'Enter the code shown on your partner\'s phone';
+
+  @override
+  String get pairingUseCode => 'Enter code manually';
+
+  @override
+  String get pairingScanQrInstead => 'Scan QR instead';
+
+  @override
+  String get pairingQrInvalid => 'This isn\'t a valid Pulse pairing QR code';
+
+  @override
+  String get pairingQrConnectionFailed =>
+      'Secure connection failed. Check that the QR code is current and try again.';
+
+  @override
+  String get pairingCameraDenied =>
+      'Camera access is needed to scan the QR code. You can still enter the code manually.';
+
+  @override
+  String get pairingCameraUnavailable =>
+      'QR scanning isn\'t available on this device. Enter the code manually.';
+
+  @override
+  String get pairingTorch => 'Flashlight';
+
+  @override
   String get pairingDerivingCode => 'Deriving secure code…';
 
   @override

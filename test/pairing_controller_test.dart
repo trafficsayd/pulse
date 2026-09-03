@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:pulse/core/storage/secure_key_store.dart';
 import 'package:pulse/features/pairing/application/pairing_controller.dart';
+import 'package:pulse/features/pairing/domain/pairing_qr_payload.dart';
 import 'package:pulse/features/transport/webrtc/signaling_client.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -186,11 +187,16 @@ void main() {
       timeout: const Duration(seconds: 5),
     );
 
-    await _waitFor(host, (s) => s.pairingCode != null);
-    final code = host.read(pairingControllerProvider).pairingCode!;
+    await _waitFor(
+      host,
+      (state) => state.pairingCode != null && state.localKeyPair != null,
+    );
+    final hostPairing = host.read(pairingControllerProvider);
+    final code = hostPairing.pairingCode!;
 
     await guestController.joinHandshake(
       code,
+      expectedHostPublicKey: hostPairing.localKeyPair!.publicKey.bytes,
       timeout: const Duration(seconds: 5),
     );
     await hostFuture;
@@ -296,6 +302,41 @@ void main() {
 
     expect(host.read(pairingControllerProvider).phase, PairingPhase.idle);
     expect(server.answerReadRequests, readsAfterReset);
+  });
+
+  test('QR join fails closed when signaling returns a different host key',
+      () async {
+    final server = _RendezvousServer();
+    final host = _container(server);
+    final guest = _container(server);
+    addTearDown(host.dispose);
+    addTearDown(guest.dispose);
+
+    final hostController = host.read(pairingControllerProvider.notifier);
+    final guestController = guest.read(pairingControllerProvider.notifier);
+    final hostFuture = hostController.startHostHandshake(
+      timeout: const Duration(seconds: 5),
+    );
+    await _waitFor(
+      host,
+      (state) => state.pairingCode != null && state.localKeyPair != null,
+    );
+    final hostState = host.read(pairingControllerProvider);
+    final wrongKey = List<int>.from(hostState.localKeyPair!.publicKey.bytes);
+    wrongKey[0] ^= 1;
+
+    await guestController.joinHandshake(
+      hostState.pairingCode!,
+      expectedHostPublicKey: wrongKey,
+      timeout: const Duration(seconds: 2),
+    );
+
+    final guestState = guest.read(pairingControllerProvider);
+    expect(guestState.phase, PairingPhase.failed);
+    expect(guestState.error, isA<PairingQrKeyMismatchException>());
+    expect(guestState.sharedSecret, isNull);
+    hostController.reset();
+    await hostFuture;
   });
 }
 

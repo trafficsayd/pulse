@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 import '../../../core/locale/locale_controller.dart';
@@ -10,6 +11,7 @@ import '../../../core/widgets/gradient_button.dart';
 import '../../../core/widgets/pulse_mockup.dart';
 import '../../../l10n/app_localizations.dart';
 import '../application/pairing_controller.dart';
+import '../domain/pairing_qr_payload.dart';
 
 /// First-launch screen: create a new pair (host) or join one (guest).
 ///
@@ -52,12 +54,15 @@ class _PairingScreenState extends ConsumerState<PairingScreen> {
   String _qrPayload(PairingState pairing) {
     final pub = pairing.localPublicKeyBase64;
     final code = pairing.pairingCode;
-    if (pub == null) {
+    if (pub == null || code == null) {
       // Generation in flight — fall back to a placeholder URI so the QR
       // widget doesn't crash on an empty string.
       return 'pulse://pair?pending=1';
     }
-    return 'pulse://pair?v=1&code=${code ?? ''}&pk=$pub';
+    return PairingQrPayload.encode(
+      code: code,
+      hostPublicKeyBase64Url: pub,
+    );
   }
 
   @override
@@ -273,7 +278,7 @@ class _PairingScreenState extends ConsumerState<PairingScreen> {
       backgroundColor: AppColors.surfaceElevated,
       isScrollControlled: true,
       builder: (sheetContext) {
-        return const _JoinByCodeSheet();
+        return const _JoinPairSheet();
       },
     );
   }
@@ -453,17 +458,25 @@ class _AnimatedToggleState extends State<AnimatedToggle> {
   }
 }
 
-class _JoinByCodeSheet extends ConsumerStatefulWidget {
-  const _JoinByCodeSheet();
+class _JoinPairSheet extends ConsumerStatefulWidget {
+  const _JoinPairSheet();
 
   @override
-  ConsumerState<_JoinByCodeSheet> createState() => _JoinByCodeSheetState();
+  ConsumerState<_JoinPairSheet> createState() => _JoinPairSheetState();
 }
 
-class _JoinByCodeSheetState extends ConsumerState<_JoinByCodeSheet> {
+class _JoinPairSheetState extends ConsumerState<_JoinPairSheet> {
   final _controller = TextEditingController();
+  late final MobileScannerController _scanner = MobileScannerController(
+    formats: const <BarcodeFormat>[BarcodeFormat.qrCode],
+    detectionSpeed: DetectionSpeed.noDuplicates,
+    returnImage: false,
+    autoZoom: true,
+  );
   bool _joining = false;
+  bool _manualEntry = false;
   String _code = '';
+  String? _scanError;
 
   @override
   void initState() {
@@ -479,91 +492,361 @@ class _JoinByCodeSheetState extends ConsumerState<_JoinByCodeSheet> {
   @override
   void dispose() {
     _controller.dispose();
+    _scanner.dispose();
     super.dispose();
+  }
+
+  Future<void> _join({
+    required String code,
+    List<int>? expectedHostPublicKey,
+  }) async {
+    if (_joining) return;
+    setState(() {
+      _joining = true;
+      _scanError = null;
+    });
+    await _scanner.stop();
+    await ref.read(pairingControllerProvider.notifier).joinHandshake(
+          code,
+          expectedHostPublicKey: expectedHostPublicKey,
+        );
+    if (!mounted) return;
+    final state = ref.read(pairingControllerProvider);
+    if (!state.isReadyToConfirm) {
+      final t = AppLocalizations.of(context)!;
+      setState(() {
+        _joining = false;
+        _scanError = expectedHostPublicKey == null
+            ? t.pairingError
+            : t.pairingQrConnectionFailed;
+      });
+      if (!_manualEntry) await _scanner.start();
+      return;
+    }
+    Navigator.of(context).pop();
+    context.go(Routes.connecting);
+  }
+
+  void _onDetect(BarcodeCapture capture) {
+    if (_joining) return;
+    PairingQrPayload? payload;
+    for (final barcode in capture.barcodes) {
+      final raw = barcode.rawValue;
+      if (raw == null) continue;
+      try {
+        payload = PairingQrPayload.parse(raw);
+        break;
+      } on PairingQrPayloadException {
+        // Keep looking in case the frame contains more than one QR code.
+      }
+    }
+    if (payload == null) {
+      setState(() {
+        _scanError = AppLocalizations.of(context)!.pairingQrInvalid;
+      });
+      return;
+    }
+    _join(
+      code: payload.code,
+      expectedHostPublicKey: payload.hostPublicKey,
+    );
+  }
+
+  void _showManualEntry() {
+    _scanner.stop();
+    setState(() {
+      _manualEntry = true;
+      _scanError = null;
+    });
+  }
+
+  void _showScanner() {
+    setState(() {
+      _manualEntry = false;
+      _scanError = null;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _scanner.start();
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context)!;
     final inset = MediaQuery.of(context).viewInsets.bottom;
-    return Padding(
-      padding: EdgeInsets.fromLTRB(24, 16, 24, 24 + inset),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: AppColors.outline,
-              borderRadius: BorderRadius.circular(2),
+    final screenHeight = MediaQuery.sizeOf(context).height;
+    final height = (screenHeight * 0.82).clamp(
+      0.0,
+      (screenHeight - inset - 12).clamp(0.0, screenHeight),
+    );
+    return SafeArea(
+      top: false,
+      child: AnimatedPadding(
+        duration: const Duration(milliseconds: 180),
+        padding: EdgeInsets.only(bottom: inset),
+        child: SizedBox(
+          height: height,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 18),
+            child: Column(
+              children: [
+                Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppColors.outline,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  _manualEntry ? t.pairingEnterCode : t.pairingScanQr,
+                  style: const TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  _manualEntry ? t.pairingManualHint : t.pairingScanQrHint,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: AppColors.textMuted,
+                    fontSize: 12,
+                    height: 1.35,
+                  ),
+                ),
+                const SizedBox(height: 18),
+                Expanded(
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 220),
+                    child: _manualEntry
+                        ? _ManualCodeEntry(
+                            key: const ValueKey<String>('manual'),
+                            controller: _controller,
+                            joining: _joining,
+                            code: _code,
+                            onJoin: () => _join(code: _code),
+                          )
+                        : _QrScannerView(
+                            key: const ValueKey<String>('scanner'),
+                            controller: _scanner,
+                            joining: _joining,
+                            onDetect: _onDetect,
+                            onUseCode: _showManualEntry,
+                          ),
+                  ),
+                ),
+                if (_scanError != null) ...[
+                  const SizedBox(height: 10),
+                  Text(
+                    _scanError!,
+                    textAlign: TextAlign.center,
+                    style:
+                        const TextStyle(color: AppColors.danger, fontSize: 12),
+                  ),
+                ],
+                const SizedBox(height: 6),
+                TextButton(
+                  onPressed: _joining
+                      ? null
+                      : _manualEntry
+                          ? _showScanner
+                          : () => Navigator.of(context).pop(),
+                  child: Text(
+                    _manualEntry ? t.pairingScanQrInstead : t.pairingCancel,
+                  ),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 16),
-          Text(
-            t.pairingEnterCode,
-            style: const TextStyle(
-              color: AppColors.textPrimary,
-              fontSize: 18,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(height: 16),
-          TextField(
-            controller: _controller,
-            keyboardType: TextInputType.number,
-            maxLength: 6,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: AppColors.textPrimary,
-              fontSize: 28,
-              letterSpacing: 8,
-              fontFamily: 'monospace',
-            ),
-            decoration: InputDecoration(
-              counterText: '',
-              filled: true,
-              fillColor: AppColors.surface,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
-                borderSide: const BorderSide(color: AppColors.outline),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
-                borderSide: const BorderSide(color: AppColors.pulse),
-              ),
-            ),
-          ),
-          const SizedBox(height: 24),
-          SizedBox(
-            width: double.infinity,
-            child: GradientButton(
-              label: _joining ? t.connectingTitle : t.pairingJoin,
-              onPressed: _code.length == 6 && !_joining
-                  ? () async {
-                      setState(() => _joining = true);
-                      await ref
-                          .read(pairingControllerProvider.notifier)
-                          .joinHandshake(_code);
-                      if (!context.mounted) return;
-                      final state = ref.read(pairingControllerProvider);
-                      if (!state.isReadyToConfirm) {
-                        setState(() => _joining = false);
-                        return;
-                      }
-                      Navigator.of(context).pop();
-                      context.go(Routes.connecting);
-                    }
-                  : null,
-            ),
-          ),
-          const SizedBox(height: 8),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: Text(t.pairingCancel),
-          ),
-        ],
+        ),
       ),
+    );
+  }
+}
+
+class _QrScannerView extends StatelessWidget {
+  const _QrScannerView({
+    super.key,
+    required this.controller,
+    required this.joining,
+    required this.onDetect,
+    required this.onUseCode,
+  });
+
+  final MobileScannerController controller;
+  final bool joining;
+  final ValueChanged<BarcodeCapture> onDetect;
+  final VoidCallback onUseCode;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context)!;
+    return Column(
+      children: [
+        Expanded(
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(28),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                MobileScanner(
+                  controller: controller,
+                  onDetect: onDetect,
+                  errorBuilder: (context, error) => ColoredBox(
+                    color: AppColors.surface,
+                    child: Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Text(
+                          error.errorCode ==
+                                  MobileScannerErrorCode.permissionDenied
+                              ? t.pairingCameraDenied
+                              : t.pairingCameraUnavailable,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: AppColors.textSecondary,
+                            height: 1.4,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                IgnorePointer(
+                  child: Center(
+                    child: Container(
+                      width: 226,
+                      height: 226,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(26),
+                        border: Border.all(
+                          color: AppColors.pulse,
+                          width: 2.5,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.pulse.withValues(alpha: 0.28),
+                            blurRadius: 24,
+                            spreadRadius: 2,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  right: 12,
+                  bottom: 12,
+                  child: ValueListenableBuilder<MobileScannerState>(
+                    valueListenable: controller,
+                    builder: (context, state, _) {
+                      if (state.torchState == TorchState.unavailable) {
+                        return const SizedBox.shrink();
+                      }
+                      return Material(
+                        color: Colors.black.withValues(alpha: 0.45),
+                        shape: const CircleBorder(),
+                        child: IconButton(
+                          tooltip: t.pairingTorch,
+                          onPressed: controller.toggleTorch,
+                          color: state.torchState == TorchState.on
+                              ? AppColors.transportRelay
+                              : Colors.white,
+                          icon: Icon(
+                            state.torchState == TorchState.on
+                                ? Icons.flashlight_on_rounded
+                                : Icons.flashlight_off_rounded,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                if (joining)
+                  ColoredBox(
+                    color: Colors.black.withValues(alpha: 0.58),
+                    child: const Center(
+                      child: CircularProgressIndicator(
+                        color: AppColors.pulse,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 14),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: joining ? null : onUseCode,
+            icon: const Icon(Icons.dialpad_rounded),
+            label: Text(t.pairingUseCode),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ManualCodeEntry extends StatelessWidget {
+  const _ManualCodeEntry({
+    super.key,
+    required this.controller,
+    required this.joining,
+    required this.code,
+    required this.onJoin,
+  });
+
+  final TextEditingController controller;
+  final bool joining;
+  final String code;
+  final VoidCallback onJoin;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context)!;
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        TextField(
+          controller: controller,
+          autofocus: true,
+          keyboardType: TextInputType.number,
+          maxLength: 6,
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            color: AppColors.textPrimary,
+            fontSize: 28,
+            letterSpacing: 8,
+            fontFamily: 'monospace',
+          ),
+          decoration: InputDecoration(
+            counterText: '',
+            filled: true,
+            fillColor: AppColors.surface,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: const BorderSide(color: AppColors.outline),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: const BorderSide(color: AppColors.pulse),
+            ),
+          ),
+        ),
+        const SizedBox(height: 24),
+        SizedBox(
+          width: double.infinity,
+          child: GradientButton(
+            label: joining ? t.connectingTitle : t.pairingJoin,
+            onPressed: code.length == 6 && !joining ? onJoin : null,
+          ),
+        ),
+      ],
     );
   }
 }

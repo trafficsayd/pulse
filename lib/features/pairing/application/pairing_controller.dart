@@ -12,6 +12,7 @@ import '../../crypto/curve25519_pairing_service.dart';
 import '../../crypto/nonce_counter.dart';
 import '../../crypto/pair_keys.dart';
 import '../../transport/webrtc/signaling_client.dart';
+import '../domain/pairing_qr_payload.dart';
 
 /// Discrete steps the pairing handshake walks through. Drives both the
 /// pairing screen badge and the connecting screen's three-step indicator.
@@ -228,6 +229,7 @@ class PairingController extends Notifier<PairingState> {
   /// Join a host-created pairing session by its six digit rendezvous code.
   Future<void> joinHandshake(
     String rawCode, {
+    List<int>? expectedHostPublicKey,
     Duration timeout = kPairingHandshakeTimeout,
   }) async {
     _cancelWatchdog();
@@ -237,6 +239,15 @@ class PairingController extends Notifier<PairingState> {
       state = PairingState(
         phase: PairingPhase.failed,
         error: FormatException('Pairing code must be 6 digits', rawCode),
+      );
+      return;
+    }
+    if (expectedHostPublicKey != null && expectedHostPublicKey.length != 32) {
+      state = const PairingState(
+        phase: PairingPhase.failed,
+        error: PairingQrPayloadException(
+          'Expected host public key must be 32 bytes',
+        ),
       );
       return;
     }
@@ -312,6 +323,10 @@ class PairingController extends Notifier<PairingState> {
         throw TimeoutException('Pairing offer timed out', timeout);
       }
       final partnerKey = _decodePublicKey(offer.sdp);
+      if (expectedHostPublicKey != null &&
+          !_constantTimeEquals(partnerKey.bytes, expectedHostPublicKey)) {
+        throw const PairingQrKeyMismatchException();
+      }
 
       state = state.copyWith(
         phase: PairingPhase.derivingSecret,
@@ -433,6 +448,15 @@ class PairingController extends Notifier<PairingState> {
       throw const FormatException('Curve25519 public key must be 32 bytes');
     }
     return SimplePublicKey(bytes, type: KeyPairType.x25519);
+  }
+
+  static bool _constantTimeEquals(List<int> left, List<int> right) {
+    if (left.length != right.length) return false;
+    var difference = 0;
+    for (var index = 0; index < left.length; index++) {
+      difference |= left[index] ^ right[index];
+    }
+    return difference == 0;
   }
 
   Future<SignalingSessionDescription?> _pollForAnswer({

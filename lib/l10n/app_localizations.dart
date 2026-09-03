@@ -146,6 +146,66 @@ abstract class AppLocalizations {
   /// **'Enter the 6-digit code'**
   String get pairingEnterCode;
 
+  /// No description provided for @pairingScanQr.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan the QR code'**
+  String get pairingScanQr;
+
+  /// No description provided for @pairingScanQrHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Point the camera at the QR code on your partner\'s phone'**
+  String get pairingScanQrHint;
+
+  /// No description provided for @pairingManualHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter the code shown on your partner\'s phone'**
+  String get pairingManualHint;
+
+  /// No description provided for @pairingUseCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter code manually'**
+  String get pairingUseCode;
+
+  /// No description provided for @pairingScanQrInstead.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan QR instead'**
+  String get pairingScanQrInstead;
+
+  /// No description provided for @pairingQrInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'This isn\'t a valid Pulse pairing QR code'**
+  String get pairingQrInvalid;
+
+  /// No description provided for @pairingQrConnectionFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Secure connection failed. Check that the QR code is current and try again.'**
+  String get pairingQrConnectionFailed;
+
+  /// No description provided for @pairingCameraDenied.
+  ///
+  /// In en, this message translates to:
+  /// **'Camera access is needed to scan the QR code. You can still enter the code manually.'**
+  String get pairingCameraDenied;
+
+  /// No description provided for @pairingCameraUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'QR scanning isn\'t available on this device. Enter the code manually.'**
+  String get pairingCameraUnavailable;
+
+  /// No description provided for @pairingTorch.
+  ///
+  /// In en, this message translates to:
+  /// **'Flashlight'**
+  String get pairingTorch;
+
   /// No description provided for @pairingDerivingCode.
   ///
   /// In en, this message translates to:

@@ -2,25 +2,32 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../l10n/app_localizations.dart';
+import '../../../haptics/application/pulse_haptic_engine.dart';
+import '../../../haptics/infrastructure/platform_haptic_bridge.dart';
 import '../../../session/application/mode_event.dart';
 import '../../../session/application/mode_event_bus.dart';
-import '../../primitives/haptic_pattern_player.dart';
-import '../../primitives/primitive_providers.dart';
+import '../../application/goosebumps/goosebumps_haptic_player.dart';
+import '../../application/goosebumps/goosebumps_motion_engine.dart';
+import '../../application/goosebumps/goosebumps_protocol.dart';
+import '../../application/goosebumps/goosebumps_wave.dart';
+import 'goosebumps/goosebumps_surface_painter.dart';
 
-/// "Goosebumps" — a rolling wave of goosebumps that travels across both
-/// screens. One user taps to send a wave; both phones ripple and vibrate
-/// in a rising-and-falling pattern.
-///
-/// Visual: a radial wave that expands from the tap point with a soft
-/// purple gradient, fading at the edges. Haptic: [HapticPatterns.wave]
-/// plays a 5-beat rising-then-falling surge.
 class GoosebumpsModeScreen extends ConsumerStatefulWidget {
-  const GoosebumpsModeScreen({super.key});
+  const GoosebumpsModeScreen({
+    super.key,
+    this.hapticEngine,
+    this.now,
+    this.idFactory,
+  });
+
+  final PulseHapticEngine? hapticEngine;
+  final DateTime Function()? now;
+  final String Function()? idFactory;
 
   @override
   ConsumerState<GoosebumpsModeScreen> createState() =>
@@ -28,114 +35,240 @@ class GoosebumpsModeScreen extends ConsumerStatefulWidget {
 }
 
 class _GoosebumpsModeScreenState extends ConsumerState<GoosebumpsModeScreen>
-    with TickerProviderStateMixin {
-  final List<_Wave> _waves = [];
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _motion;
+  late final GoosebumpsHapticPlayer _haptics;
+  late final String Function() _idFactory;
+  final GoosebumpsWaveDeduplicator _dedupe = GoosebumpsWaveDeduplicator();
+  final List<GoosebumpsVisualWave> _waves = <GoosebumpsVisualWave>[];
+  final List<GoosebumpsGestureSample> _samples = <GoosebumpsGestureSample>[];
+  final List<Offset> _gesture = <Offset>[];
+  final Set<Timer> _timers = <Timer>{};
   StreamSubscription<ModeEvent>? _partnerSub;
-  late final HapticPatternPlayer _player;
+  int? _activePointer;
+  GoosebumpsWave? _lastWave;
+  bool _reduceMotion = false;
+
+  DateTime get _now => widget.now?.call() ?? DateTime.now();
 
   @override
   void initState() {
     super.initState();
-    _player = HapticPatternPlayer(ref.read(hapticEngineProvider));
+    const uuid = Uuid();
+    _idFactory = widget.idFactory ?? uuid.v4;
+    _haptics = GoosebumpsHapticPlayer(
+      widget.hapticEngine ?? const PlatformHapticBridge(),
+    );
+    _motion = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1600),
+    );
     _partnerSub = ref
         .read(modeEventBusProvider)
         .incoming
-        .where((e) => e.type == 'goosebumps_wave')
+        .where((event) => event.type == GoosebumpsProtocol.eventType)
         .listen(_onPartnerWave);
   }
 
-  void _onPartnerWave(ModeEvent event) {
-    if (!mounted) return;
-    final x = (event.data['x'] as num?)?.toDouble() ?? 0.5;
-    final y = (event.data['y'] as num?)?.toDouble() ?? 0.5;
-    _addWave(Offset(x, y), isLocal: false);
-    unawaited(_player.play(HapticPatterns.wave));
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final media = MediaQuery.maybeOf(context);
+    final reduce =
+        media?.disableAnimations == true || media?.accessibleNavigation == true;
+    _reduceMotion = reduce;
+    if (reduce) {
+      _motion.stop();
+    } else if (!_motion.isAnimating) {
+      _motion.repeat();
+    }
   }
 
-  void _addWave(Offset normalizedPosition, {required bool isLocal}) {
-    final controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1400),
+  void _onPointerDown(PointerDownEvent event, Size size) {
+    if (_activePointer != null || size.isEmpty) return;
+    _activePointer = event.pointer;
+    _samples.clear();
+    _gesture.clear();
+    _record(event, size);
+    setState(() {});
+  }
+
+  void _onPointerMove(PointerMoveEvent event, Size size) {
+    if (_activePointer != event.pointer || size.isEmpty) return;
+    final last = _gesture.isEmpty ? null : _gesture.last;
+    if (last != null && (event.localPosition - last).distance < 2.5) return;
+    _record(event, size);
+    if (_samples.length > 48) {
+      _samples.removeAt(1);
+      _gesture.removeAt(1);
+    }
+    setState(() {});
+  }
+
+  Future<void> _onPointerUp(PointerUpEvent event, Size size) async {
+    if (_activePointer != event.pointer || size.isEmpty) return;
+    _record(event, size);
+    final wave = GoosebumpsMotionEngine.fromGesture(
+      id: _idFactory(),
+      samples: List<GoosebumpsGestureSample>.of(_samples),
     );
-    final wave = _Wave(
-        position: normalizedPosition, controller: controller, isLocal: isLocal);
-    setState(() => _waves.add(wave));
-    controller.forward().whenComplete(() {
-      if (!mounted) return;
-      setState(() => _waves.remove(wave));
-      controller.dispose();
+    setState(() {
+      _activePointer = null;
+      _gesture.clear();
+      _samples.clear();
+      _lastWave = wave;
+    });
+    if (wave == null) return;
+    _addWave(wave, isLocal: true, start: _now);
+    unawaited(_haptics.play(wave));
+    await ref.read(modeEventBusProvider).send(GoosebumpsProtocol.wave(wave));
+  }
+
+  void _onPointerCancel(PointerCancelEvent event) {
+    if (_activePointer != event.pointer) return;
+    setState(() {
+      _activePointer = null;
+      _gesture.clear();
+      _samples.clear();
     });
   }
 
-  Future<void> _onTap(TapDownDetails details) async {
-    final size = context.size;
-    if (size == null) return;
-    final normalized = Offset(
-      details.localPosition.dx / size.width,
-      details.localPosition.dy / size.height,
+  void _record(PointerEvent event, Size size) {
+    final position = Offset(
+      event.localPosition.dx.clamp(0.0, size.width),
+      event.localPosition.dy.clamp(0.0, size.height),
     );
-    _addWave(normalized, isLocal: true);
-    HapticFeedback.selectionClick();
-    unawaited(_player.play(HapticPatterns.wave));
-    await ref.read(modeEventBusProvider).send(ModeEvent(
-          type: 'goosebumps_wave',
-          data: {
-            'x': normalized.dx,
-            'y': normalized.dy,
-          },
-        ));
+    _gesture.add(position);
+    _samples.add(GoosebumpsGestureSample(
+      x: position.dx / size.width,
+      y: position.dy / size.height,
+      timeMs: _now.millisecondsSinceEpoch,
+      pressure: event.pressure,
+      pressureMin: event.pressureMin,
+      pressureMax: event.pressureMax,
+    ));
   }
+
+  void _onPartnerWave(ModeEvent event) {
+    final wave = GoosebumpsProtocol.tryParse(
+      event,
+      nowMs: _now.millisecondsSinceEpoch,
+    );
+    if (wave == null || !mounted) return;
+    if (GoosebumpsProtocol.isVersioned(event) && !_dedupe.accept(wave.id)) {
+      return;
+    }
+    final clockAge = _now.millisecondsSinceEpoch - wave.createdAtMs;
+    final trustedAge = clockAge.abs() <= 10000 ? math.max(0, clockAge) : 0;
+    final delayMs = math.max(0, wave.handoffMs - trustedAge);
+    late final Timer timer;
+    timer = Timer(Duration(milliseconds: delayMs), () {
+      _timers.remove(timer);
+      if (!mounted) return;
+      _addWave(wave, isLocal: false, start: _now);
+      unawaited(_haptics.play(wave));
+    });
+    _timers.add(timer);
+  }
+
+  void _addWave(GoosebumpsWave wave,
+      {required bool isLocal, required DateTime start}) {
+    final visual = GoosebumpsVisualWave(
+      wave: wave,
+      startedAt: start,
+      isLocal: isLocal,
+    );
+    setState(() => _waves.add(visual));
+    late final Timer timer;
+    timer = Timer(Duration(milliseconds: wave.travelMs + 120), () {
+      _timers.remove(timer);
+      if (!mounted) return;
+      setState(() => _waves.remove(visual));
+    });
+    _timers.add(timer);
+  }
+
+  String _copy(BuildContext context, String ru, String en) =>
+      Localizations.localeOf(context).languageCode == 'ru' ? ru : en;
 
   @override
   void dispose() {
     _partnerSub?.cancel();
-    for (final w in _waves) {
-      w.controller.dispose();
+    for (final timer in _timers) {
+      timer.cancel();
     }
-    unawaited(_player.stop());
+    _haptics.stop();
+    _motion.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context)!;
+    final wave = _lastWave;
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
         child: Stack(
           children: [
             Positioned.fill(
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTapDown: _onTap,
-                child: CustomPaint(
-                  painter: _GoosebumpsPainter(waves: _waves),
-                ),
-              ),
-            ),
-            Positioned(
-              top: 14,
-              left: 0,
-              right: 0,
-              child: Center(
-                child: Text(
-                  t.modeGoosebumps,
-                  style: const TextStyle(
-                    color: AppColors.textMuted,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
+              child: LayoutBuilder(builder: (context, constraints) {
+                final size = constraints.biggest;
+                return Semantics(
+                  label: _copy(
+                    context,
+                    'Проведите пальцем, чтобы отправить тактильную волну',
+                    'Swipe to send a tactile wave',
                   ),
-                ),
-              ),
+                  child: Listener(
+                    behavior: HitTestBehavior.opaque,
+                    onPointerDown: (event) => _onPointerDown(event, size),
+                    onPointerMove: (event) => _onPointerMove(event, size),
+                    onPointerUp: (event) => _onPointerUp(event, size),
+                    onPointerCancel: _onPointerCancel,
+                    child: CustomPaint(
+                      painter: GoosebumpsSurfacePainter(
+                        waves: _waves,
+                        now: () => _now,
+                        gesture: _gesture,
+                        reduceMotion: _reduceMotion,
+                        repaint: _motion,
+                      ),
+                    ),
+                  ),
+                );
+              }),
             ),
             Positioned(
-              top: 8,
+              top: 12,
+              left: 20,
+              right: 20,
+              child: _Header(title: t.modeGoosebumps),
+            ),
+            Positioned(
+              top: 4,
               right: 8,
               child: IconButton(
                 tooltip: t.hubExit,
                 color: AppColors.textSecondary,
                 icon: const Icon(Icons.close_rounded),
                 onPressed: () => Navigator.of(context).maybePop(),
+              ),
+            ),
+            Positioned(
+              left: 20,
+              right: 20,
+              bottom: 18,
+              child: _GlassPanel(
+                instruction: _copy(
+                  context,
+                  'Проведи по поверхности — волна продолжится у близкого',
+                  'Swipe the surface — the wave continues on their phone',
+                ),
+                speed: wave?.speed,
+                intensity: wave?.intensity,
+                speedLabel: _copy(context, 'скорость', 'speed'),
+                intensityLabel: _copy(context, 'сила', 'strength'),
               ),
             ),
           ],
@@ -145,65 +278,148 @@ class _GoosebumpsModeScreenState extends ConsumerState<GoosebumpsModeScreen>
   }
 }
 
-class _Wave {
-  _Wave(
-      {required this.position,
-      required this.controller,
-      required this.isLocal});
-  final Offset position;
-  final AnimationController controller;
-  final bool isLocal;
+class _Header extends StatelessWidget {
+  const _Header({required this.title});
+  final String title;
+
+  @override
+  Widget build(BuildContext context) => Center(
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: .055),
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: Colors.white.withValues(alpha: .07)),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Text(
+              title,
+              style: const TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                letterSpacing: -.15,
+              ),
+            ),
+          ),
+        ),
+      );
 }
 
-class _GoosebumpsPainter extends CustomPainter {
-  _GoosebumpsPainter({required this.waves})
-      : super(
-          repaint: Listenable.merge(
-            waves.map((wave) => wave.controller).toList(growable: false),
-          ),
-        );
-  final List<_Wave> waves;
+class _GlassPanel extends StatelessWidget {
+  const _GlassPanel({
+    required this.instruction,
+    required this.speed,
+    required this.intensity,
+    required this.speedLabel,
+    required this.intensityLabel,
+  });
+
+  final String instruction;
+  final double? speed;
+  final double? intensity;
+  final String speedLabel;
+  final String intensityLabel;
 
   @override
-  void paint(Canvas canvas, Size size) {
-    for (final wave in waves) {
-      final position = Offset(
-        wave.position.dx * size.width,
-        wave.position.dy * size.height,
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.fromLTRB(18, 15, 18, 14),
+        decoration: BoxDecoration(
+          color: const Color(0xFF171725).withValues(alpha: .88),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: Colors.white.withValues(alpha: .09)),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.pulse.withValues(alpha: .12),
+              blurRadius: 32,
+              spreadRadius: -8,
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              instruction,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 14,
+                height: 1.35,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: _Metric(
+                    icon: Icons.speed_rounded,
+                    label: speedLabel,
+                    value: speed ?? .18,
+                    active: speed != null,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _Metric(
+                    icon: Icons.graphic_eq_rounded,
+                    label: intensityLabel,
+                    value: intensity ?? .18,
+                    active: intensity != null,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       );
-      final progress = wave.controller.value;
-      final maxRadius = size.shortestSide * 0.7;
-      // Three concentric rings expanding outward.
-      for (var ring = 0; ring < 3; ring++) {
-        final ringProgress = (progress - ring * 0.12).clamp(0.0, 1.0);
-        if (ringProgress <= 0 || ringProgress >= 1) continue;
-        final radius = ringProgress * maxRadius;
-        final alpha = (1 - ringProgress) * 0.5;
-        final color = wave.isLocal
-            ? AppColors.pulse.withValues(alpha: alpha)
-            : AppColors.heart.withValues(alpha: alpha);
-        final paint = Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 3 - ringProgress * 2
-          ..color = color
-          ..isAntiAlias = true;
-        canvas.drawCircle(position, radius, paint);
-        // Tiny "bumps" along the ring for texture.
-        const bumpCount = 24;
-        final bumpPaint = Paint()
-          ..color = color
-          ..style = PaintingStyle.fill;
-        for (var i = 0; i < bumpCount; i++) {
-          final theta = (i / bumpCount) * 2 * math.pi;
-          final bumpR = radius + math.sin(ringProgress * 20 + i) * 3;
-          final p = position + Offset(math.cos(theta), math.sin(theta)) * bumpR;
-          canvas.drawCircle(p, 2.5 * (1 - ringProgress), bumpPaint);
-        }
-      }
-    }
-  }
+}
+
+class _Metric extends StatelessWidget {
+  const _Metric({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.active,
+  });
+
+  final IconData icon;
+  final String label;
+  final double value;
+  final bool active;
 
   @override
-  bool shouldRepaint(covariant _GoosebumpsPainter old) =>
-      old.waves.length != waves.length;
+  Widget build(BuildContext context) => Row(
+        children: [
+          Icon(icon, size: 16, color: AppColors.textSecondary),
+          const SizedBox(width: 7),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(
+                    color: AppColors.textMuted,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(99),
+                  child: LinearProgressIndicator(
+                    value: value,
+                    minHeight: 3,
+                    color:
+                        active ? const Color(0xFFB995FF) : AppColors.textMuted,
+                    backgroundColor: Colors.white.withValues(alpha: .055),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      );
 }

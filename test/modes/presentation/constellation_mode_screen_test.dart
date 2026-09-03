@@ -6,6 +6,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulse/features/modes/presentation/modes/constellation_mode_screen.dart';
+import 'package:pulse/features/modes/presentation/modes/constellation/constellation_sky_painter.dart';
 import 'package:pulse/features/modes/primitives/painting_canvas.dart';
 import 'package:pulse/features/session/application/mode_event.dart';
 import 'package:pulse/features/session/application/mode_event_bus.dart';
@@ -98,12 +99,135 @@ void main() {
     expect(key.currentState!.strokes.length, 2);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('local star sends versioned history packet', (tester) async {
+    final sent = <ModeEvent>[];
+    final source = StreamController<ModeEvent>.broadcast(sync: true);
+    final bus = ModeEventBus.testing(
+      source.stream,
+      onSend: sent.add,
+    );
+    addTearDown(bus.dispose);
+    addTearDown(source.close);
+
+    await _pump(
+      tester,
+      ConstellationModeScreen(
+        random: math.Random(4),
+        now: () => DateTime.fromMillisecondsSinceEpoch(500),
+        idFactory: () => 'local-star',
+      ),
+      overrides: [modeEventBusProvider.overrideWithValue(bus)],
+    );
+    await tester.tapAt(const Offset(160, 260));
+    await tester.pump();
+
+    expect(sent, hasLength(1));
+    expect(sent.single.type, 'star');
+    expect(sent.single.data['v'], 2);
+    final records = sent.single.data['records'] as List<dynamic>;
+    expect(records, hasLength(1));
+    expect((records.single as Map<String, dynamic>)['id'], 'local-star');
+  });
+
+  testWidgets('duplicate remote packet paints one partner star',
+      (tester) async {
+    final key = GlobalKey<PaintingCanvasState>();
+    final source = StreamController<ModeEvent>.broadcast(sync: true);
+    final bus = ModeEventBus.testing(source.stream);
+    addTearDown(bus.dispose);
+    addTearDown(source.close);
+
+    await _pump(
+      tester,
+      ConstellationModeScreen(canvasKey: key, random: math.Random(2)),
+      overrides: [modeEventBusProvider.overrideWithValue(bus)],
+    );
+    const event = ModeEvent(
+      type: 'star',
+      data: {
+        'v': 2,
+        'records': [
+          {'id': 'remote-1', 'a': 'remote', 'x': .2, 'y': .6, 'at': 1, 's': 0}
+        ],
+      },
+    );
+    source
+      ..add(event)
+      ..add(event);
+    await tester.pump(const Duration(milliseconds: 150));
+
+    expect(key.currentState!.strokes, hasLength(1));
+  });
+
+  testWidgets('hidden compatibility canvas remains bounded', (tester) async {
+    final key = GlobalKey<PaintingCanvasState>();
+    final source = StreamController<ModeEvent>.broadcast(sync: true);
+    final bus = ModeEventBus.testing(source.stream);
+    addTearDown(bus.dispose);
+    addTearDown(source.close);
+
+    await _pump(
+      tester,
+      ConstellationModeScreen(canvasKey: key, random: math.Random(8)),
+      overrides: [modeEventBusProvider.overrideWithValue(bus)],
+    );
+    source.add(ModeEvent(
+      type: 'star',
+      data: {
+        'v': 2,
+        'records': List.generate(
+          105,
+          (index) => {
+            'id': 'remote-$index',
+            'a': 'remote',
+            'x': .2 + (index % 5) * .1,
+            'y': .2 + (index % 6) * .08,
+            'at': index,
+            's': index,
+            'e': .7,
+          },
+        ),
+      },
+    ));
+    await tester.pump(const Duration(milliseconds: 150));
+
+    expect(key.currentState!.strokes, isNotEmpty);
+    expect(key.currentState!.strokes.length, lessThanOrEqualTo(96));
+  });
+
+  testWidgets('reduced motion freezes ambient renderer and stays semantic',
+      (tester) async {
+    await _pump(
+      tester,
+      ConstellationModeScreen(random: math.Random(3)),
+      disableAnimations: true,
+    );
+
+    final paintFinder = find.byWidgetPredicate(
+      (widget) =>
+          widget is CustomPaint && widget.painter is ConstellationSkyPainter,
+    );
+    final paint = tester.widget<CustomPaint>(paintFinder);
+    final painter = paint.painter! as ConstellationSkyPainter;
+    expect(painter.reduceMotion, isTrue);
+    expect(painter.phase, closeTo(.22, .001));
+
+    final semanticWidget = tester.widget<Semantics>(
+      find.byWidgetPredicate(
+        (widget) => widget is Semantics && widget.properties.value == '0',
+      ),
+    );
+    expect(semanticWidget.properties.label, isNotEmpty);
+    expect(semanticWidget.properties.onTap, isNotNull);
+  });
 }
 
 Future<void> _pump(
   WidgetTester tester,
   Widget child, {
   List<Override> overrides = const <Override>[],
+  bool disableAnimations = false,
 }) async {
   await tester.pumpWidget(
     ProviderScope(
@@ -116,7 +240,10 @@ Future<void> _pump(
           GlobalCupertinoLocalizations.delegate,
         ],
         supportedLocales: AppLocalizations.supportedLocales,
-        home: child,
+        home: MediaQuery(
+          data: MediaQueryData(disableAnimations: disableAnimations),
+          child: child,
+        ),
       ),
     ),
   );

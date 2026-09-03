@@ -57,6 +57,123 @@ void main() {
     expect(find.text('Shared Pulse'), findsOneWidget);
     await _finish(tester, source);
   });
+
+  testWidgets('duplicate v2 partner touch is felt only once', (tester) async {
+    final source = StreamController<ModeEvent>.broadcast(sync: true);
+    final bus = ModeEventBus.testing(source.stream);
+    final engine = RecordingHapticEngine();
+    await _pump(tester, bus, engine: engine);
+    final event = ModeEvent(
+      type: 'sync_tap',
+      data: {
+        'v': 2,
+        'epoch': 77,
+        'seq': 3,
+        'id': 1,
+        'sentAtUs': DateTime.now().microsecondsSinceEpoch,
+        'progress': 0,
+      },
+    );
+
+    source.add(event);
+    await tester.pump(const Duration(milliseconds: 90));
+    source.add(event);
+    await tester.pump(const Duration(milliseconds: 90));
+
+    expect(engine.played, hasLength(1));
+    await _finish(tester, source);
+  });
+
+  testWidgets('reduced motion keeps the full screen tappable and semantic',
+      (tester) async {
+    final source = StreamController<ModeEvent>.broadcast(sync: true);
+    final bus = ModeEventBus.testing(source.stream);
+    final semantics = tester.ensureSemantics();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [modeEventBusProvider.overrideWithValue(bus)],
+        child: const MaterialApp(
+          localizationsDelegates: [
+            AppLocalizations.delegate,
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: MediaQuery(
+            data: MediaQueryData(disableAnimations: true),
+            child: SyncModeScreen(
+              hapticEngine: NullHapticEngine(),
+              guideBeatDuration: Duration(hours: 1),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 120));
+
+    expect(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is Semantics &&
+            widget.properties.label == 'Shared Pulse' &&
+            widget.properties.button == true,
+      ),
+      findsOneWidget,
+    );
+    await tester.tapAt(const Offset(200, 350));
+    await tester.pump();
+    expect(tester.takeException(), isNull);
+    semantics.dispose();
+    await _finish(tester, source);
+  });
+
+  testWidgets('stale hold cannot become active after a newer release',
+      (tester) async {
+    final source = StreamController<ModeEvent>.broadcast(sync: true);
+    final bus = ModeEventBus.testing(source.stream);
+    final engine = RecordingHapticEngine();
+    await _pump(tester, bus, engine: engine);
+
+    source.add(const ModeEvent(type: 'sync_hold', data: {
+      'v': 2,
+      'epoch': 41,
+      'seq': 7,
+      'sentAtUs': 700,
+      'active': false,
+    }));
+    source.add(const ModeEvent(type: 'sync_hold', data: {
+      'v': 2,
+      'epoch': 41,
+      'seq': 6,
+      'sentAtUs': 600,
+      'active': true,
+    }));
+    await tester.pump(const Duration(milliseconds: 120));
+
+    expect(engine.played, isEmpty);
+    await _finish(tester, source);
+  });
+
+  testWidgets('pause stops network loops and resume restarts once',
+      (tester) async {
+    final source = StreamController<ModeEvent>.broadcast(sync: true);
+    final sent = <ModeEvent>[];
+    final bus = ModeEventBus.testing(source.stream, onSend: sent.add);
+    await _pump(tester, bus);
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    await tester.pump();
+    final pausedCount = sent.length;
+    await tester.pump(const Duration(seconds: 4));
+    expect(sent.length, pausedCount);
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump(const Duration(milliseconds: 50));
+    expect(sent.length, greaterThan(pausedCount));
+    expect(tester.takeException(), isNull);
+    await _finish(tester, source);
+  });
 }
 
 Future<void> _pump(

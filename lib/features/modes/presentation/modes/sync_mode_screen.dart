@@ -32,7 +32,7 @@ class SyncModeScreen extends ConsumerStatefulWidget {
 }
 
 class _SyncModeScreenState extends ConsumerState<SyncModeScreen>
-    with TickerProviderStateMixin {
+    with TickerProviderStateMixin, WidgetsBindingObserver {
   late final AnimationController _ambient;
   late final AnimationController _beat;
   late final AnimationController _localTap;
@@ -41,11 +41,17 @@ class _SyncModeScreenState extends ConsumerState<SyncModeScreen>
   late final HapticPatternPlayer _player;
   final SyncClockEstimator _clock = SyncClockEstimator();
   final SyncProgressTracker _progress = SyncProgressTracker();
+  late final SharedRhythmReconciler _rhythm;
+  final SyncEventDeduplicator _deduplicator = SyncEventDeduplicator();
 
   StreamSubscription<ModeEvent>? _partnerSub;
   Timer? _beatTimer;
   Timer? _pingTimer;
+  Timer? _presenceTimer;
+  Timer? _linkRefreshTimer;
   Timer? _partnerHoldTimer;
+  late final int _epoch;
+  int _protocolSequence = 0;
   int _pingSequence = 0;
   int _tapSequence = 0;
   final Map<int, int> _pendingPings = {};
@@ -57,6 +63,9 @@ class _SyncModeScreenState extends ConsumerState<SyncModeScreen>
   bool _localHolding = false;
   bool _partnerHolding = false;
   bool _completed = false;
+  bool _reduceMotion = false;
+  bool _paused = false;
+  DateTime? _lastPartnerSeenAt;
   double _progressFrom = 0;
   double _progressTo = 0;
   DateTime? _lastInteractionAt;
@@ -64,6 +73,9 @@ class _SyncModeScreenState extends ConsumerState<SyncModeScreen>
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _epoch = DateTime.now().microsecondsSinceEpoch;
+    _rhythm = SharedRhythmReconciler(initialInterval: widget.guideBeatDuration);
     _player = HapticPatternPlayer(
       widget.hapticEngine ?? ref.read(hapticEngineProvider),
     );
@@ -94,17 +106,101 @@ class _SyncModeScreenState extends ConsumerState<SyncModeScreen>
         .incoming
         .where((event) => event.type.startsWith('sync_'))
         .listen(_onPartnerEvent);
+    _startLoops();
+  }
+
+  void _startLoops() {
+    if (_paused || !mounted) return;
+    _beatTimer?.cancel();
+    _pingTimer?.cancel();
+    _presenceTimer?.cancel();
+    _linkRefreshTimer?.cancel();
     _scheduleNextBeat();
     _sendPing();
     _pingTimer = Timer.periodic(
       const Duration(seconds: 3),
       (_) => _sendPing(),
     );
+    _sendPresence();
+    _presenceTimer = Timer.periodic(
+      const Duration(milliseconds: 2500),
+      (_) => _sendPresence(),
+    );
+    _linkRefreshTimer = Timer.periodic(const Duration(seconds: 2), (_) {
+      if (mounted && !_paused) setState(() {});
+    });
+  }
+
+  void _stopLoops() {
+    _beatTimer?.cancel();
+    _pingTimer?.cancel();
+    _presenceTimer?.cancel();
+    _linkRefreshTimer?.cancel();
+    _partnerHoldTimer?.cancel();
+    _pendingPings.clear();
+    _localHolding = false;
+    _partnerHolding = false;
+    _ambient.stop();
+    _beat.stop();
+    _localTap.stop();
+    _partnerTap.stop();
+    _progressAnimation.stop();
+    unawaited(_player.stop());
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final shouldPause = state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.detached ||
+        state == AppLifecycleState.hidden;
+    if (shouldPause && !_paused) {
+      _paused = true;
+      _stopLoops();
+      return;
+    }
+    if (state == AppLifecycleState.resumed && _paused) {
+      _paused = false;
+      if (!_reduceMotion && !_ambient.isAnimating) _ambient.repeat();
+      _startLoops();
+      unawaited(_sendState());
+      if (mounted) setState(() {});
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final media = MediaQuery.maybeOf(context);
+    final reduce =
+        media?.disableAnimations == true || media?.accessibleNavigation == true;
+    if (reduce == _reduceMotion) return;
+    _reduceMotion = reduce;
+    if (reduce) {
+      _ambient.stop();
+      _ambient.value = .32;
+    } else if (!_paused && !_ambient.isAnimating) {
+      _ambient.repeat();
+    }
   }
 
   int _nowUs() => DateTime.now().microsecondsSinceEpoch;
 
+  Map<String, Object> _payload(
+    Map<String, Object> data, {
+    int? sentAtUs,
+  }) =>
+      SyncProtocol.envelope(
+        epoch: _epoch,
+        sequence: ++_protocolSequence,
+        sentAtUs: sentAtUs ?? _nowUs(),
+        data: data,
+      );
+
   void _onPartnerEvent(ModeEvent event) {
+    if (_paused) return;
+    if (!_deduplicator.accept(event.data)) return;
+    _lastPartnerSeenAt = DateTime.now();
     switch (event.type) {
       case 'sync_ping':
         _replyToPing(event);
@@ -121,10 +217,25 @@ class _SyncModeScreenState extends ConsumerState<SyncModeScreen>
       case 'sync_hold':
         _receiveHold(event);
         break;
+      case 'sync_presence':
+        if (mounted) setState(() {});
+        break;
     }
   }
 
+  void _sendPresence() {
+    if (_paused) return;
+    unawaited(ref.read(modeEventBusProvider).send(ModeEvent(
+          type: 'sync_presence',
+          data: _payload(<String, Object>{
+            'progress': _progress.progress,
+            'intervalUs': _rhythm.interval.inMicroseconds,
+          }),
+        )));
+  }
+
   void _sendPing() {
+    if (_paused) return;
     final id = ++_pingSequence;
     final sentAtUs = _nowUs();
     _pendingPings[id] = sentAtUs;
@@ -133,7 +244,7 @@ class _SyncModeScreenState extends ConsumerState<SyncModeScreen>
     }
     unawaited(ref.read(modeEventBusProvider).send(ModeEvent(
           type: 'sync_ping',
-          data: {'id': id, 'sentAtUs': sentAtUs},
+          data: _payload(<String, Object>{'id': id}, sentAtUs: sentAtUs),
         )));
   }
 
@@ -145,12 +256,12 @@ class _SyncModeScreenState extends ConsumerState<SyncModeScreen>
     final sentAtUs = _nowUs();
     unawaited(ref.read(modeEventBusProvider).send(ModeEvent(
           type: 'sync_pong',
-          data: {
+          data: _payload(<String, Object>{
             'id': id,
             'localSentAtUs': localSentAtUs,
             'partnerReceivedAtUs': receivedAtUs,
             'partnerSentAtUs': sentAtUs,
-          },
+          }, sentAtUs: sentAtUs),
         )));
   }
 
@@ -181,6 +292,9 @@ class _SyncModeScreenState extends ConsumerState<SyncModeScreen>
     final nowUs = _nowUs();
     final tapId = ++_tapSequence;
     _lastInteractionAt = DateTime.now();
+    _rhythm.observeLocalTap(nowUs);
+    _beatTimer?.cancel();
+    _scheduleNextBeat();
     _localTapUs = nowUs;
     _localTapId = tapId;
     _localTap.forward(from: 0);
@@ -190,11 +304,11 @@ class _SyncModeScreenState extends ConsumerState<SyncModeScreen>
     final matched = _scoreCurrentPair();
     await ref.read(modeEventBusProvider).send(ModeEvent(
           type: 'sync_tap',
-          data: {
+          data: _payload(<String, Object>{
             'id': tapId,
-            'sentAtUs': nowUs,
             'progress': _progress.progress,
-          },
+            'intervalUs': _rhythm.interval.inMicroseconds,
+          }, sentAtUs: nowUs),
         ));
     if (!matched && mounted) setState(() {});
   }
@@ -208,6 +322,9 @@ class _SyncModeScreenState extends ConsumerState<SyncModeScreen>
     _partnerTapLocalUs = _clock.hasSample
         ? _clock.partnerToLocalUs(partnerSentAtUs)
         : receivedAtUs;
+    _rhythm.observePartnerTap(_partnerTapLocalUs!);
+    _beatTimer?.cancel();
+    _scheduleNextBeat();
     _partnerTapId = partnerId;
     _lastInteractionAt = DateTime.now();
     final remoteProgress = (event.data['progress'] as num?)?.toDouble();
@@ -260,11 +377,12 @@ class _SyncModeScreenState extends ConsumerState<SyncModeScreen>
 
   Future<void> _sendState() => ref.read(modeEventBusProvider).send(ModeEvent(
         type: 'sync_state',
-        data: {
+        data: _payload(<String, Object>{
           'progress': _progress.progress,
           'streak': _progress.streak,
           'completed': _completed,
-        },
+          'intervalUs': _rhythm.interval.inMicroseconds,
+        }),
       ));
 
   void _receiveState(ModeEvent event) {
@@ -288,18 +406,18 @@ class _SyncModeScreenState extends ConsumerState<SyncModeScreen>
     setState(() => _localHolding = true);
     _localTap.forward(from: 0);
     unawaited(_player.play(HapticPatterns.syncHold));
-    unawaited(ref.read(modeEventBusProvider).send(const ModeEvent(
+    unawaited(ref.read(modeEventBusProvider).send(ModeEvent(
           type: 'sync_hold',
-          data: {'active': true},
+          data: _payload(const <String, Object>{'active': true}),
         )));
   }
 
   void _onLongPressEnd(LongPressEndDetails _) {
     if (!mounted) return;
     setState(() => _localHolding = false);
-    unawaited(ref.read(modeEventBusProvider).send(const ModeEvent(
+    unawaited(ref.read(modeEventBusProvider).send(ModeEvent(
           type: 'sync_hold',
-          data: {'active': false},
+          data: _payload(const <String, Object>{'active': false}),
         )));
   }
 
@@ -330,14 +448,23 @@ class _SyncModeScreenState extends ConsumerState<SyncModeScreen>
       )!;
 
   void _scheduleNextBeat() {
-    if (!mounted) return;
-    final intervalUs = widget.guideBeatDuration.inMicroseconds;
-    final sharedNow = _clock.sharedNowUs(_nowUs());
-    final remainder = sharedNow % intervalUs;
-    final delayUs = remainder == 0 ? intervalUs : intervalUs - remainder;
+    if (!mounted || _paused) return;
+    final localNow = _nowUs();
+    final delayUs = _rhythm.hasObservation
+        ? math.max(1000, _rhythm.nextBeatAfterUs(localNow) - localNow)
+        : () {
+            final intervalUs = _rhythm.interval.inMicroseconds;
+            final sharedNow = _clock.sharedNowUs(localNow);
+            final remainder = sharedNow % intervalUs;
+            return remainder == 0 ? intervalUs : intervalUs - remainder;
+          }();
     _beatTimer = Timer(Duration(microseconds: delayUs), () {
-      if (!mounted) return;
-      _beat.forward(from: 0);
+      if (!mounted || _paused) return;
+      if (_reduceMotion) {
+        _beat.value = .55;
+      } else {
+        _beat.forward(from: 0);
+      }
       final quietFor = _lastInteractionAt == null
           ? const Duration(days: 1)
           : DateTime.now().difference(_lastInteractionAt!);
@@ -358,10 +485,22 @@ class _SyncModeScreenState extends ConsumerState<SyncModeScreen>
     return t.syncHintStart;
   }
 
+  SyncLinkQuality get _linkQuality {
+    final seen = _lastPartnerSeenAt;
+    if (seen == null) return SyncLinkQuality.acquiring;
+    final age = DateTime.now().difference(seen);
+    if (age > const Duration(seconds: 12)) return SyncLinkQuality.offline;
+    if (age > const Duration(seconds: 6)) return SyncLinkQuality.degraded;
+    return _clock.qualityAt(_nowUs());
+  }
+
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _beatTimer?.cancel();
     _pingTimer?.cancel();
+    _presenceTimer?.cancel();
+    _linkRefreshTimer?.cancel();
     _partnerHoldTimer?.cancel();
     _partnerSub?.cancel();
     _ambient.dispose();
@@ -389,23 +528,32 @@ class _SyncModeScreenState extends ConsumerState<SyncModeScreen>
         child: Stack(
           children: [
             Positioned.fill(
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
+              child: Semantics(
+                button: true,
+                label: t.modeSync,
+                hint: t.syncHoldHint,
                 onTap: _onTap,
-                onLongPressStart: _onLongPressStart,
-                onLongPressEnd: _onLongPressEnd,
-                child: AnimatedBuilder(
-                  animation: animations,
-                  builder: (context, _) => CustomPaint(
-                    painter: _SharedPulsePainter(
-                      ambient: _ambient.value,
-                      beat: _beat.value,
-                      localTap: _localTap.value,
-                      partnerTap: _partnerTap.value,
-                      progress: _visualProgress,
-                      completed: _completed,
-                      localHolding: _localHolding,
-                      partnerHolding: _partnerHolding,
+                child: GestureDetector(
+                  excludeFromSemantics: true,
+                  behavior: HitTestBehavior.opaque,
+                  onTap: _onTap,
+                  onLongPressStart: _onLongPressStart,
+                  onLongPressEnd: _onLongPressEnd,
+                  child: AnimatedBuilder(
+                    animation: animations,
+                    builder: (context, _) => CustomPaint(
+                      painter: _SharedPulsePainter(
+                        ambient: _ambient.value,
+                        beat: _beat.value,
+                        localTap: _localTap.value,
+                        partnerTap: _partnerTap.value,
+                        progress: _visualProgress,
+                        completed: _completed,
+                        localHolding: _localHolding,
+                        partnerHolding: _partnerHolding,
+                        linkQuality: _linkQuality,
+                        reduceMotion: _reduceMotion,
+                      ),
                     ),
                   ),
                 ),
@@ -426,6 +574,11 @@ class _SyncModeScreenState extends ConsumerState<SyncModeScreen>
                       fontWeight: FontWeight.w600,
                       letterSpacing: .2,
                     ),
+                  ),
+                  const SizedBox(height: 6),
+                  Semantics(
+                    label: t.connectionStatusTitle,
+                    child: _PresencePill(quality: _linkQuality),
                   ),
                   const SizedBox(height: 8),
                   AnimatedSwitcher(
@@ -485,6 +638,45 @@ class _SyncModeScreenState extends ConsumerState<SyncModeScreen>
   }
 }
 
+class _PresencePill extends StatelessWidget {
+  const _PresencePill({required this.quality});
+
+  final SyncLinkQuality quality;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = switch (quality) {
+      SyncLinkQuality.stable => const Color(0xFF91E8C4),
+      SyncLinkQuality.acquiring => const Color(0xFFC7A5FF),
+      SyncLinkQuality.degraded => const Color(0xFFFFD98B),
+      SyncLinkQuality.offline => const Color(0xFF8C8798),
+    };
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 420),
+      width: 28,
+      height: 8,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(99),
+        color: Colors.white.withValues(alpha: .055),
+        border: Border.all(color: Colors.white.withValues(alpha: .07)),
+      ),
+      alignment: Alignment.center,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 420),
+        width: quality == SyncLinkQuality.stable ? 17 : 8,
+        height: 3,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(99),
+          color: color,
+          boxShadow: [
+            BoxShadow(color: color.withValues(alpha: .38), blurRadius: 5),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _SyncJourney extends StatelessWidget {
   const _SyncJourney({required this.progress});
 
@@ -537,6 +729,8 @@ class _SharedPulsePainter extends CustomPainter {
     required this.completed,
     required this.localHolding,
     required this.partnerHolding,
+    required this.linkQuality,
+    required this.reduceMotion,
   });
 
   final double ambient;
@@ -547,6 +741,8 @@ class _SharedPulsePainter extends CustomPainter {
   final bool completed;
   final bool localHolding;
   final bool partnerHolding;
+  final SyncLinkQuality linkQuality;
+  final bool reduceMotion;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -563,16 +759,18 @@ class _SharedPulsePainter extends CustomPainter {
       endSeparation,
       easedProgress,
     )!;
-    final breath = math.sin(phase * 1.13) * 4;
-    final localCenter =
-        center + Offset(-separation, breath + math.sin(phase * .7) * 2.5);
-    final partnerCenter =
-        center + Offset(separation, -breath + math.cos(phase * .74) * 2.5);
+    final motionScale = reduceMotion ? .12 : 1.0;
+    final breath = math.sin(phase * 1.13) * 4 * motionScale;
+    final localCenter = center +
+        Offset(-separation, breath + math.sin(phase * .7) * 2.5 * motionScale);
+    final partnerCenter = center +
+        Offset(separation, -breath + math.cos(phase * .74) * 2.5 * motionScale);
     final individualOpacity =
         (1 - ((easedProgress - .80) / .20).clamp(0.0, 1.0) * .78)
             .clamp(.22, 1.0);
 
     _drawGuideBeat(canvas, center, baseRadius, beat, easedProgress);
+    _drawPresenceHalo(canvas, center, baseRadius, phase);
     _drawConnection(
       canvas,
       localCenter,
@@ -627,6 +825,29 @@ class _SharedPulsePainter extends CustomPainter {
         ((easedProgress - .72) / .28).clamp(0.0, 1.0),
       );
     }
+  }
+
+  void _drawPresenceHalo(
+    Canvas canvas,
+    Offset center,
+    double radius,
+    double phase,
+  ) {
+    final color = switch (linkQuality) {
+      SyncLinkQuality.stable => const Color(0xFF91E8C4),
+      SyncLinkQuality.acquiring => const Color(0xFFB786FF),
+      SyncLinkQuality.degraded => const Color(0xFFFFD98B),
+      SyncLinkQuality.offline => const Color(0xFF777180),
+    };
+    final opacity = linkQuality == SyncLinkQuality.offline ? .05 : .1;
+    canvas.drawCircle(
+      center,
+      radius * (2.35 + math.sin(phase) * (reduceMotion ? .01 : .035)),
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = .8
+        ..color = color.withValues(alpha: opacity),
+    );
   }
 
   void _drawBackground(
@@ -731,7 +952,7 @@ class _SharedPulsePainter extends CustomPainter {
         ).createShader(rect),
     );
 
-    final particleCount = 3 + (value * 5).round();
+    final particleCount = reduceMotion ? 2 : 3 + (value * 5).round();
     for (var i = 0; i < particleCount; i++) {
       final travel = (ambient * (.55 + i * .07) + i / particleCount) % 1;
       final point = Offset.lerp(from, to, travel)! +
@@ -985,5 +1206,7 @@ class _SharedPulsePainter extends CustomPainter {
       old.progress != progress ||
       old.completed != completed ||
       old.localHolding != localHolding ||
-      old.partnerHolding != partnerHolding;
+      old.partnerHolding != partnerHolding ||
+      old.linkQuality != linkQuality ||
+      old.reduceMotion != reduceMotion;
 }

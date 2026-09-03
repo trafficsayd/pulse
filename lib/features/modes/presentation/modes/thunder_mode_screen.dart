@@ -2,189 +2,384 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../l10n/app_localizations.dart';
-import '../../../capabilities/application/capability_providers.dart';
-import '../../../capabilities/domain/device_capability.dart';
+import '../../../session/application/mode_event.dart';
+import '../../../session/application/mode_event_bus.dart';
+import '../../application/thunder/thunder_audio_engine.dart';
+import '../../application/thunder/thunder_choreography.dart';
+import '../../application/thunder/thunder_flash_coordinator.dart';
+import '../../application/thunder/thunder_models.dart';
+import '../../application/thunder/thunder_protocol.dart';
 import '../../primitives/flashlight_controller.dart';
 import '../../primitives/haptic_pattern_player.dart';
 import '../../primitives/primitive_providers.dart';
-import '../../../session/application/mode_event.dart';
-import '../../../session/application/mode_event_bus.dart';
-import 'unsupported_mode_screen.dart';
+import 'thunder/storm_surface_painter.dart';
 
-/// "Thunder" — tap to strike lightning. A jagged bolt flashes across both
-/// screens, the torch pulses, and a deep rumble vibration plays.
-///
-/// Requires [DeviceCapability.flashlight].
 class ThunderModeScreen extends ConsumerWidget {
-  const ThunderModeScreen({super.key});
+  const ThunderModeScreen({
+    super.key,
+    this.flashlight,
+    this.hapticEngine,
+    this.audioEngine,
+    this.now,
+    this.idFactory,
+  });
+
+  final FlashlightController? flashlight;
+  final HapticEngine? hapticEngine;
+  final ThunderAudioEngine? audioEngine;
+  final DateTime Function()? now;
+  final String Function()? idFactory;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final t = AppLocalizations.of(context)!;
-    final capsAsync = ref.watch(deviceCapabilitiesProvider);
-    const required = {DeviceCapability.flashlight};
-    if (capsAsync.isLoading) {
-      return const Scaffold(
-        backgroundColor: AppColors.background,
-        body: Center(child: CircularProgressIndicator(color: AppColors.pulse)),
+  Widget build(BuildContext context, WidgetRef ref) => _ThunderModeView(
+        flashlight: flashlight ?? ref.watch(flashlightControllerProvider),
+        hapticEngine: hapticEngine ?? ref.watch(hapticEngineProvider),
+        audioEngine: audioEngine ?? const PlatformThunderAudioEngine(),
+        now: now,
+        idFactory: idFactory,
       );
-    }
-    final caps = capsAsync.asData?.value ?? const DeviceCapabilities.none();
-    if (!caps.hasAll(required)) {
-      return UnsupportedModeScreen(
-        title: t.modeThunder,
-        missing: caps.missing(required),
-      );
-    }
-    return _ThunderModeView(
-      flashlight: ref.watch(flashlightControllerProvider),
-      hapticEngine: ref.watch(hapticEngineProvider),
-    );
-  }
 }
 
 class _ThunderModeView extends ConsumerStatefulWidget {
-  const _ThunderModeView(
-      {required this.flashlight, required this.hapticEngine});
+  const _ThunderModeView({
+    required this.flashlight,
+    required this.hapticEngine,
+    required this.audioEngine,
+    required this.now,
+    required this.idFactory,
+  });
 
   final FlashlightController flashlight;
   final HapticEngine hapticEngine;
+  final ThunderAudioEngine audioEngine;
+  final DateTime Function()? now;
+  final String Function()? idFactory;
 
   @override
   ConsumerState<_ThunderModeView> createState() => _ThunderModeViewState();
 }
 
 class _ThunderModeViewState extends ConsumerState<_ThunderModeView>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
+  late final AnimationController _motion;
+  late final ThunderFlashCoordinator _flash;
+  late final String Function() _idFactory;
+  final ThunderStrikeDeduplicator _dedupe = ThunderStrikeDeduplicator();
+  final List<ThunderVisualStrike> _strikes = <ThunderVisualStrike>[];
+  final List<ThunderGestureSample> _samples = <ThunderGestureSample>[];
+  final List<Offset> _gesture = <Offset>[];
+  final Set<Timer> _timers = <Timer>{};
   StreamSubscription<ModeEvent>? _partnerSub;
-  late final AnimationController _bolt;
-  List<Offset> _currentBolt = [];
-  late final HapticPatternPlayer _player;
+  int? _activePointer;
+  int _lastLocalStrikeMs = -100000;
+  bool _reduceMotion = false;
+  bool _lifecycleActive = true;
+  ThunderStrike? _lastStrike;
+
+  DateTime get _now => widget.now?.call() ?? DateTime.now();
 
   @override
   void initState() {
     super.initState();
-    _player = HapticPatternPlayer(widget.hapticEngine);
-    _bolt = AnimationController(
+    WidgetsBinding.instance.addObserver(this);
+    const uuid = Uuid();
+    _idFactory = widget.idFactory ?? uuid.v4;
+    _flash = ThunderFlashCoordinator(widget.flashlight);
+    _motion = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 400),
-    );
+      duration: const Duration(milliseconds: 2800),
+    )..repeat();
     _partnerSub = ref
         .read(modeEventBusProvider)
         .incoming
-        .where((e) => e.type == 'thunder_strike')
+        .where((event) => event.type == ThunderProtocol.eventType)
         .listen(_onPartnerStrike);
   }
 
-  void _onPartnerStrike(ModeEvent event) {
-    if (!mounted) return;
-    final startX = (event.data['x'] as num?)?.toDouble() ?? 0.5;
-    final size = context.size;
-    if (size == null) return;
-    _strike(Offset(startX * size.width, 0), notifyPartner: false);
-  }
-
-  Future<void> _strike(Offset start, {bool notifyPartner = true}) async {
-    final size = context.size ?? const Size(400, 800);
-    setState(() {
-      _currentBolt = _generateBolt(start, size);
-    });
-    _bolt
-      ..reset()
-      ..forward();
-    HapticFeedback.heavyImpact();
-    // Flash the torch briefly.
-    unawaited(widget.flashlight.pulse(
-      const Duration(milliseconds: 120),
-      const Duration(milliseconds: 60),
-      2,
-    ));
-    unawaited(_player.play(HapticPatterns.rumble));
-    if (notifyPartner) {
-      await ref.read(modeEventBusProvider).send(ModeEvent(
-            type: 'thunder_strike',
-            data: {'x': start.dx / size.width},
-          ));
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _lifecycleActive = true;
+      return;
     }
-  }
-
-  /// Generate a jagged lightning bolt from [start] downward.
-  List<Offset> _generateBolt(Offset start, Size size) {
-    final points = <Offset>[start];
-    final random = math.Random();
-    var x = start.dx;
-    var y = start.dy;
-    final endY = size.height;
-    while (y < endY) {
-      y += 20 + random.nextInt(40);
-      x += (random.nextDouble() - 0.5) * 80;
-      x = x.clamp(0.0, size.width);
-      points.add(Offset(x, y));
-    }
-    return points;
+    _lifecycleActive = false;
+    _cancelPendingEffects();
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final media = MediaQuery.maybeOf(context);
+    _reduceMotion =
+        media?.disableAnimations == true || media?.accessibleNavigation == true;
+  }
+
+  void _onPointerDown(PointerDownEvent event, Size size) {
+    if (!_lifecycleActive || _activePointer != null || size.isEmpty) return;
+    _activePointer = event.pointer;
+    _samples.clear();
+    _gesture.clear();
+    _record(event, size);
+    setState(() {});
+  }
+
+  void _onPointerMove(PointerMoveEvent event, Size size) {
+    if (_activePointer != event.pointer || size.isEmpty) return;
+    if (_gesture.isNotEmpty &&
+        (event.localPosition - _gesture.last).distance < 3) {
+      return;
+    }
+    _record(event, size);
+    if (_samples.length > 44) {
+      _samples.removeAt(1);
+      _gesture.removeAt(1);
+    }
+    setState(() {});
+  }
+
+  Future<void> _onPointerUp(PointerUpEvent event, Size size) async {
+    if (_activePointer != event.pointer || size.isEmpty) return;
+    _record(event, size);
+    final nowMs = _now.millisecondsSinceEpoch;
+    final id = _idFactory();
+    final strike = ThunderChoreography.fromGesture(
+      id: id,
+      seed: id.hashCode & 0x7fffffff,
+      samples: List<ThunderGestureSample>.of(_samples),
+    );
+    setState(() {
+      _activePointer = null;
+      _gesture.clear();
+      _samples.clear();
+    });
+    if (strike == null || nowMs - _lastLocalStrikeMs < 700) return;
+    _lastLocalStrikeMs = nowMs;
+    setState(() => _lastStrike = strike);
+    _playStrike(strike, isLocal: true);
+    await ref.read(modeEventBusProvider).send(ThunderProtocol.strike(strike));
+  }
+
+  void _onPointerCancel(PointerCancelEvent event) {
+    if (_activePointer != event.pointer) return;
+    setState(() {
+      _activePointer = null;
+      _samples.clear();
+      _gesture.clear();
+    });
+  }
+
+  void _record(PointerEvent event, Size size) {
+    final position = Offset(
+      event.localPosition.dx.clamp(0.0, size.width),
+      event.localPosition.dy.clamp(0.0, size.height),
+    );
+    _gesture.add(position);
+    _samples.add(ThunderGestureSample(
+      x: position.dx / size.width,
+      y: position.dy / size.height,
+      timeMs: _now.millisecondsSinceEpoch,
+      pressure: event.pressure,
+      pressureMin: event.pressureMin,
+      pressureMax: event.pressureMax,
+    ));
+  }
+
+  void _onPartnerStrike(ModeEvent event) {
+    final strike = ThunderProtocol.tryParse(
+      event,
+      nowMs: _now.millisecondsSinceEpoch,
+    );
+    if (strike == null || !mounted) return;
+    if (ThunderProtocol.isVersioned(event) && !_dedupe.accept(strike.id)) {
+      return;
+    }
+    if (!_lifecycleActive) return;
+    final clockAge = _now.millisecondsSinceEpoch - strike.createdAtMs;
+    final trustedAge = clockAge.abs() <= 10000 ? math.max(0, clockAge) : 0;
+    final delay = math.max(0, strike.handoffMs - trustedAge);
+    _schedule(delay, () {
+      if (!mounted) return;
+      setState(() => _lastStrike = strike);
+      _playStrike(strike, isLocal: false);
+    });
+  }
+
+  void _playStrike(ThunderStrike strike, {required bool isLocal}) {
+    if (!_lifecycleActive) return;
+    final cues = ThunderChoreography.cues(
+      strike,
+      reduceMotion: _reduceMotion,
+    );
+    final visual = ThunderVisualStrike(
+      strike: strike,
+      geometry: ThunderChoreography.geometry(strike, remote: !isLocal),
+      startedAt: _now,
+      isLocal: isLocal,
+    );
+    setState(() => _strikes.add(visual));
+
+    _schedule(cues.flashDelayMs, () {
+      unawaited(_flash.pulse(
+        onMs: cues.flashOnMs,
+        gapMs: cues.flashGapMs,
+        count: cues.flashCount,
+      ));
+    });
+    _schedule(cues.impactDelayMs, () {
+      unawaited(widget.hapticEngine.playBeat(HapticBeat(
+        duration: Duration(milliseconds: 68 + (strike.intensity * 92).round()),
+        amplitude: cues.hapticAmplitude,
+      )));
+    });
+    _schedule(cues.impactDelayMs + 115, () {
+      unawaited(widget.hapticEngine.playBeat(HapticBeat(
+        duration: const Duration(milliseconds: 92),
+        amplitude: (cues.hapticAmplitude * .62).round(),
+      )));
+    });
+    _schedule(cues.rumbleDelayMs, () {
+      unawaited(widget.audioEngine.play(
+        strike,
+        durationMs: cues.rumbleDurationMs,
+      ));
+    });
+    _schedule(cues.totalDurationMs + 260, () {
+      if (mounted) setState(() => _strikes.remove(visual));
+    });
+  }
+
+  void _schedule(int delayMs, void Function() action) {
+    late final Timer timer;
+    timer = Timer(Duration(milliseconds: delayMs), () {
+      _timers.remove(timer);
+      if (_lifecycleActive) action();
+    });
+    _timers.add(timer);
+  }
+
+  void _cancelPendingEffects() {
+    for (final timer in _timers) {
+      timer.cancel();
+    }
+    _timers.clear();
+    _activePointer = null;
+    _samples.clear();
+    _gesture.clear();
+    if (mounted) setState(_strikes.clear);
+    unawaited(_flash.stop());
+    unawaited(widget.hapticEngine.cancel());
+    unawaited(widget.audioEngine.stop());
+  }
+
+  String _copy(BuildContext context, String ru, String en) =>
+      Localizations.localeOf(context).languageCode == 'ru' ? ru : en;
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _partnerSub?.cancel();
-    _bolt.dispose();
-    unawaited(_player.stop());
+    for (final timer in _timers) {
+      timer.cancel();
+    }
+    unawaited(_flash.dispose());
+    unawaited(widget.hapticEngine.cancel());
+    unawaited(widget.audioEngine.stop());
+    _motion.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context)!;
+    final last = _lastStrike;
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
         child: Stack(
           children: [
             Positioned.fill(
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTapDown: (d) => _strike(d.localPosition),
-                child: AnimatedBuilder(
-                  animation: _bolt,
-                  builder: (context, _) {
-                    return CustomPaint(
-                      painter: _ThunderPainter(
-                        bolt: _currentBolt,
-                        progress: _bolt.value,
+              child: LayoutBuilder(builder: (context, constraints) {
+                final size = constraints.biggest;
+                return Semantics(
+                  label: _copy(
+                    context,
+                    'Проведите пальцем, чтобы создать гром',
+                    'Swipe to create thunder',
+                  ),
+                  child: Listener(
+                    behavior: HitTestBehavior.opaque,
+                    onPointerDown: (event) => _onPointerDown(event, size),
+                    onPointerMove: (event) => _onPointerMove(event, size),
+                    onPointerUp: (event) => _onPointerUp(event, size),
+                    onPointerCancel: _onPointerCancel,
+                    child: CustomPaint(
+                      painter: StormSurfacePainter(
+                        strikes: _strikes,
+                        gesture: _gesture,
+                        now: () => _now,
+                        reduceMotion: _reduceMotion,
+                        repaint: _motion,
                       ),
-                    );
-                  },
-                ),
-              ),
+                    ),
+                  ),
+                );
+              }),
             ),
             Positioned(
-              top: 14,
-              left: 0,
-              right: 0,
+              top: 12,
+              left: 20,
+              right: 20,
               child: Center(
-                child: Text(
-                  t.modeThunder,
-                  style: const TextStyle(
-                    color: AppColors.textMuted,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: .055),
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: .07),
+                    ),
+                  ),
+                  child: Text(
+                    t.modeThunder,
+                    style: const TextStyle(
+                      color: AppColors.textPrimary,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
               ),
             ),
             Positioned(
-              top: 8,
+              top: 4,
               right: 8,
               child: IconButton(
                 tooltip: t.hubExit,
                 color: AppColors.textSecondary,
                 icon: const Icon(Icons.close_rounded),
                 onPressed: () => Navigator.of(context).maybePop(),
+              ),
+            ),
+            Positioned(
+              left: 20,
+              right: 20,
+              bottom: 18,
+              child: _StormPanel(
+                instruction: _copy(
+                  context,
+                  'Проведи — свет, удар и раскат продолжатся у близкого',
+                  'Swipe — light, impact and rumble continue on their phone',
+                ),
+                intensity: last?.intensity,
+                velocity: last?.velocity,
+                strengthLabel: _copy(context, 'сила', 'strength'),
+                speedLabel: _copy(context, 'скорость', 'speed'),
               ),
             ),
           ],
@@ -194,53 +389,106 @@ class _ThunderModeViewState extends ConsumerState<_ThunderModeView>
   }
 }
 
-class _ThunderPainter extends CustomPainter {
-  _ThunderPainter({required this.bolt, required this.progress});
+class _StormPanel extends StatelessWidget {
+  const _StormPanel({
+    required this.instruction,
+    required this.intensity,
+    required this.velocity,
+    required this.strengthLabel,
+    required this.speedLabel,
+  });
 
-  final List<Offset> bolt;
-  final double progress;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    if (bolt.isEmpty || progress >= 1) return;
-    final fade = (1 - progress).clamp(0.0, 1.0);
-
-    // Screen flash overlay.
-    final flashPaint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.15 * fade);
-    canvas.drawRect(Offset.zero & size, flashPaint);
-
-    // Bolt path.
-    if (bolt.length < 2) return;
-    final path = Path()..moveTo(bolt[0].dx, bolt[0].dy);
-    for (var i = 1; i < bolt.length; i++) {
-      path.lineTo(bolt[i].dx, bolt[i].dy);
-    }
-
-    // Outer glow.
-    canvas.drawPath(
-      path,
-      Paint()
-        ..color = AppColors.pulse.withValues(alpha: 0.4 * fade)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 10
-        ..strokeCap = StrokeCap.round
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6),
-    );
-
-    // Main bolt.
-    canvas.drawPath(
-      path,
-      Paint()
-        ..color = Colors.white.withValues(alpha: fade)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 3
-        ..strokeCap = StrokeCap.round
-        ..isAntiAlias = true,
-    );
-  }
+  final String instruction;
+  final double? intensity;
+  final double? velocity;
+  final String strengthLabel;
+  final String speedLabel;
 
   @override
-  bool shouldRepaint(covariant _ThunderPainter old) =>
-      old.progress != progress || old.bolt.length != bolt.length;
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.fromLTRB(18, 15, 18, 14),
+        decoration: BoxDecoration(
+          color: const Color(0xFF151623).withValues(alpha: .9),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: Colors.white.withValues(alpha: .085)),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF6960FF).withValues(alpha: .13),
+              blurRadius: 30,
+              spreadRadius: -8,
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              instruction,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 14,
+                height: 1.35,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(children: [
+              Expanded(
+                child: _Meter(
+                  icon: Icons.graphic_eq_rounded,
+                  label: strengthLabel,
+                  value: intensity,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: _Meter(
+                  icon: Icons.speed_rounded,
+                  label: speedLabel,
+                  value: velocity,
+                ),
+              ),
+            ]),
+          ],
+        ),
+      );
+}
+
+class _Meter extends StatelessWidget {
+  const _Meter({required this.icon, required this.label, required this.value});
+  final IconData icon;
+  final String label;
+  final double? value;
+
+  @override
+  Widget build(BuildContext context) => Row(children: [
+        Icon(icon, size: 16, color: AppColors.textSecondary),
+        const SizedBox(width: 7),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label,
+                  style: const TextStyle(
+                    color: AppColors.textMuted,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                  )),
+              const SizedBox(height: 4),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(99),
+                child: LinearProgressIndicator(
+                  value: value ?? .18,
+                  minHeight: 3,
+                  color: value == null
+                      ? AppColors.textMuted
+                      : const Color(0xFFA9A2FF),
+                  backgroundColor: Colors.white.withValues(alpha: .055),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ]);
 }

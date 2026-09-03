@@ -29,6 +29,80 @@ void main() {
     expect(clock.hasSample, isFalse);
   });
 
+  test('congested outlier does not drag an acquired clock', () {
+    final clock = SyncClockEstimator();
+    for (var i = 0; i < 5; i++) {
+      clock.observeExchange(
+        localSentUs: 1_000_000 + i * 200_000,
+        partnerReceivedUs: 1_520_000 + i * 200_000,
+        partnerSentUs: 1_521_000 + i * 200_000,
+        localReceivedUs: 1_041_000 + i * 200_000,
+      );
+    }
+    final before = clock.partnerOffset.inMilliseconds;
+    clock.observeExchange(
+      localSentUs: 3_000_000,
+      partnerReceivedUs: 4_100_000,
+      partnerSentUs: 4_101_000,
+      localReceivedUs: 3_901_000,
+    );
+
+    expect(clock.partnerOffset.inMilliseconds, closeTo(before, 3));
+    expect(clock.sampleCount, 5);
+  });
+
+  test('two tempos glide toward a shared interval and keep a local fallback',
+      () {
+    final rhythm = SharedRhythmReconciler(
+      initialInterval: const Duration(milliseconds: 1600),
+    );
+    rhythm.observeLocalTap(1_000_000);
+    rhythm.observePartnerTap(1_080_000);
+    for (var i = 1; i <= 8; i++) {
+      rhythm.observeLocalTap(1_000_000 + i * 1_200_000);
+      rhythm.observePartnerTap(1_080_000 + i * 1_400_000);
+    }
+
+    expect(rhythm.interval.inMilliseconds, inInclusiveRange(1250, 1450));
+    final next = rhythm.nextBeatAfterUs(20_000_000);
+    expect(next, greaterThan(20_000_000));
+    expect(
+        next - 20_000_000, lessThanOrEqualTo(rhythm.interval.inMicroseconds));
+  });
+
+  test('versioned sync events are idempotent while legacy remains readable',
+      () {
+    final deduplicator = SyncEventDeduplicator(capacity: 2);
+    final event = SyncProtocol.envelope(
+      epoch: 10,
+      sequence: 4,
+      sentAtUs: 100,
+    );
+
+    expect(deduplicator.accept(event), isTrue);
+    expect(deduplicator.accept(event), isFalse);
+    expect(deduplicator.accept(<String, dynamic>{'sentAtUs': 100}), isTrue);
+  });
+
+  test('older sequence cannot restore stale sync state', () {
+    final deduplicator = SyncEventDeduplicator();
+    final released = SyncProtocol.envelope(
+      epoch: 90,
+      sequence: 12,
+      sentAtUs: 120,
+      data: const {'active': false},
+    );
+    final staleHold = SyncProtocol.envelope(
+      epoch: 90,
+      sequence: 11,
+      sentAtUs: 110,
+      data: const {'active': true},
+    );
+
+    expect(deduplicator.accept(released), isTrue);
+    expect(deduplicator.accept(staleHold), isFalse);
+  });
+
   test('matching taps build progress and tighten tolerance', () {
     final tracker = SyncProgressTracker();
     final initialTolerance = tracker.toleranceMs;

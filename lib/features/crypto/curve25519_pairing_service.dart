@@ -40,7 +40,7 @@ class SmallSubgroupPublicKeyException implements Exception {
 }
 
 /// Output of the ECDH + HKDF step. The contained 32 bytes are the symmetric
-/// key both peers will use for AES-256-GCM sealing.
+/// key both peers use for AES-256-GCM sealing in disjoint nonce domains.
 class SharedSecret {
   SharedSecret(Uint8List bytes)
       : assert(bytes.length == 32, 'Pulse uses AES-256 (32-byte key)'),
@@ -48,7 +48,7 @@ class SharedSecret {
 
   final Uint8List _bytes;
 
-  /// 32-byte derived key. Wrap with [secretKey] when handing to AES-GCM.
+  /// 32-byte derived key.
   Uint8List get bytes => Uint8List.fromList(_bytes);
 
   /// Convenience: wrap the derived bytes as a [SecretKey].

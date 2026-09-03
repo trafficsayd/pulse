@@ -36,10 +36,11 @@ After pairing, every payload is sealed with `AES-256-GCM`:
 nonce(12) || ciphertext(N) || mac(16)
 ```
 
-`nonce` is derived deterministically from a 64-bit monotonic counter (one per
-direction). The high 32 bits of the 96-bit nonce field are reserved zero —
-they exist to allow a future epoch/rekey bump without changing the wire
-format.
+`nonce` is derived deterministically from a direction marker and a 32-bit
+monotonic counter. Public-key ordering assigns different markers to low→high
+and high→low traffic, so equal local counters never repeat an AES-GCM key/nonce
+pair. Bytes 0..3 remain zero and marker zero is accepted on receive for v1
+rollout compatibility; upgraded senders always use a non-zero marker.
 
 ## Threat model
 
@@ -78,6 +79,7 @@ format.
 | File                                  | Responsibility                                                                                |
 |---------------------------------------|-----------------------------------------------------------------------------------------------|
 | `curve25519_pairing_service.dart`     | X25519 keypair + ECDH + HKDF-SHA-256 + SAS code derivation.                                  |
+| `pair_channel_nonce_domains.dart`     | Direction-separated nonce assignment using ordered X25519 public keys.                        |
 | `aes_gcm_sealer.dart`                 | AES-256-GCM `seal`/`open` over `nonce || ciphertext || mac` with counter-derived nonces.     |
 | `nonce_counter.dart`                  | Monotonic counter with CAS high-water-mark rollback detection. Persisted to SecureKeyStore.  |
 | `pair_channel.dart`                   | Wraps any `RawByteChannel` and applies seal/open; emits a `Stream<PulsePacket>` upward.       |
@@ -92,7 +94,7 @@ format.
 | KDF                                | HKDF-SHA-256, salt = `""`, info = `"pulse:pair:v1:aead-key"` |
 | AEAD                               | AES-256-GCM                                 |
 | Key length                         | 32 bytes (256 bits)                         |
-| Nonce length                       | 12 bytes (96 bits, high 32 = epoch reserved) |
+| Nonce length                       | 12 bytes (32 reserved + 32 direction + 32 counter) |
 | MAC tag length                     | 16 bytes (128 bits)                         |
 | SAS context                        | SHA-256(`"pulse:pair:v1:sas"` ‖ shared), first 4 bytes as big-endian uint32 mod 10⁶ |
 | RNG                                | `Random.secure()` (platform CSPRNG)         |

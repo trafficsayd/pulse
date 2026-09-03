@@ -6,8 +6,9 @@ import '../../core/storage/secure_key_store.dart';
 /// Cryptographic material for a single saved connection.
 ///
 /// Pulse derives this on first pairing via Curve25519 ECDH, authenticated
-/// over a short numeric / QR code. The 32-byte symmetric key is used to seal
-/// every payload with AES-256-GCM before it ever touches a transport.
+/// over a short numeric / QR code. The 32-byte symmetric key seals every
+/// payload with AES-256-GCM in direction-separated nonce domains before it
+/// reaches a transport.
 ///
 /// Instances of this class only ever live in memory while a session is
 /// running. The on-disk copy is wrapped by [SecureKeyStore] (iOS Keychain /
@@ -112,6 +113,6 @@ abstract interface class PairingService {
   Future<PairKeys> completePairing(String partnerCode);
 
   /// Derive a fresh AES-GCM nonce for the next outbound payload. Nonces are
-  /// monotonic per direction to prevent reuse.
+  /// monotonic within each direction-separated nonce domain.
   Uint8List nextNonce(String connectionId);
 }

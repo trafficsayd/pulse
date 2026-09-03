@@ -38,9 +38,9 @@ class NonceRollbackException implements Exception {
 /// Monotonic 64-bit counter used to derive deterministic AES-GCM nonces
 /// for a single direction of a paired channel.
 ///
-/// One counter exists per direction (outbound/inbound) so that the two
-/// peers never collide on a nonce, even if they restart the app or swap
-/// transports mid-session.
+/// One counter exists per local direction (outbound/inbound). Counter
+/// monotonicity prevents reuse within a direction, while [PairChannel] maps
+/// opposite directions into disjoint nonce namespaces.
 ///
 /// Backed by [SecureKeyStore] (iOS Keychain / Android
 /// EncryptedSharedPreferences) with a *compare-and-set* style high-water

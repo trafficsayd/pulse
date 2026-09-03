@@ -368,7 +368,9 @@ class PairingController extends Notifier<PairingState> {
       final store = ref.read(secureKeyStoreProvider);
       await pair.persist(store);
 
-      // Fresh counters per direction, both start at zero.
+      // Fresh counters per direction, both start at zero. Session startup maps
+      // them into disjoint nonce domains, so opposite peers cannot repeat an
+      // AES-GCM key/nonce pair.
       final outbound = NonceCounter(
         storage: store,
         storageKey: PairKeys.outboundNonceKey(id),

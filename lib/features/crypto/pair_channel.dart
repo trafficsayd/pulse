@@ -5,6 +5,7 @@ import 'package:cryptography/cryptography.dart';
 
 import 'aes_gcm_sealer.dart';
 import 'nonce_counter.dart';
+import 'pair_channel_nonce_domains.dart';
 
 /// Abstraction over the underlying transport (BLE, mDNS/LAN, WebRTC).
 ///
@@ -39,24 +40,27 @@ class PulsePacket {
 /// Sealed packet layer that sits between a raw byte transport and the
 /// rest of the app.
 ///
-/// Each direction has its own monotonic [NonceCounter] so the two peers
-/// can never collide on a 96-bit AES-GCM nonce, even across app
-/// restarts.
+/// Each direction has a disjoint AES-GCM nonce namespace and its own monotonic
+/// [NonceCounter]. This prevents the two peers from ever using the same
+/// key/nonce pair, including when both local counters start at one.
 class PairChannel {
   PairChannel({
     required RawByteChannel transport,
     required SecretKey key,
+    required PairChannelNonceDomains nonceDomains,
     required NonceCounter outboundCounter,
     required NonceCounter inboundCounter,
     AesGcmSealer? sealer,
   })  : _transport = transport,
         _key = key,
+        _nonceDomains = nonceDomains,
         _outbound = outboundCounter,
         _inbound = inboundCounter,
         _sealer = sealer ?? AesGcmSealer();
 
   final RawByteChannel _transport;
   final SecretKey _key;
+  final PairChannelNonceDomains _nonceDomains;
   final NonceCounter _outbound;
   final NonceCounter _inbound;
   final AesGcmSealer _sealer;
@@ -98,6 +102,9 @@ class PairChannel {
       final packetCounter = AesGcmSealer.counterFromNonce(
         Uint8List.sublistView(bytes, 0, AesGcmSealer.nonceLength),
       );
+      if (!_nonceDomains.acceptsInboundWireCounter(packetCounter)) {
+        throw StateError('AES-GCM nonce belongs to the wrong direction');
+      }
       if (packetCounter < expected) {
         throw StateError('AES-GCM replayed or stale nonce counter');
       }
@@ -111,7 +118,10 @@ class PairChannel {
       // are intentionally ephemeral, so the secure channel must continue.
       await _inbound.advanceTo(packetCounter, reservationSize: 64);
       _controller.add(
-        PulsePacket(payload: plain, nonceCounter: packetCounter),
+        PulsePacket(
+          payload: plain,
+          nonceCounter: _nonceDomains.logicalCounter(packetCounter),
+        ),
       );
     } catch (e) {
       _errors.add(e);
@@ -139,10 +149,11 @@ class PairChannel {
     // packets from memory. A crash skips unused values instead of ever
     // reusing one; the receiver already supports authenticated forward gaps.
     final counter = await _outbound.next(reservationSize: 64);
+    final wireCounter = _nonceDomains.outboundWireCounter(counter);
     final packet = await _sealer.seal(
       plaintext,
       key: _key,
-      nonceCounter: counter,
+      nonceCounter: wireCounter,
     );
     await _transport.send(packet);
   }

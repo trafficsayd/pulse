@@ -10,6 +10,7 @@ import '../../connections/domain/connection.dart';
 import '../../connections/domain/connection_status.dart';
 import '../../crypto/nonce_counter.dart';
 import '../../crypto/pair_channel.dart';
+import '../../crypto/pair_channel_nonce_domains.dart';
 import '../../crypto/pair_keys.dart';
 import '../../transport/transport_byte_adapter.dart';
 import '../../transport/transport.dart';
@@ -56,10 +57,17 @@ class SessionNotifier extends AsyncNotifier<PulseSession?> {
     final transportManager = TransportManager();
     final adapter = TransportByteAdapter(manager: transportManager);
 
+    // Assign stable, disjoint nonce domains by ordering both endpoint public
+    // keys. The AES key and v1 packet layout remain compatible with older
+    // clients while upgraded peers can no longer collide on a key/nonce pair.
+    final nonceDomains =
+        await PairChannelNonceDomainDeriver().deriveFromPairKeys(pairKeys);
+
     // Build encrypted channel on top of the transport.
     final pairChannel = PairChannel(
       transport: adapter,
       key: SecretKey(pairKeys.symmetricKey),
+      nonceDomains: nonceDomains,
       outboundCounter: outboundCounter,
       inboundCounter: inboundCounter,
     );
